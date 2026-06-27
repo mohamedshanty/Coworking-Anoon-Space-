@@ -1,0 +1,271 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum PersonType {
+  visitor
+  subscriber
+  trainee
+}
+
+enum SessionPaymentStatus {
+  paid
+  partial_debt
+  full_debt
+}
+
+enum PaymentMethod {
+  cash
+  card
+  transfer
+}
+
+enum SubscriptionPackage {
+  monthly
+  weekly
+}
+
+enum SubscriptionStatus {
+  active
+  expired
+  paused
+  renewing
+}
+
+enum ExpenseCategory {
+  electricity
+  rent
+  salaries
+  maintenance
+  marketing
+  other
+}
+
+enum DebtType {
+  session
+  manual
+}
+
+enum DebtStatus {
+  unpaid
+  collected
+}
+
+enum BookingStatus {
+  confirmed
+  pending
+  cancelled
+}
+
+enum TraineePaymentStatus {
+  full
+  installment
+}
+
+enum StaffRole {
+  admin
+  manager
+  staff
+}
+
+enum LoginStatus {
+  success
+  fail
+}
+
+enum FollowUpStatus {
+  needs
+  contacted
+  opt_out
+}
+
+model Visitor {
+  id             String          @id @default(uuid())
+  name           String
+  phone          String
+  type           PersonType
+  lastVisit      DateTime?
+  followUpStatus FollowUpStatus?
+  followUpAt     DateTime?
+  sessions       Session[]
+  subscriptions  Subscription[]
+  debts          Debt[]
+}
+
+model Session {
+  id            String               @id @default(uuid())
+  visitorId     String
+  visitor       Visitor              @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  checkIn       DateTime
+  checkOut      DateTime?
+  amount        Decimal              @db.Decimal(10, 2)
+  paymentStatus SessionPaymentStatus
+  paymentMethod PaymentMethod?
+  snackOrders   SnackOrder[]
+  sales         Sale[]
+}
+
+model SnackOrder {
+  id         String        @id @default(uuid())
+  sessionId  String
+  session    Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  itemId     String
+  item       InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  qty        Int
+  total      Decimal       @db.Decimal(10, 2)
+  isHotDrink Boolean
+}
+
+model Subscription {
+  id              String              @id @default(uuid())
+  visitorId       String
+  visitor         Visitor             @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  packageType     SubscriptionPackage
+  startDate       DateTime
+  endDate         DateTime
+  dailyQuotaHours Int
+  daysUsed        Int
+  amountPaid      Decimal             @db.Decimal(10, 2)
+  status          SubscriptionStatus
+}
+
+model InventoryItem {
+  id              String       @id @default(uuid())
+  name            String
+  quantity        Int
+  sellPrice       Decimal      @db.Decimal(10, 2)
+  costPrice       Decimal      @db.Decimal(10, 2)
+  lastRestockDate DateTime
+  alertThreshold  Int
+  snackOrders     SnackOrder[]
+}
+
+model Sale {
+  id            String        @id @default(uuid())
+  itemId        String
+  itemName      String
+  quantity      Int
+  total         Decimal       @db.Decimal(10, 2)
+  sessionId     String?
+  session       Session?      @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  linkedName    String?
+  paymentMethod PaymentMethod
+  isHotDrink    Boolean
+  date          DateTime
+}
+
+model Expense {
+  id          String          @id @default(uuid())
+  description String
+  category    ExpenseCategory
+  amount      Decimal         @db.Decimal(10, 2)
+  date        DateTime
+  notes       String?
+}
+
+model Debt {
+  id          String     @id @default(uuid())
+  visitorId   String?
+  visitor     Visitor?   @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+  name        String
+  phone       String
+  amount      Decimal    @db.Decimal(10, 2)
+  type        DebtType
+  status      DebtStatus
+  createdAt   DateTime
+  collectedAt DateTime?
+  note        String?
+}
+
+model Room {
+  id       String    @id @default(uuid())
+  name     String
+  bookings Booking[]
+  courses  Course[]
+}
+
+model Booking {
+  id          String        @id @default(uuid())
+  roomId      String
+  room        Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  bookerName  String
+  bookerPhone String
+  purpose     String
+  startTime   DateTime
+  endTime     DateTime
+  price       Decimal       @db.Decimal(10, 2)
+  status      BookingStatus
+}
+
+model Course {
+  id              String    @id @default(uuid())
+  name            String
+  trainer         String
+  startDate       DateTime
+  endDate         DateTime
+  sessionsCount   Int
+  pricePerTrainee Decimal   @db.Decimal(10, 2)
+  maxSeats        Int
+  roomId          String
+  room            Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  trainees        Trainee[]
+}
+
+model Trainee {
+  id                String               @id @default(uuid())
+  courseId          String
+  course            Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  name              String
+  phone             String
+  amountPaid        Decimal              @db.Decimal(10, 2)
+  paymentStatus     TraineePaymentStatus
+  attendancePercent Float
+}
+
+model Staff {
+  id             String       @id @default(uuid())
+  name           String
+  username       String       @unique
+  role           StaffRole
+  passwordHash   String
+  failedAttempts Int          @default(0)
+  lockedUntil    DateTime?
+  loginLogs      LoginLog[]
+  permissions    Permission[]
+}
+
+model LoginLog {
+  id        String      @id @default(uuid())
+  userId    String?
+  staff     Staff?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  username  String
+  at        DateTime
+  status    LoginStatus
+  ip        String
+  userAgent String?
+}
+
+model Settings {
+  id                    String  @id @default("default")
+  hourlyRate            Decimal @db.Decimal(10, 2)
+  fullDayPrice          Decimal @db.Decimal(10, 2)
+  fullDayThresholdHours Int
+  hotDrinksMonthlyCost  Decimal @db.Decimal(10, 2)
+  company               Json
+}
+
+model Permission {
+  id        String  @id @default(uuid())
+  staffId   String
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  pageKey   String
+  canView   Boolean
+  canEdit   Boolean
+  canDelete Boolean
+
+  @@unique([staffId, pageKey])
+}

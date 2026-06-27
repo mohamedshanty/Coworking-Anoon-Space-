@@ -1,0 +1,1523 @@
+{
+  "info": {
+    "name": "Coworking Backend API",
+    "description": "Complete Postman collection for the Coworking Space Backend API.\n\nBase URL: http://localhost:5000/api/v1\n\nBefore use, set the {{token}} variable with a valid Bearer token obtained from POST /auth/login.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Authentication endpoints (no auth required)",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"\",\n  \"password\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.accessToken) {",
+                  "    pm.collectionVariables.set('token', jsonData.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "auth": null
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            }
+          },
+          "auth": null
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          },
+          "auth": null
+        }
+      ]
+    },
+    {
+      "name": "Sessions",
+      "description": "Active sessions (inside the space) - requires auth + 'داخل المساحة' permission",
+      "item": [
+        {
+          "name": "Get Live Sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sessions/live",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "live"]
+            }
+          }
+        },
+        {
+          "name": "Check-In Visitor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"visitorId\": \"\",\n  \"name\": \"\",\n  \"phone\": \"\",\n  \"type\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions"]
+            }
+          }
+        },
+        {
+          "name": "Update Session",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"checkIn\": \"\",\n  \"checkOut\": \"\",\n  \"amount\": 0,\n  \"paymentStatus\": \"paid\",\n  \"paymentMethod\": \"cash\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Checkout Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentMethod\": \"cash\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions/:id/checkout",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", ":id", "checkout"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Checkout Unpaid Session",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions/:id/checkout-unpaid",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", ":id", "checkout-unpaid"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Order to Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemId\": \"\",\n  \"qty\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions/:id/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", ":id", "orders"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscribers",
+      "description": "Subscriber management - requires auth + 'المشتركون' permission",
+      "item": [
+        {
+          "name": "Get All Subscribers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscribers",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscribers"]
+            }
+          }
+        },
+        {
+          "name": "Create Subscriber",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"phone\": \"\",\n  \"type\": \"\",\n  \"startDate\": \"\",\n  \"endDate\": \"\",\n  \"amountPaid\": 0,\n  \"paymentStatus\": \"unpaid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/subscribers",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscribers"]
+            }
+          }
+        },
+        {
+          "name": "Update Subscriber",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"phone\": \"\",\n  \"type\": \"\",\n  \"startDate\": \"\",\n  \"endDate\": \"\",\n  \"amountPaid\": 0,\n  \"paymentStatus\": \"paid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/subscribers/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscribers", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Pause Subscriber",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/subscribers/:id/pause",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscribers", ":id", "pause"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Renew Subscriber",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/subscribers/:id/renew",
+              "host": ["{{baseUrl}}"],
+              "path": ["subscribers", ":id", "renew"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "description": "Inventory management - requires auth + 'المخزون' permission",
+      "item": [
+        {
+          "name": "Get All Inventory Items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/inventory",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory"]
+            }
+          }
+        },
+        {
+          "name": "Create Inventory Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"quantity\": 0,\n  \"price\": 0,\n  \"cost\": 0,\n  \"category\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inventory",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory"]
+            }
+          }
+        },
+        {
+          "name": "Update Inventory Item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"quantity\": 0,\n  \"price\": 0,\n  \"cost\": 0,\n  \"category\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inventory/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Inventory Item",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inventory/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Restock Inventory Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inventory/:id/restock",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory", ":id", "restock"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sales - Snacks",
+      "description": "Snack sales - requires auth + 'السناكس' permission",
+      "item": [
+        {
+          "name": "Get All Snack Sales",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sales",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales"]
+            }
+          }
+        },
+        {
+          "name": "Create Snack Sale",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemName\": \"\",\n  \"quantity\": 1,\n  \"total\": 0,\n  \"sessionId\": \"\",\n  \"linkedName\": \"\",\n  \"paymentMethod\": \"cash\",\n  \"isHotDrink\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sales - Hot Drinks",
+      "description": "Hot drink sales - requires auth + 'المشروبات' permission",
+      "item": [
+        {
+          "name": "Get All Hot Drink Sales",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/hot-drinks",
+              "host": ["{{baseUrl}}"],
+              "path": ["hot-drinks"]
+            }
+          }
+        },
+        {
+          "name": "Create Hot Drink Sale",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemName\": \"\",\n  \"quantity\": 1,\n  \"total\": 0,\n  \"sessionId\": \"\",\n  \"linkedName\": \"\",\n  \"paymentMethod\": \"cash\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/hot-drinks",
+              "host": ["{{baseUrl}}"],
+              "path": ["hot-drinks"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Expenses",
+      "description": "Expense tracking - requires auth + 'المصروفات' permission",
+      "item": [
+        {
+          "name": "Get All Expenses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/expenses",
+              "host": ["{{baseUrl}}"],
+              "path": ["expenses"]
+            }
+          }
+        },
+        {
+          "name": "Get Expenses by Category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/expenses/by-category?from=&to=",
+              "host": ["{{baseUrl}}"],
+              "path": ["expenses", "by-category"],
+              "query": [
+                { "key": "from", "value": "", "description": "Start date (YYYY-MM-DD)" },
+                { "key": "to", "value": "", "description": "End date (YYYY-MM-DD)" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Expense",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"\",\n  \"category\": \"\",\n  \"amount\": 0,\n  \"date\": \"\",\n  \"notes\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/expenses",
+              "host": ["{{baseUrl}}"],
+              "path": ["expenses"]
+            }
+          }
+        },
+        {
+          "name": "Update Expense",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"\",\n  \"category\": \"\",\n  \"amount\": 0,\n  \"date\": \"\",\n  \"notes\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/expenses/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["expenses", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Expense",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/expenses/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["expenses", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Debts",
+      "description": "Debt tracking - requires auth + 'المديونيات' permission",
+      "item": [
+        {
+          "name": "Get All Debts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/debts",
+              "host": ["{{baseUrl}}"],
+              "path": ["debts"]
+            }
+          }
+        },
+        {
+          "name": "Create Debt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"visitorId\": \"\",\n  \"name\": \"\",\n  \"phone\": \"\",\n  \"amount\": 0,\n  \"type\": \"\",\n  \"note\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/debts",
+              "host": ["{{baseUrl}}"],
+              "path": ["debts"]
+            }
+          }
+        },
+        {
+          "name": "Collect Debt",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/debts/:id/collect",
+              "host": ["{{baseUrl}}"],
+              "path": ["debts", ":id", "collect"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Debt",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"phone\": \"\",\n  \"amount\": 0,\n  \"type\": \"\",\n  \"status\": \"pending\",\n  \"note\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/debts/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["debts", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Debt",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/debts/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["debts", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rooms",
+      "description": "Room management - requires auth + 'القاعات' permission",
+      "item": [
+        {
+          "name": "Get All Rooms",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms",
+              "host": ["{{baseUrl}}"],
+              "path": ["rooms"]
+            }
+          }
+        },
+        {
+          "name": "Get Room by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["rooms", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Room",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/rooms",
+              "host": ["{{baseUrl}}"],
+              "path": ["rooms"]
+            }
+          }
+        },
+        {
+          "name": "Update Room",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/rooms/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["rooms", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Room",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/rooms/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["rooms", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "description": "Room booking management - requires auth + 'القاعات' permission",
+      "item": [
+        {
+          "name": "Get All Bookings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["rooms", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "Check Booking Conflict",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms/bookings/check-conflict?roomId=&start=&end=&excludeId=",
+              "host": ["{{baseUrl}}"],
+              "path": ["rooms", "bookings", "check-conflict"],
+              "query": [
+                { "key": "roomId", "value": "", "description": "Room ID", "disabled": false },
+                { "key": "start", "value": "", "description": "Start time (ISO 8601)", "disabled": false },
+                { "key": "end", "value": "", "description": "End time (ISO 8601)", "disabled": false },
+                { "key": "excludeId", "value": "", "description": "Booking ID to exclude (for updates)", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Booking by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/rooms/bookings/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["rooms", "bookings", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roomId\": \"\",\n  \"bookerName\": \"\",\n  \"bookerPhone\": \"\",\n  \"purpose\": \"\",\n  \"startTime\": \"\",\n  \"endTime\": \"\",\n  \"price\": 0,\n  \"status\": \"confirmed\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/rooms/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["rooms", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "Update Booking",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roomId\": \"\",\n  \"bookerName\": \"\",\n  \"bookerPhone\": \"\",\n  \"purpose\": \"\",\n  \"startTime\": \"\",\n  \"endTime\": \"\",\n  \"price\": 0,\n  \"status\": \"confirmed\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/rooms/bookings/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["rooms", "bookings", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Booking",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/rooms/bookings/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["rooms", "bookings", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Courses",
+      "description": "Course management - requires auth + 'الدورات' permission",
+      "item": [
+        {
+          "name": "Get All Courses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/courses",
+              "host": ["{{baseUrl}}"],
+              "path": ["courses"]
+            }
+          }
+        },
+        {
+          "name": "Get Course by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/courses/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["courses", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"trainer\": \"\",\n  \"startDate\": \"\",\n  \"endDate\": \"\",\n  \"sessionsCount\": 0,\n  \"pricePerTrainee\": 0,\n  \"maxSeats\": 0,\n  \"roomId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/courses",
+              "host": ["{{baseUrl}}"],
+              "path": ["courses"]
+            }
+          }
+        },
+        {
+          "name": "Update Course",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"trainer\": \"\",\n  \"startDate\": \"\",\n  \"endDate\": \"\",\n  \"sessionsCount\": 0,\n  \"pricePerTrainee\": 0,\n  \"maxSeats\": 0,\n  \"roomId\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/courses/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["courses", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Course",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/courses/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["courses", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Course Trainees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/courses/:id/trainees",
+              "host": ["{{baseUrl}}"],
+              "path": ["courses", ":id", "trainees"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Trainee to Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"phone\": \"\",\n  \"amountPaid\": 0,\n  \"paymentStatus\": \"unpaid\",\n  \"attendancePercent\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/courses/:id/trainees",
+              "host": ["{{baseUrl}}"],
+              "path": ["courses", ":id", "trainees"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Trainee Attendance",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"attendancePercent\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/courses/:id/trainees/:traineeId/attendance",
+              "host": ["{{baseUrl}}"],
+              "path": ["courses", ":id", "trainees", ":traineeId", "attendance"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                },
+                {
+                  "key": "traineeId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Follow-Up",
+      "description": "Visitor follow-up - requires auth + 'المتابعة' permission",
+      "item": [
+        {
+          "name": "Get Follow-Up Visitors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/follow-up?showAll=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["follow-up"],
+              "query": [
+                { "key": "showAll", "value": "false", "description": "true or false" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark Visitor as Contacted",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/follow-up/:visitorId/contacted",
+              "host": ["{{baseUrl}}"],
+              "path": ["follow-up", ":visitorId", "contacted"],
+              "variable": [
+                {
+                  "key": "visitorId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Opt Out Visitor",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/follow-up/:visitorId/opt-out",
+              "host": ["{{baseUrl}}"],
+              "path": ["follow-up", ":visitorId", "opt-out"],
+              "variable": [
+                {
+                  "key": "visitorId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "description": "Dashboard summary and revenue trend - requires auth + 'الرئيسية' permission",
+      "item": [
+        {
+          "name": "Get Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "summary"]
+            }
+          }
+        },
+        {
+          "name": "Get Revenue Trend",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/revenue-trend?days=7",
+              "host": ["{{baseUrl}}"],
+              "path": ["dashboard", "revenue-trend"],
+              "query": [
+                { "key": "days", "value": "7", "description": "Number of days", "disabled": false }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "description": "Report export - requires auth + 'التقارير' permission",
+      "item": [
+        {
+          "name": "Export Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reports/export?from=&to=&format=xlsx",
+              "host": ["{{baseUrl}}"],
+              "path": ["reports", "export"],
+              "query": [
+                { "key": "from", "value": "", "description": "Start date (YYYY-MM-DD)", "disabled": false },
+                { "key": "to", "value": "", "description": "End date (YYYY-MM-DD)", "disabled": false },
+                { "key": "format", "value": "xlsx", "description": "Export format", "disabled": false }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "description": "System settings - requires auth + 'الإعدادات' permission",
+      "item": [
+        {
+          "name": "Get Settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings"]
+            }
+          }
+        },
+        {
+          "name": "Update Settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hourlyRate\": 0,\n  \"fullDayPrice\": 0,\n  \"fullDayThresholdHours\": 0,\n  \"hotDrinksMonthlyCost\": 0,\n  \"company\": {\n    \"name\": \"\",\n    \"phone\": \"\",\n    \"email\": \"\",\n    \"address\": \"\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Staff",
+      "description": "Staff management - requires auth + admin role only",
+      "item": [
+        {
+          "name": "Get All Staff",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff"]
+            }
+          }
+        },
+        {
+          "name": "Get Staff by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"username\": \"\",\n  \"role\": \"staff\",\n  \"password\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff"]
+            }
+          }
+        },
+        {
+          "name": "Update Staff",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"username\": \"\",\n  \"role\": \"staff\",\n  \"password\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Staff",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Permissions",
+      "description": "Permission management - requires auth + admin role only. pageKey values: داخل المساحة, المشتركون, المخزون, السناكس, المشروبات, المصروفات, المديونيات, القاعات, الدورات, المتابعة, الرئيسية, التقارير, الإعدادات, الموظفون, الصلاحيات, سجلات الدخول",
+      "item": [
+        {
+          "name": "Get Permissions for Staff",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/permissions/:staffId",
+              "host": ["{{baseUrl}}"],
+              "path": ["permissions", ":staffId"],
+              "variable": [
+                {
+                  "key": "staffId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Permissions for Staff",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": [\n    {\n      \"pageKey\": \"\",\n      \"canView\": false,\n      \"canEdit\": false,\n      \"canDelete\": false\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/permissions/:staffId",
+              "host": ["{{baseUrl}}"],
+              "path": ["permissions", ":staffId"],
+              "variable": [
+                {
+                  "key": "staffId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login Logs",
+      "description": "Login logs - requires auth + admin role only",
+      "item": [
+        {
+          "name": "Get Login Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/login-logs?from=&to=&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["login-logs"],
+              "query": [
+                { "key": "from", "value": "", "description": "Start date (YYYY-MM-DD)", "disabled": true },
+                { "key": "to", "value": "", "description": "End date (YYYY-MM-DD)", "disabled": true },
+                { "key": "page", "value": "1", "description": "Page number", "disabled": false },
+                { "key": "limit", "value": "20", "description": "Results per page", "disabled": false }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

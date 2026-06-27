@@ -1,0 +1,2309 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Coworking Space Backend API",
+    "description": "API for managing coworking space operations including auth, sessions, subscribers, inventory, sales, expenses, debts, rooms, bookings, courses, follow-up, dashboard, reports, settings, staff, permissions, and login logs.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000/api/v1",
+      "description": "Local development server"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": { "type": "string" },
+          "password": { "type": "string" }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": { "type": "string" },
+          "refreshToken": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/User" }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "required": ["refreshToken"],
+        "properties": {
+          "refreshToken": { "type": "string" }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": { "type": "string" },
+          "refreshToken": { "type": "string" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "username": { "type": "string" },
+          "role": { "type": "string", "enum": ["admin", "staff"] }
+        }
+      },
+      "SessionCheckIn": {
+        "type": "object",
+        "properties": {
+          "visitorId": { "type": "string", "description": "Existing visitor ID (for returning visitors)" },
+          "name": { "type": "string", "description": "Visitor name (for walk-ins)" },
+          "phone": { "type": "string", "description": "Visitor phone (for walk-ins)" },
+          "type": { "type": "string", "description": "Visitor type (for walk-ins)" }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "visitor": { "type": "string" },
+          "checkIn": { "type": "string", "format": "date-time" },
+          "checkOut": { "type": "string", "format": "date-time", "nullable": true },
+          "amount": { "type": "number" },
+          "paymentStatus": { "type": "string", "enum": ["paid", "unpaid", "partial"] },
+          "paymentMethod": { "type": "string", "enum": ["cash", "card", "transfer"], "nullable": true }
+        }
+      },
+      "SessionUpdate": {
+        "type": "object",
+        "properties": {
+          "checkIn": { "type": "string", "format": "date-time" },
+          "checkOut": { "type": "string", "format": "date-time" },
+          "amount": { "type": "number" },
+          "paymentStatus": { "type": "string", "enum": ["paid", "unpaid", "partial"] },
+          "paymentMethod": { "type": "string", "enum": ["cash", "card", "transfer"] }
+        }
+      },
+      "CheckoutRequest": {
+        "type": "object",
+        "required": ["paymentMethod"],
+        "properties": {
+          "paymentMethod": { "type": "string", "enum": ["cash", "card", "transfer"] }
+        }
+      },
+      "SessionOrder": {
+        "type": "object",
+        "required": ["itemId", "qty"],
+        "properties": {
+          "itemId": { "type": "string" },
+          "qty": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "SubscriberCreate": {
+        "type": "object",
+        "required": ["name", "phone"],
+        "properties": {
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "type": { "type": "string" },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date" },
+          "amountPaid": { "type": "number" },
+          "paymentStatus": { "type": "string", "enum": ["paid", "unpaid", "partial"] }
+        }
+      },
+      "SubscriberUpdate": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "type": { "type": "string" },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date" },
+          "amountPaid": { "type": "number" },
+          "paymentStatus": { "type": "string", "enum": ["paid", "unpaid", "partial"] }
+        }
+      },
+      "Subscriber": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "type": { "type": "string" },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date" },
+          "amountPaid": { "type": "number" },
+          "paymentStatus": { "type": "string" },
+          "status": { "type": "string" }
+        }
+      },
+      "InventoryItem": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "quantity": { "type": "integer" },
+          "price": { "type": "number" },
+          "cost": { "type": "number" },
+          "category": { "type": "string" }
+        }
+      },
+      "InventoryCreate": {
+        "type": "object",
+        "required": ["name", "quantity", "price", "cost"],
+        "properties": {
+          "name": { "type": "string" },
+          "quantity": { "type": "integer" },
+          "price": { "type": "number" },
+          "cost": { "type": "number" },
+          "category": { "type": "string" }
+        }
+      },
+      "InventoryUpdate": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "quantity": { "type": "integer" },
+          "price": { "type": "number" },
+          "cost": { "type": "number" },
+          "category": { "type": "string" }
+        }
+      },
+      "RestockRequest": {
+        "type": "object",
+        "required": ["quantity"],
+        "properties": {
+          "quantity": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "SaleCreate": {
+        "type": "object",
+        "required": ["itemName", "quantity", "total", "paymentMethod"],
+        "properties": {
+          "itemName": { "type": "string" },
+          "quantity": { "type": "integer" },
+          "total": { "type": "number" },
+          "sessionId": { "type": "string" },
+          "linkedName": { "type": "string" },
+          "paymentMethod": { "type": "string", "enum": ["cash", "card", "transfer"] },
+          "isHotDrink": { "type": "boolean" }
+        }
+      },
+      "Sale": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "itemName": { "type": "string" },
+          "quantity": { "type": "integer" },
+          "total": { "type": "number" },
+          "sessionId": { "type": "string", "nullable": true },
+          "linkedName": { "type": "string", "nullable": true },
+          "paymentMethod": { "type": "string" },
+          "isHotDrink": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "HotDrinkCreate": {
+        "type": "object",
+        "required": ["itemName", "quantity", "total", "paymentMethod"],
+        "properties": {
+          "itemName": { "type": "string" },
+          "quantity": { "type": "integer" },
+          "total": { "type": "number" },
+          "sessionId": { "type": "string" },
+          "linkedName": { "type": "string" },
+          "paymentMethod": { "type": "string", "enum": ["cash", "card", "transfer"] }
+        }
+      },
+      "Expense": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "description": { "type": "string" },
+          "category": { "type": "string" },
+          "amount": { "type": "number" },
+          "date": { "type": "string", "format": "date" },
+          "notes": { "type": "string" }
+        }
+      },
+      "ExpenseCreate": {
+        "type": "object",
+        "required": ["description", "category", "amount", "date"],
+        "properties": {
+          "description": { "type": "string" },
+          "category": { "type": "string" },
+          "amount": { "type": "number" },
+          "date": { "type": "string", "format": "date" },
+          "notes": { "type": "string" }
+        }
+      },
+      "ExpenseUpdate": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "category": { "type": "string" },
+          "amount": { "type": "number" },
+          "date": { "type": "string", "format": "date" },
+          "notes": { "type": "string" }
+        }
+      },
+      "Debt": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "visitorId": { "type": "string", "nullable": true },
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "amount": { "type": "number" },
+          "type": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "collected", "cancelled"] },
+          "note": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "DebtCreate": {
+        "type": "object",
+        "required": ["name", "phone", "amount", "type"],
+        "properties": {
+          "visitorId": { "type": "string" },
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "amount": { "type": "number" },
+          "type": { "type": "string" },
+          "note": { "type": "string" }
+        }
+      },
+      "DebtUpdate": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "amount": { "type": "number" },
+          "type": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "collected", "cancelled"] },
+          "note": { "type": "string" }
+        }
+      },
+      "Room": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" }
+        }
+      },
+      "RoomCreate": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" }
+        }
+      },
+      "Booking": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "roomId": { "type": "string" },
+          "bookerName": { "type": "string" },
+          "bookerPhone": { "type": "string" },
+          "purpose": { "type": "string" },
+          "startTime": { "type": "string", "format": "date-time" },
+          "endTime": { "type": "string", "format": "date-time" },
+          "price": { "type": "number" },
+          "status": { "type": "string" }
+        }
+      },
+      "BookingCreate": {
+        "type": "object",
+        "required": ["roomId", "bookerName", "bookerPhone", "purpose", "startTime", "endTime", "price", "status"],
+        "properties": {
+          "roomId": { "type": "string" },
+          "bookerName": { "type": "string" },
+          "bookerPhone": { "type": "string" },
+          "purpose": { "type": "string" },
+          "startTime": { "type": "string", "format": "date-time" },
+          "endTime": { "type": "string", "format": "date-time" },
+          "price": { "type": "number" },
+          "status": { "type": "string" }
+        }
+      },
+      "Course": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "trainer": { "type": "string" },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date" },
+          "sessionsCount": { "type": "integer" },
+          "pricePerTrainee": { "type": "number" },
+          "maxSeats": { "type": "integer" },
+          "roomId": { "type": "string" }
+        }
+      },
+      "CourseCreate": {
+        "type": "object",
+        "required": ["name", "trainer", "startDate", "endDate", "sessionsCount", "pricePerTrainee", "maxSeats", "roomId"],
+        "properties": {
+          "name": { "type": "string" },
+          "trainer": { "type": "string" },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date" },
+          "sessionsCount": { "type": "integer" },
+          "pricePerTrainee": { "type": "number" },
+          "maxSeats": { "type": "integer" },
+          "roomId": { "type": "string" }
+        }
+      },
+      "Trainee": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "amountPaid": { "type": "number" },
+          "paymentStatus": { "type": "string" },
+          "attendancePercent": { "type": "number" }
+        }
+      },
+      "TraineeCreate": {
+        "type": "object",
+        "required": ["name", "phone", "amountPaid", "paymentStatus", "attendancePercent"],
+        "properties": {
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "amountPaid": { "type": "number" },
+          "paymentStatus": { "type": "string", "enum": ["paid", "unpaid", "partial"] },
+          "attendancePercent": { "type": "number" }
+        }
+      },
+      "AttendanceUpdate": {
+        "type": "object",
+        "required": ["attendancePercent"],
+        "properties": {
+          "attendancePercent": { "type": "number", "minimum": 0, "maximum": 100 }
+        }
+      },
+      "FollowUpVisitor": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "phone": { "type": "string" },
+          "lastVisit": { "type": "string", "format": "date-time" },
+          "contacted": { "type": "boolean" },
+          "optedOut": { "type": "boolean" }
+        }
+      },
+      "DashboardSummary": {
+        "type": "object",
+        "properties": {
+          "todayRevenue": { "type": "number" },
+          "todaySessions": { "type": "integer" },
+          "activeSubscribers": { "type": "integer" },
+          "totalExpenses": { "type": "number" },
+          "pendingDebts": { "type": "number" },
+          "roomBookingsToday": { "type": "integer" }
+        }
+      },
+      "RevenueTrend": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "revenue": { "type": "number" }
+        }
+      },
+      "Settings": {
+        "type": "object",
+        "properties": {
+          "hourlyRate": { "type": "number" },
+          "fullDayPrice": { "type": "number" },
+          "fullDayThresholdHours": { "type": "number" },
+          "hotDrinksMonthlyCost": { "type": "number" },
+          "company": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "phone": { "type": "string" },
+              "email": { "type": "string" },
+              "address": { "type": "string" }
+            }
+          }
+        }
+      },
+      "SettingsUpdate": {
+        "type": "object",
+        "properties": {
+          "hourlyRate": { "type": "number" },
+          "fullDayPrice": { "type": "number" },
+          "fullDayThresholdHours": { "type": "number" },
+          "hotDrinksMonthlyCost": { "type": "number" },
+          "company": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "phone": { "type": "string" },
+              "email": { "type": "string" },
+              "address": { "type": "string" }
+            }
+          }
+        }
+      },
+      "Staff": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "username": { "type": "string" },
+          "role": { "type": "string", "enum": ["admin", "staff"] }
+        }
+      },
+      "StaffCreate": {
+        "type": "object",
+        "required": ["name", "username", "role", "password"],
+        "properties": {
+          "name": { "type": "string" },
+          "username": { "type": "string" },
+          "role": { "type": "string", "enum": ["admin", "staff"] },
+          "password": { "type": "string" }
+        }
+      },
+      "StaffUpdate": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "username": { "type": "string" },
+          "role": { "type": "string", "enum": ["admin", "staff"] },
+          "password": { "type": "string" }
+        }
+      },
+      "Permission": {
+        "type": "object",
+        "properties": {
+          "pageKey": { "type": "string", "description": "Arabic page key, e.g. inside space, subscribers, inventory, snacks, drinks, expenses, debts, rooms, courses, followUp, dashboard, reports, settings, staff, permissions, loginLogs" },
+          "canView": { "type": "boolean" },
+          "canEdit": { "type": "boolean" },
+          "canDelete": { "type": "boolean" }
+        }
+      },
+      "PermissionsUpdate": {
+        "type": "object",
+        "required": ["permissions"],
+        "properties": {
+          "permissions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Permission" }
+          }
+        }
+      },
+      "LoginLog": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "staffId": { "type": "string" },
+          "staffName": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "ip": { "type": "string" },
+          "success": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "tags": [
+    { "name": "Auth", "description": "Authentication (no auth required)" },
+    { "name": "Sessions", "description": "Active sessions (inside the space)" },
+    { "name": "Subscribers", "description": "Subscriber management" },
+    { "name": "Inventory", "description": "Inventory management" },
+    { "name": "Sales - Snacks", "description": "Snack sales" },
+    { "name": "Sales - Hot Drinks", "description": "Hot drink sales" },
+    { "name": "Expenses", "description": "Expense tracking" },
+    { "name": "Debts", "description": "Debt tracking" },
+    { "name": "Rooms", "description": "Room management" },
+    { "name": "Bookings", "description": "Room booking management" },
+    { "name": "Courses", "description": "Course management" },
+    { "name": "Follow-Up", "description": "Visitor follow-up" },
+    { "name": "Dashboard", "description": "Dashboard summary and revenue trend" },
+    { "name": "Reports", "description": "Report export" },
+    { "name": "Settings", "description": "System settings" },
+    { "name": "Staff", "description": "Staff management (admin only)" },
+    { "name": "Permissions", "description": "Permission management (admin only)" },
+    { "name": "Login Logs", "description": "Login logs (admin only)" }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login",
+        "description": "Authenticate user and return access + refresh tokens",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LoginResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Refresh token",
+        "description": "Exchange refresh token for new access + refresh tokens",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RefreshRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens refreshed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TokenResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid refresh token",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Logout",
+        "description": "Invalidate current session",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Logged out",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/live": {
+      "get": {
+        "tags": ["Sessions"],
+        "summary": "Get live sessions",
+        "description": "View all currently active (not checked out) sessions",
+        "responses": {
+          "200": {
+            "description": "List of active sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Session" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "post": {
+        "tags": ["Sessions"],
+        "summary": "Check-in visitor",
+        "description": "Start a new session (check-in). For existing visitors, send visitorId. For walk-ins, send name, phone, type.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SessionCheckIn" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Session" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}": {
+      "patch": {
+        "tags": ["Sessions"],
+        "summary": "Update session",
+        "description": "Update session details such as check-in/out time, amount, payment status/method",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SessionUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Session" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}/checkout": {
+      "post": {
+        "tags": ["Sessions"],
+        "summary": "Checkout session",
+        "description": "End session and record payment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CheckoutRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session checked out",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Session" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}/checkout-unpaid": {
+      "post": {
+        "tags": ["Sessions"],
+        "summary": "Checkout unpaid session",
+        "description": "End session and create a debt record for unpaid amount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session checked out unpaid, debt created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Session" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}/orders": {
+      "post": {
+        "tags": ["Sessions"],
+        "summary": "Add order to session",
+        "description": "Add an inventory item order to the active session",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SessionOrder" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order added",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Session" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subscribers": {
+      "get": {
+        "tags": ["Subscribers"],
+        "summary": "Get all subscribers",
+        "responses": {
+          "200": {
+            "description": "List of subscribers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Subscriber" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Subscribers"],
+        "summary": "Create subscriber",
+        "description": "Create a new subscriber with subscription details",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SubscriberCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Subscriber created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Subscriber" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subscribers/{id}": {
+      "patch": {
+        "tags": ["Subscribers"],
+        "summary": "Update subscriber",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SubscriberUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscriber updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Subscriber" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subscribers/{id}/pause": {
+      "patch": {
+        "tags": ["Subscribers"],
+        "summary": "Pause subscriber",
+        "description": "Pause an active subscription",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription paused",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Subscriber" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subscribers/{id}/renew": {
+      "post": {
+        "tags": ["Subscribers"],
+        "summary": "Renew subscriber",
+        "description": "Renew or extend an existing subscription",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription renewed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Subscriber" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inventory": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "Get all inventory items",
+        "responses": {
+          "200": {
+            "description": "List of inventory items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/InventoryItem" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Create inventory item",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InventoryCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Item created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InventoryItem" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inventory/{id}": {
+      "patch": {
+        "tags": ["Inventory"],
+        "summary": "Update inventory item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InventoryUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InventoryItem" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Inventory"],
+        "summary": "Delete inventory item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inventory/{id}/restock": {
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Restock inventory item",
+        "description": "Add quantity to existing inventory item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RestockRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item restocked",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InventoryItem" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sales": {
+      "get": {
+        "tags": ["Sales - Snacks"],
+        "summary": "Get all snack sales",
+        "responses": {
+          "200": {
+            "description": "List of snack sales",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Sale" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Sales - Snacks"],
+        "summary": "Create snack sale",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SaleCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sale created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Sale" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hot-drinks": {
+      "get": {
+        "tags": ["Sales - Hot Drinks"],
+        "summary": "Get all hot drink sales",
+        "responses": {
+          "200": {
+            "description": "List of hot drink sales",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Sale" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Sales - Hot Drinks"],
+        "summary": "Create hot drink sale",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/HotDrinkCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Hot drink sale created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Sale" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expenses": {
+      "get": {
+        "tags": ["Expenses"],
+        "summary": "Get all expenses",
+        "responses": {
+          "200": {
+            "description": "List of expenses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Expense" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Expenses"],
+        "summary": "Create expense",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ExpenseCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Expense created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Expense" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expenses/by-category": {
+      "get": {
+        "tags": ["Expenses"],
+        "summary": "Get expenses by category",
+        "description": "Get expense breakdown grouped by category within optional date range",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Expenses grouped by category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": { "type": "number" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/expenses/{id}": {
+      "patch": {
+        "tags": ["Expenses"],
+        "summary": "Update expense",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ExpenseUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Expense updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Expense" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Expenses"],
+        "summary": "Delete expense",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Expense deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/debts": {
+      "get": {
+        "tags": ["Debts"],
+        "summary": "Get all debts",
+        "responses": {
+          "200": {
+            "description": "List of debts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Debt" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Debts"],
+        "summary": "Create debt",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DebtCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Debt created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Debt" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/debts/{id}/collect": {
+      "post": {
+        "tags": ["Debts"],
+        "summary": "Collect debt",
+        "description": "Mark a pending debt as collected",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debt collected",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Debt" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/debts/{id}": {
+      "patch": {
+        "tags": ["Debts"],
+        "summary": "Update debt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DebtUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Debt updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Debt" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Debts"],
+        "summary": "Delete debt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debt deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rooms": {
+      "get": {
+        "tags": ["Rooms"],
+        "summary": "Get all rooms",
+        "responses": {
+          "200": {
+            "description": "List of rooms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Room" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Rooms"],
+        "summary": "Create room",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RoomCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Room created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Room" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rooms/{id}": {
+      "get": {
+        "tags": ["Rooms"],
+        "summary": "Get room by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Room details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Room" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Rooms"],
+        "summary": "Update room",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RoomCreate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Room updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Room" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Rooms"],
+        "summary": "Delete room",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Room deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rooms/bookings": {
+      "get": {
+        "tags": ["Bookings"],
+        "summary": "Get all room bookings",
+        "responses": {
+          "200": {
+            "description": "List of bookings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Booking" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Bookings"],
+        "summary": "Create booking",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BookingCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Booking created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Booking" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rooms/bookings/check-conflict": {
+      "get": {
+        "tags": ["Bookings"],
+        "summary": "Check booking conflict",
+        "description": "Check if a time slot conflicts with existing bookings for a room",
+        "parameters": [
+          {
+            "name": "roomId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "date-time" }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "date-time" }
+          },
+          {
+            "name": "excludeId",
+            "in": "query",
+            "schema": { "type": "string", "description": "Booking ID to exclude from conflict check (for updates)" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conflict check result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conflict": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rooms/bookings/{id}": {
+      "get": {
+        "tags": ["Bookings"],
+        "summary": "Get booking by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Booking" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Bookings"],
+        "summary": "Update booking",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BookingCreate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Booking updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Booking" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Bookings"],
+        "summary": "Delete booking",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/courses": {
+      "get": {
+        "tags": ["Courses"],
+        "summary": "Get all courses",
+        "responses": {
+          "200": {
+            "description": "List of courses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Course" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Courses"],
+        "summary": "Create course",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CourseCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Course created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Course" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/courses/{id}": {
+      "get": {
+        "tags": ["Courses"],
+        "summary": "Get course by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Course details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Course" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Courses"],
+        "summary": "Update course",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CourseCreate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Course updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Course" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Courses"],
+        "summary": "Delete course",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Course deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/courses/{id}/trainees": {
+      "get": {
+        "tags": ["Courses"],
+        "summary": "Get trainees for course",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of trainees",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Trainee" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Courses"],
+        "summary": "Add trainee to course",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TraineeCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Trainee added",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Trainee" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/courses/{id}/trainees/{traineeId}/attendance": {
+      "patch": {
+        "tags": ["Courses"],
+        "summary": "Update trainee attendance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "traineeId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AttendanceUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Attendance updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Trainee" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/follow-up": {
+      "get": {
+        "tags": ["Follow-Up"],
+        "summary": "Get follow-up visitors",
+        "description": "Get list of visitors for follow-up. Use showAll=true to include contacted/opted-out visitors.",
+        "parameters": [
+          {
+            "name": "showAll",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of follow-up visitors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/FollowUpVisitor" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/follow-up/{visitorId}/contacted": {
+      "post": {
+        "tags": ["Follow-Up"],
+        "summary": "Mark visitor as contacted",
+        "parameters": [
+          {
+            "name": "visitorId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Visitor marked as contacted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FollowUpVisitor" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/follow-up/{visitorId}/opt-out": {
+      "post": {
+        "tags": ["Follow-Up"],
+        "summary": "Opt out visitor from follow-up",
+        "parameters": [
+          {
+            "name": "visitorId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Visitor opted out",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FollowUpVisitor" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/summary": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Get dashboard summary",
+        "description": "Get today's key metrics: revenue, sessions, active subscribers, expenses, pending debts, room bookings",
+        "responses": {
+          "200": {
+            "description": "Dashboard summary",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DashboardSummary" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/revenue-trend": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Get revenue trend",
+        "description": "Get daily revenue data for the specified number of days",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "schema": { "type": "integer", "default": 7 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revenue trend data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/RevenueTrend" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/export": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Export report",
+        "description": "Export data report for a date range as XLSX",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["xlsx"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report file (XLSX)",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Get settings",
+        "description": "Get current system settings including hourly rate, full day price, company info",
+        "responses": {
+          "200": {
+            "description": "Current settings",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Settings" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Settings"],
+        "summary": "Update settings",
+        "description": "Update system settings (partial update)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SettingsUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Settings" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff": {
+      "get": {
+        "tags": ["Staff"],
+        "summary": "Get all staff",
+        "description": "Admin only",
+        "responses": {
+          "200": {
+            "description": "List of staff members",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Staff" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Staff"],
+        "summary": "Create staff member",
+        "description": "Admin only",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StaffCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Staff member created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Staff" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/staff/{id}": {
+      "get": {
+        "tags": ["Staff"],
+        "summary": "Get staff member by ID",
+        "description": "Admin only",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Staff member details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Staff" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Staff"],
+        "summary": "Update staff member",
+        "description": "Admin only",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StaffUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Staff member updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Staff" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Staff"],
+        "summary": "Delete staff member",
+        "description": "Admin only",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Staff member deleted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/permissions/{staffId}": {
+      "get": {
+        "tags": ["Permissions"],
+        "summary": "Get permissions for staff member",
+        "description": "Admin only. pageKey values: داخل المساحة, المشتركون, المخزون, السناكس, المشروبات, المصروفات, المديونيات, القاعات, الدورات, المتابعة, الرئيسية, التقارير, الإعدادات, الموظفون, الصلاحيات, سجلات الدخول",
+        "parameters": [
+          {
+            "name": "staffId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Staff permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Permission" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Permissions"],
+        "summary": "Update permissions for staff member",
+        "description": "Admin only. pageKey values: داخل المساحة, المشتركون, المخزون, السناكس, المشروبات, المصروفات, المديونيات, القاعات, الدورات, المتابعة, الرئيسية, التقارير, الإعدادات, الموظفون, الصلاحيات, سجلات الدخول",
+        "parameters": [
+          {
+            "name": "staffId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PermissionsUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Permissions updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Permission" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login-logs": {
+      "get": {
+        "tags": ["Login Logs"],
+        "summary": "Get login logs",
+        "description": "Admin only. Paginated login history with optional date filtering.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "default": 1 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Login logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "logs": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/LoginLog" }
+                    },
+                    "total": { "type": "integer" },
+                    "page": { "type": "integer" },
+                    "limit": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
