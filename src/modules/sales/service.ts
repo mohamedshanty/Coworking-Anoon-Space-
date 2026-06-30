@@ -44,6 +44,25 @@ export class SalesService {
       throw new ApiError(400, `Insufficient inventory stock for ${item.name}`);
     }
 
+    // Validate session if provided
+    let linkedName: string | null = null;
+    let sessionId: string | null = null;
+
+    if (data.sessionId) {
+      const session = await prisma.session.findUnique({
+        where: { id: data.sessionId },
+        include: { visitor: true },
+      });
+      if (!session) {
+        throw new ApiError(404, "Session not found");
+      }
+      if (session.checkOut !== null) {
+        throw new ApiError(400, "Session is no longer active (already checked out)");
+      }
+      sessionId = session.id;
+      linkedName = session.visitor.name;
+    }
+
     // Deduct stock
     await prisma.inventoryItem.update({
       where: { id: data.itemId },
@@ -62,6 +81,7 @@ export class SalesService {
         paymentMethod: data.paymentMethod,
         isHotDrink: false,
         date: new Date(),
+        ...(sessionId ? { sessionId, linkedName } : {}),
       },
     });
   }

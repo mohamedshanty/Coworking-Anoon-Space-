@@ -11,10 +11,7 @@ const router = Router();
 router.use(authenticate);
 router.use(authorize('القاعات', 'view'));
 router.get('/', RoomsController.getAll);
-router.get('/:id', RoomsController.getOne);
 router.post('/', authorize('القاعات', 'edit'), RoomsController.create);
-router.patch('/:id', authorize('القاعات', 'edit'), RoomsController.update);
-router.delete('/:id', authorize('القاعات', 'delete'), RoomsController.delete);
 
 // Bookings endpoints – same pageKey (static routes BEFORE :id param)
 router.get('/bookings', authorize('القاعات', 'view'), BookingsController.getAll);
@@ -23,5 +20,10 @@ router.get('/bookings/:id', authorize('القاعات', 'view'), BookingsControl
 router.post('/bookings', authorize('القاعات', 'edit'), BookingsController.create);
 router.patch('/bookings/:id', authorize('القاعات', 'edit'), BookingsController.update);
 router.delete('/bookings/:id', authorize('القاعات', 'delete'), BookingsController.delete);
+
+// Room single-item routes AFTER static routes
+router.get('/:id', RoomsController.getOne);
+router.patch('/:id', authorize('القاعات', 'edit'), RoomsController.update);
+router.delete('/:id', authorize('القاعات', 'delete'), RoomsController.delete);
 
 export default router;

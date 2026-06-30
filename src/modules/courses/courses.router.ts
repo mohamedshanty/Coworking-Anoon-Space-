@@ -19,5 +19,8 @@ router.delete('/:id', authorize('الدورات', 'delete'), CoursesController.d
 router.get('/:id/trainees', authorize('الدورات', 'view'), CoursesController.getTrainees);
 router.post('/:id/trainees', authorize('الدورات', 'edit'), CoursesController.addTrainee);
 router.patch('/:id/trainees/:traineeId/attendance', authorize('الدورات', 'edit'), CoursesController.updateAttendance);
+router.patch('/:id/trainees/:traineeId', authorize('الدورات', 'edit'), CoursesController.updateTrainee);
+router.delete('/:id/trainees/:traineeId', authorize('الدورات', 'delete'), CoursesController.deleteTrainee);
+router.post('/:id/trainees/:traineeId/payments', authorize('الدورات', 'edit'), CoursesController.recordPayment);
 
 export default router;

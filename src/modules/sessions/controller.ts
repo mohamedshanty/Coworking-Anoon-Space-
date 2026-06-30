@@ -3,6 +3,19 @@ import { sessionsService } from "./service";
 import { checkInSchema, updateSessionSchema, checkoutSchema, addOrderSchema } from "./schema";
 
 export class SessionsController {
+  async visitorLookup(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const q = (req.query.q as string) ?? "";
+      const data = await sessionsService.visitorLookup(q);
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getLiveSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const data = await sessionsService.getLiveSessions();
@@ -108,6 +121,50 @@ export class SessionsController {
         order,
         sale,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { from, to, type, paymentStatus, page, limit } = req.query;
+
+      if (!from || !to) {
+        res.status(400).json({ success: false, message: "'from' and 'to' query params are required" });
+        return;
+      }
+
+      const data = await sessionsService.getHistory({
+        from: from as string,
+        to: to as string,
+        type: type as string | undefined,
+        paymentStatus: paymentStatus as string | undefined,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+      });
+
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getHistorySummary(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { from, to } = req.query;
+
+      if (!from || !to) {
+        res.status(400).json({ success: false, message: "'from' and 'to' query params are required" });
+        return;
+      }
+
+      const data = await sessionsService.getHistorySummary({
+        from: from as string,
+        to: to as string,
+      });
+
+      res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
     }

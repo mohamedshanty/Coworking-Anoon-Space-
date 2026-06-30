@@ -8,6 +8,12 @@ const router = Router();
 router.use(authenticate);
 
 router.get(
+  "/preview",
+  authorize("التقارير", "view"),
+  (req, res, next) => reportsController.getPreview(req, res, next)
+);
+
+router.get(
   "/export",
   authorize("التقارير", "view"),
   (req, res, next) => reportsController.exportReport(req, res, next)

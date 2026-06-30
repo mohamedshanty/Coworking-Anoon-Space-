@@ -8,6 +8,27 @@ const router = Router();
 // Apply authenticate to all sessions routes
 router.use(authenticate);
 
+// GET visitor lookup by name (MUST be before /:id routes)
+router.get(
+  "/visitor-lookup",
+  authorize("داخل المساحة", "view"),
+  (req, res, next) => sessionsController.visitorLookup(req, res, next)
+);
+
+// GET history (MUST be before /:id routes)
+router.get(
+  "/history",
+  authorize("السجل", "view"),
+  (req, res, next) => sessionsController.getHistory(req, res, next)
+);
+
+// GET history summary (MUST be before /:id routes)
+router.get(
+  "/history/summary",
+  authorize("السجل", "view"),
+  (req, res, next) => sessionsController.getHistorySummary(req, res, next)
+);
+
 // GET active sessions
 router.get(
   "/live",

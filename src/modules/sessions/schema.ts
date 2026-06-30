@@ -3,11 +3,14 @@ import { z } from "zod";
 export const checkInSchema = z.union([
   z.object({
     visitorId: z.string().min(1),
+    notes: z.string().optional(),
   }),
   z.object({
     name: z.string().min(1),
     phone: z.string().min(1),
     type: z.enum(["visitor", "subscriber", "trainee"]),
+    source: z.string().optional(),
+    notes: z.string().optional(),
   }),
 ]);
 

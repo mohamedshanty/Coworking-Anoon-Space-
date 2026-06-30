@@ -578,8 +578,16 @@
               "host": ["{{baseUrl}}"],
               "path": ["expenses", "by-category"],
               "query": [
-                { "key": "from", "value": "", "description": "Start date (YYYY-MM-DD)" },
-                { "key": "to", "value": "", "description": "End date (YYYY-MM-DD)" }
+                {
+                  "key": "from",
+                  "value": "",
+                  "description": "Start date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "to",
+                  "value": "",
+                  "description": "End date (YYYY-MM-DD)"
+                }
               ]
             }
           }
@@ -898,10 +906,30 @@
               "host": ["{{baseUrl}}"],
               "path": ["rooms", "bookings", "check-conflict"],
               "query": [
-                { "key": "roomId", "value": "", "description": "Room ID", "disabled": false },
-                { "key": "start", "value": "", "description": "Start time (ISO 8601)", "disabled": false },
-                { "key": "end", "value": "", "description": "End time (ISO 8601)", "disabled": false },
-                { "key": "excludeId", "value": "", "description": "Booking ID to exclude (for updates)", "disabled": true }
+                {
+                  "key": "roomId",
+                  "value": "",
+                  "description": "Room ID",
+                  "disabled": false
+                },
+                {
+                  "key": "start",
+                  "value": "",
+                  "description": "Start time (ISO 8601)",
+                  "disabled": false
+                },
+                {
+                  "key": "end",
+                  "value": "",
+                  "description": "End time (ISO 8601)",
+                  "disabled": false
+                },
+                {
+                  "key": "excludeId",
+                  "value": "",
+                  "description": "Booking ID to exclude (for updates)",
+                  "disabled": true
+                }
               ]
             }
           }
@@ -1162,7 +1190,13 @@
             "url": {
               "raw": "{{baseUrl}}/courses/:id/trainees/:traineeId/attendance",
               "host": ["{{baseUrl}}"],
-              "path": ["courses", ":id", "trainees", ":traineeId", "attendance"],
+              "path": [
+                "courses",
+                ":id",
+                "trainees",
+                ":traineeId",
+                "attendance"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -1192,7 +1226,11 @@
               "host": ["{{baseUrl}}"],
               "path": ["follow-up"],
               "query": [
-                { "key": "showAll", "value": "false", "description": "true or false" }
+                {
+                  "key": "showAll",
+                  "value": "false",
+                  "description": "true or false"
+                }
               ]
             }
           }
@@ -1269,7 +1307,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["dashboard", "revenue-trend"],
               "query": [
-                { "key": "days", "value": "7", "description": "Number of days", "disabled": false }
+                {
+                  "key": "days",
+                  "value": "7",
+                  "description": "Number of days",
+                  "disabled": false
+                }
               ]
             }
           }
@@ -1290,9 +1333,24 @@
               "host": ["{{baseUrl}}"],
               "path": ["reports", "export"],
               "query": [
-                { "key": "from", "value": "", "description": "Start date (YYYY-MM-DD)", "disabled": false },
-                { "key": "to", "value": "", "description": "End date (YYYY-MM-DD)", "disabled": false },
-                { "key": "format", "value": "xlsx", "description": "Export format", "disabled": false }
+                {
+                  "key": "from",
+                  "value": "",
+                  "description": "Start date (YYYY-MM-DD)",
+                  "disabled": false
+                },
+                {
+                  "key": "to",
+                  "value": "",
+                  "description": "End date (YYYY-MM-DD)",
+                  "disabled": false
+                },
+                {
+                  "key": "format",
+                  "value": "xlsx",
+                  "description": "Export format",
+                  "disabled": false
+                }
               ]
             }
           }
@@ -1509,10 +1567,30 @@
               "host": ["{{baseUrl}}"],
               "path": ["login-logs"],
               "query": [
-                { "key": "from", "value": "", "description": "Start date (YYYY-MM-DD)", "disabled": true },
-                { "key": "to", "value": "", "description": "End date (YYYY-MM-DD)", "disabled": true },
-                { "key": "page", "value": "1", "description": "Page number", "disabled": false },
-                { "key": "limit", "value": "20", "description": "Results per page", "disabled": false }
+                {
+                  "key": "from",
+                  "value": "",
+                  "description": "Start date (YYYY-MM-DD)",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "",
+                  "description": "End date (YYYY-MM-DD)",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Results per page",
+                  "disabled": false
+                }
               ]
             }
           }

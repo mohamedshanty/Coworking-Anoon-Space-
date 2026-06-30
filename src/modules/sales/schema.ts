@@ -4,6 +4,7 @@ export const createSnackSaleSchema = z.object({
   itemId: z.string().min(1, "Item ID is required"),
   quantity: z.number().int().min(1, "Quantity must be at least 1"),
   paymentMethod: z.enum(["cash", "card", "transfer"]),
+  sessionId: z.string().uuid("Session ID must be a valid UUID").optional(),
 });
 
 export const createHotDrinkSaleSchema = z.object({

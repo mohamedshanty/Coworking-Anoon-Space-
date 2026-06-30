@@ -88,6 +88,7 @@ model Visitor {
   name           String
   phone          String
   type           PersonType
+  source         String?
   lastVisit      DateTime?
   followUpStatus FollowUpStatus?
   followUpAt     DateTime?
@@ -105,19 +106,21 @@ model Session {
   amount        Decimal              @db.Decimal(10, 2)
   paymentStatus SessionPaymentStatus
   paymentMethod PaymentMethod?
+  notes         String?
   snackOrders   SnackOrder[]
   sales         Sale[]
 }
 
 model SnackOrder {
-  id         String        @id @default(uuid())
-  sessionId  String
-  session    Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  itemId     String
-  item       InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  qty        Int
-  total      Decimal       @db.Decimal(10, 2)
-  isHotDrink Boolean
+  id           String         @id @default(uuid())
+  sessionId    String
+  session      Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  itemId       String?
+  item         InventoryItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  hotDrinkName String?
+  qty          Int
+  total        Decimal        @db.Decimal(10, 2)
+  isHotDrink   Boolean
 }
 
 model Subscription {

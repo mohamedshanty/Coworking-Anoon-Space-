@@ -4,9 +4,13 @@ import { ApiError } from "../lib/ApiError";
 
 export const authorize = (
   pageKey: string,
-  action: "view" | "edit" | "delete"
+  action: "view" | "edit" | "delete",
 ) => {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const user = req.user;
 
@@ -28,14 +32,13 @@ export const authorize = (
         },
       });
 
+      // No permission record = default allow (permissions are opt-out, not opt-in)
       if (!permission) {
-        throw new ApiError(403, "Access denied. Insufficient permissions.");
+        return next();
       }
 
-      let allowed = false;
-      if (action === "view" && permission.canView) allowed = true;
-      if (action === "edit" && permission.canEdit) allowed = true;
-      if (action === "delete" && permission.canDelete) allowed = true;
+      // If canView is true, all actions (edit/delete) are allowed
+      const allowed = permission.canView;
 
       if (!allowed) {
         throw new ApiError(403, "Access denied. Insufficient permissions.");

@@ -104,6 +104,20 @@ export class CoursesController {
     }
   }
 
+  static async recordPayment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id, traineeId } = req.params;
+      const paymentSchema = z.object({
+        amount: z.number().positive("Amount must be positive"),
+      });
+      const { amount } = paymentSchema.parse(req.body);
+      const trainee = await new CoursesService().recordPayment(id, traineeId, amount);
+      res.json({ success: true, data: trainee });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async updateAttendance(req: Request, res: Response, next: NextFunction) {
     try {
       const { id, traineeId } = req.params;
@@ -113,6 +127,32 @@ export class CoursesController {
       const { attendancePercent } = attendanceSchema.parse(req.body);
       const trainee = await new CoursesService().updateAttendance(id, traineeId, attendancePercent);
       res.json({ success: true, data: trainee });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async updateTrainee(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id, traineeId } = req.params;
+      const schema = z.object({
+        name: z.string().min(1).optional(),
+        phone: z.string().min(1).optional(),
+        paymentStatus: z.enum(["full", "installment"]).optional(),
+      });
+      const parsed = schema.parse(req.body);
+      const trainee = await new CoursesService().updateTrainee(id, traineeId, parsed);
+      res.json({ success: true, data: trainee });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async deleteTrainee(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id, traineeId } = req.params;
+      await new CoursesService().deleteTrainee(id, traineeId);
+      res.status(204).send();
     } catch (err) {
       next(err);
     }

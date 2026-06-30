@@ -8,10 +8,11 @@ const exportQuerySchema = z.object({
   from: z.string().min(1, "'from' is required"),
   to: z.string().min(1, "'to' is required"),
   format: z.enum(["xlsx"]).optional(),
+  type: z.enum(["reports", "history"]).optional(),
 });
 
 export class ReportsController {
-  async exportReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getPreview(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const parsed = exportQuerySchema.parse(req.query);
       const fromDate = new Date(parsed.from);
@@ -22,30 +23,102 @@ export class ReportsController {
         throw new ApiError(400, "Invalid date format for 'from' or 'to'");
       }
 
+      const [sessions, sales, expenses, bookings, courses, activeSubscriptions, settings] = await Promise.all([
+        prisma.session.findMany({
+          where: { checkIn: { gte: fromDate, lte: toDate }, checkOut: { not: null } },
+          select: { amount: true, paymentStatus: true, visitor: { select: { type: true } } },
+        }),
+        prisma.sale.findMany({
+          where: { date: { gte: fromDate, lte: toDate } },
+          select: { total: true, isHotDrink: true },
+        }),
+        prisma.expense.findMany({
+          where: { date: { gte: fromDate, lte: toDate } },
+          select: { amount: true },
+        }),
+        prisma.booking.findMany({
+          where: { startTime: { gte: fromDate, lte: toDate }, status: "confirmed" },
+          select: { price: true },
+        }),
+        prisma.course.findMany({
+          where: { startDate: { lte: toDate }, endDate: { gte: fromDate } },
+          select: { id: true },
+        }),
+        prisma.subscription.findMany({
+          where: { status: "active" },
+          select: { visitorId: true, amountPaid: true },
+        }),
+        prisma.settings.findFirst(),
+      ]);
+
+      const r = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
+
+      // Visits
+      const visitCount = sessions.length;
+      const hoursRevenue = r(
+        sessions.filter((s) => s.paymentStatus === "paid").reduce((sum, s) => sum + Number(s.amount), 0)
+      );
+
+      // Subscribers
+      const activeCount = activeSubscriptions.length;
+      const totalPaid = r(activeSubscriptions.reduce((sum, s) => sum + Number(s.amountPaid), 0));
+
+      // Sales (snacks vs hot drinks)
+      const snacksRevenue = r(sales.filter((s) => !s.isHotDrink).reduce((sum, s) => sum + Number(s.total), 0));
+      const hotDrinksRevenue = r(sales.filter((s) => s.isHotDrink).reduce((sum, s) => sum + Number(s.total), 0));
+
+      // Expenses
+      const expensesTotal = r(expenses.reduce((sum, e) => sum + Number(e.amount), 0));
+      const monthlyHotDrinksCost = settings ? Number(settings.hotDrinksMonthlyCost) : 0;
+      const daysInRange = Math.max(1, Math.ceil((toDate.getTime() - fromDate.getTime()) / 86400000));
+      const hotDrinksCost = r(monthlyHotDrinksCost * (daysInRange / 30));
+
+      // Rooms & Courses
+      const roomsRevenue = r(bookings.reduce((sum, b) => sum + Number(b.price), 0));
+      let coursesRevenue = 0;
+      if (courses.length > 0) {
+        const trainees = await prisma.trainee.findMany({
+          where: { courseId: { in: courses.map((c) => c.id) } },
+          select: { amountPaid: true },
+        });
+        coursesRevenue = r(trainees.reduce((sum, t) => sum + Number(t.amountPaid), 0));
+      }
+
+      // Financial summary
+      const totalRevenue = r(hoursRevenue + snacksRevenue + hotDrinksRevenue + coursesRevenue + roomsRevenue);
+      const netProfit = r(totalRevenue - expensesTotal - hotDrinksCost);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          visits: { count: visitCount, hoursRevenue },
+          subscribers: { activeCount, totalPaid },
+          sales: { snacksRevenue, hotDrinksRevenue },
+          expenses: { total: expensesTotal, hotDrinksCost },
+          roomsCourses: { roomsRevenue, coursesRevenue },
+          financialSummary: { hoursRevenue, snacksRevenue, hotDrinksRevenue, coursesRevenue, roomsRevenue, expenses: expensesTotal, hotDrinksCost, netProfit },
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async exportReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const parsed = exportQuerySchema.parse(req.query);
+      const fromDate = new Date(parsed.from);
+      const toDate = new Date(parsed.to);
+      toDate.setHours(23, 59, 59, 999);
+      const exportType = parsed.type ?? "reports";
+
+      if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+        throw new ApiError(400, "Invalid date format for 'from' or 'to'");
+      }
+
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "Noon Coworking";
       workbook.created = new Date();
-
-      // Sheet 1: الزيارات (Visits)
-      const visitsSheet = workbook.addWorksheet("الزيارات");
-      visitsSheet.columns = [
-        { header: "اسم الزائر", key: "visitorName", width: 20 },
-        { header: "النوع", key: "type", width: 12 },
-        { header: "وقت الدخول", key: "checkIn", width: 20 },
-        { header: "وقت الخروج", key: "checkOut", width: 20 },
-        { header: "المدة (ساعات)", key: "duration", width: 14 },
-        { header: "المبلغ", key: "amount", width: 12 },
-        { header: "حالة الدفع", key: "paymentStatus", width: 14 },
-        { header: "طريقة الدفع", key: "paymentMethod", width: 14 },
-      ];
-
-      const sessions = await prisma.session.findMany({
-        where: {
-          checkIn: { gte: fromDate, lte: toDate },
-        },
-        include: { visitor: { select: { name: true, type: true } } },
-        orderBy: { checkIn: "asc" },
-      });
 
       const paymentStatusMap: Record<string, string> = {
         paid: "مدفوع",
@@ -63,20 +136,71 @@ export class ReportsController {
         trainee: "متدرب",
       };
 
-      for (const s of sessions) {
-        const duration = s.checkOut
-          ? Math.round(((s.checkOut.getTime() - s.checkIn.getTime()) / 3600000) * 100) / 100
-          : null;
-        visitsSheet.addRow({
-          visitorName: s.visitor.name,
-          type: typeMap[s.visitor.type] || s.visitor.type,
-          checkIn: s.checkIn.toISOString(),
-          checkOut: s.checkOut ? s.checkOut.toISOString() : "نشط",
-          duration: duration !== null ? duration : "—",
-          amount: Number(s.amount),
-          paymentStatus: paymentStatusMap[s.paymentStatus] || s.paymentStatus,
-          paymentMethod: s.paymentMethod ? paymentMethodMap[s.paymentMethod] : "—",
-        });
+      // Fetch sessions (needed for both types: history shows them, reports needs revenue calc)
+      const sessions = await prisma.session.findMany({
+        where: {
+          checkIn: { gte: fromDate, lte: toDate },
+        },
+        include: { visitor: { select: { name: true, type: true } } },
+        orderBy: { checkIn: "asc" },
+      });
+
+      // Sheet 1: الزيارات (Visits) — history type ONLY
+      if (exportType === "history") {
+        const visitsSheet = workbook.addWorksheet("الزيارات");
+        visitsSheet.columns = [
+          { header: "اسم الزائر", key: "visitorName", width: 20 },
+          { header: "النوع", key: "type", width: 12 },
+          { header: "وقت الدخول", key: "checkIn", width: 20 },
+          { header: "وقت الخروج", key: "checkOut", width: 20 },
+          { header: "المدة (ساعات)", key: "duration", width: 14 },
+          { header: "المبلغ", key: "amount", width: 12 },
+          { header: "حالة الدفع", key: "paymentStatus", width: 14 },
+          { header: "طريقة الدفع", key: "paymentMethod", width: 14 },
+        ];
+
+        for (const s of sessions) {
+          const duration = s.checkOut
+            ? Math.round(((s.checkOut.getTime() - s.checkIn.getTime()) / 3600000) * 100) / 100
+            : null;
+          visitsSheet.addRow({
+            visitorName: s.visitor.name,
+            type: typeMap[s.visitor.type] || s.visitor.type,
+            checkIn: s.checkIn.toISOString(),
+            checkOut: s.checkOut ? s.checkOut.toISOString() : "نشط",
+            duration: duration !== null ? duration : "—",
+            amount: Number(s.amount),
+            paymentStatus: paymentStatusMap[s.paymentStatus] || s.paymentStatus,
+            paymentMethod: s.paymentMethod ? paymentMethodMap[s.paymentMethod] : "—",
+          });
+        }
+      }
+
+      // Sheet 1 (reports type): ملخص الزيارات (Visits Summary)
+      if (exportType === "reports") {
+        const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
+        const visitsSummarySheet = workbook.addWorksheet("ملخص الزيارات");
+        visitsSummarySheet.columns = [
+          { header: "البند", key: "item", width: 28 },
+          { header: "القيمة", key: "value", width: 16 },
+        ];
+
+        const totalVisits = sessions.length;
+        const paidVisits = sessions.filter((s) => s.paymentStatus === "paid" && s.checkOut !== null);
+        const totalRevenue = r2(paidVisits.reduce((sum, s) => sum + Number(s.amount), 0));
+        const avgRevenue = paidVisits.length > 0 ? r2(totalRevenue / paidVisits.length) : 0;
+
+        const visitorCount = sessions.filter((s) => s.visitor.type === "visitor").length;
+        const subscriberCount = sessions.filter((s) => s.visitor.type === "subscriber").length;
+        const traineeCount = sessions.filter((s) => s.visitor.type === "trainee").length;
+
+        visitsSummarySheet.addRow({ item: "إجمالي الزيارات", value: totalVisits });
+        visitsSummarySheet.addRow({ item: "الزيارات المدفوعة", value: paidVisits.length });
+        visitsSummarySheet.addRow({ item: "إيراد الجلسات", value: totalRevenue });
+        visitsSummarySheet.addRow({ item: "متوسط إيراد الزيارة", value: avgRevenue });
+        visitsSummarySheet.addRow({ item: "الزائرون", value: visitorCount });
+        visitsSummarySheet.addRow({ item: "المشتركون", value: subscriberCount });
+        visitsSummarySheet.addRow({ item: "المتدربون", value: traineeCount });
       }
 
       // Sheet 2: المشتركون (Subscribers)
@@ -253,9 +377,9 @@ export class ReportsController {
         { header: "المبلغ", key: "amount", width: 16 },
       ];
 
-      // 1. Session revenue
+      // 1. Session revenue (cash-basis: only paid sessions count)
       const sessionRev = sessions
-        .filter((s) => s.checkOut !== null)
+        .filter((s) => s.checkOut !== null && s.paymentStatus === "paid")
         .reduce((sum, s) => sum + Number(s.amount), 0);
 
       // 2. Sale revenue
@@ -319,9 +443,10 @@ export class ReportsController {
         "Content-Type",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
+      res.setHeader("Cache-Control", "no-store");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename=report_${parsed.from}_${parsed.to}.xlsx`
+        `attachment; filename=${exportType}_${parsed.from}_${parsed.to}.xlsx`
       );
       res.status(200).send(Buffer.from(buffer));
     } catch (error) {
