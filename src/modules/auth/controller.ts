@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { authService } from "./service";
-import { loginSchema, refreshSchema } from "./schema";
+import { loginSchema, refreshSchema, changePasswordSchema } from "./schema";
 
 export class AuthController {
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -41,6 +41,16 @@ export class AuthController {
         success: true,
         message: "Logged out successfully",
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = changePasswordSchema.parse(req.body);
+      const result = await authService.changePassword(req.user!.id, data);
+      res.status(200).json({ success: true, ...result });
     } catch (error) {
       next(error);
     }

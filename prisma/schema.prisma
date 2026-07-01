@@ -101,6 +101,7 @@ model Session {
   id            String               @id @default(uuid())
   visitorId     String
   visitor       Visitor              @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  sessionType   String?
   checkIn       DateTime
   checkOut      DateTime?
   amount        Decimal              @db.Decimal(10, 2)
@@ -271,4 +272,15 @@ model Permission {
   canDelete Boolean
 
   @@unique([staffId, pageKey])
+}
+
+model Contact {
+  id        String   @id @default(uuid())
+  fullName  String
+  phone     String
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([phone])
 }

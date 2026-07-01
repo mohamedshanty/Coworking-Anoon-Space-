@@ -58,9 +58,11 @@ export class SessionsService {
         (sub) => sub.visitorId === s.visitorId
       );
 
+      const effectiveType = s.sessionType ?? s.visitor.type;
+
       const pricing = calculateSessionPricing(
         s.checkIn,
-        s.visitor.type,
+        effectiveType,
         hasActiveSub,
         s.snackOrders,
         {
@@ -72,6 +74,7 @@ export class SessionsService {
 
       return {
         ...s,
+        type: effectiveType,
         hours: pricing.hours,
         isSub: pricing.isSub,
         amount: pricing.totalAmount, // Dynamically computed active total amount (time + snacks)
@@ -104,12 +107,6 @@ export class SessionsService {
             source: "source" in data ? (data as { source?: string }).source ?? null : null,
           },
         });
-      } else if (visitor.type !== data.type) {
-        // Update visitor type if check-in type differs from stored type
-        visitor = await prisma.visitor.update({
-          where: { id: visitor.id },
-          data: { type: data.type },
-        });
       }
       visitorId = visitor.id;
     }
@@ -122,9 +119,12 @@ export class SessionsService {
       throw new ApiError(400, "Visitor is already checked in");
     }
 
+    const sessionType = "type" in data ? (data as { type?: string }).type ?? null : null;
+
     const session = await prisma.session.create({
       data: {
         visitorId,
+        sessionType,
         checkIn: new Date(),
         amount: 0,
         paymentStatus: "full_debt",
@@ -194,9 +194,11 @@ export class SessionsService {
       where: { visitorId: session.visitorId, status: "active" },
     });
 
+    const effectiveType = session.sessionType ?? session.visitor.type;
+
     const pricing = calculateSessionPricing(
       session.checkIn,
-      session.visitor.type,
+      effectiveType,
       !!activeSub,
       session.snackOrders,
       {
@@ -244,9 +246,11 @@ export class SessionsService {
       where: { visitorId: session.visitorId, status: "active" },
     });
 
+    const effectiveType = session.sessionType ?? session.visitor.type;
+
     const pricing = calculateSessionPricing(
       session.checkIn,
-      session.visitor.type,
+      effectiveType,
       !!activeSub,
       session.snackOrders,
       {
@@ -391,7 +395,10 @@ export class SessionsService {
     };
 
     if (params.type) {
-      where.visitor = { type: params.type as any };
+      where.OR = [
+        { sessionType: params.type },
+        { AND: [{ sessionType: null }, { visitor: { type: params.type as any } }] },
+      ];
     }
 
     if (params.paymentStatus) {
@@ -419,15 +426,20 @@ export class SessionsService {
         (sub) => sub.visitorId === s.visitorId
       );
 
+      const effectiveType = s.sessionType ?? s.visitor.type;
+
       const hours = s.checkOut
         ? Math.round(((s.checkOut.getTime() - s.checkIn.getTime()) / 3600000) * 100) / 100
         : 0;
 
-      const isSub = s.visitor.type === "subscriber" && hasActiveSub;
+      const isSub =
+        (effectiveType === "subscriber" && hasActiveSub) ||
+        effectiveType === "trainee";
 
       return {
         id: s.id,
         visitorId: s.visitorId,
+        sessionType: s.sessionType,
         checkIn: s.checkIn.toISOString(),
         checkOut: s.checkOut ? s.checkOut.toISOString() : null,
         amount: Number(s.amount),
@@ -476,7 +488,7 @@ export class SessionsService {
           checkIn: { gte: fromDate, lte: toDate },
           checkOut: { not: null },
         },
-        include: { visitor: { select: { type: true } } },
+        select: { sessionType: true, visitorId: true, paymentStatus: true, amount: true, visitor: { select: { type: true } } },
       }),
       prisma.sale.findMany({
         where: { date: { gte: fromDate, lte: toDate } },
@@ -517,7 +529,7 @@ export class SessionsService {
 
     const subscriberCount = sessions.filter(
       (s) =>
-        s.visitor.type === "subscriber" &&
+        (s.sessionType ?? s.visitor.type) === "subscriber" &&
         activeSubscriptions.some((sub) => sub.visitorId === s.visitorId)
     ).length;
 

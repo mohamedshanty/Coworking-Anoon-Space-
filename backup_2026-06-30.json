@@ -1,0 +1,2551 @@
+{
+  "Visitor": [
+    {
+      "id": "v2",
+      "name": "سارة يوسف",
+      "phone": "0599101234",
+      "type": "subscriber",
+      "lastVisit": "2026-06-22T06:10:15.231Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "v3",
+      "name": "محمد عبدالله",
+      "phone": "0599102469",
+      "type": "subscriber",
+      "lastVisit": "2026-06-20T06:10:15.231Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "v4",
+      "name": "فاطمة الزهراء",
+      "phone": "0599103704",
+      "type": "subscriber",
+      "lastVisit": "2026-06-18T06:10:15.231Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "v5",
+      "name": "خالد ناصر",
+      "phone": "0599104938",
+      "type": "subscriber",
+      "lastVisit": "2026-06-16T06:10:15.231Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "v6",
+      "name": "ليلى منصور",
+      "phone": "0599106173",
+      "type": "trainee",
+      "lastVisit": "2026-06-14T06:10:15.231Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "v7",
+      "name": "عمر شاهين",
+      "phone": "0599107408",
+      "type": "trainee",
+      "lastVisit": "2026-06-12T06:10:15.231Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "v8",
+      "name": "نور الدين",
+      "phone": "0599108642",
+      "type": "trainee",
+      "lastVisit": "2026-06-10T06:10:15.231Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "v9",
+      "name": "ريم حسن",
+      "phone": "0599109877",
+      "type": "trainee",
+      "lastVisit": "2026-06-08T06:10:15.231Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "v10",
+      "name": "يوسف الكردي",
+      "phone": "0599111112",
+      "type": "visitor",
+      "lastVisit": "2026-06-06T06:10:15.231Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "v11",
+      "name": "هبة سليم",
+      "phone": "0599112347",
+      "type": "visitor",
+      "lastVisit": "2026-06-04T06:10:15.231Z",
+      "followUpStatus": "needs",
+      "followUpAt": "2026-06-03T06:10:15.231Z",
+      "source": null
+    },
+    {
+      "id": "v12",
+      "name": "مصطفى زيدان",
+      "phone": "0599113581",
+      "type": "visitor",
+      "lastVisit": "2026-06-02T06:10:15.231Z",
+      "followUpStatus": "needs",
+      "followUpAt": "2026-06-01T06:10:15.231Z",
+      "source": null
+    },
+    {
+      "id": "6bc484e7-84d4-4691-a7af-741306073028",
+      "name": "Test",
+      "phone": "0597867603",
+      "type": "trainee",
+      "lastVisit": "2026-06-30T07:58:35.917Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "da758d7c-47dc-4b88-94af-d957df73f60b",
+      "name": "Mohamed",
+      "phone": "05978676003",
+      "type": "trainee",
+      "lastVisit": "2026-06-30T08:01:22.315Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": "صديق / معارف"
+    },
+    {
+      "id": "8d4efaae-0ff9-4c1a-97ed-8cf7d76d8551",
+      "name": "مشترك تجربة",
+      "phone": "0599888777",
+      "type": "subscriber",
+      "lastVisit": null,
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "5f55a443-21f4-40fb-8b7b-e7b1b62f8b26",
+      "name": "Mohamed Salem",
+      "phone": "05978676032",
+      "type": "visitor",
+      "lastVisit": "2026-06-30T08:02:17.889Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": "إعلان"
+    },
+    {
+      "id": "bb255f22-7f3b-4785-9ebb-33336544b407",
+      "name": "جلسة تجربة",
+      "phone": "0599112233",
+      "type": "visitor",
+      "lastVisit": null,
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "bb66965f-ab01-4428-b3b5-8b6e23183c27",
+      "name": "Ahmad Test",
+      "phone": "0599999999",
+      "type": "visitor",
+      "lastVisit": null,
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "a47b4d06-3ab6-43b8-beaa-599c9d9609c9",
+      "name": "زائر اختبار ربط",
+      "phone": "0599991100",
+      "type": "visitor",
+      "lastVisit": null,
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "583ce92f-3b12-48e1-873b-9536109d5233",
+      "name": "dsada",
+      "phone": "54654",
+      "type": "visitor",
+      "lastVisit": null,
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "6e499e29-25e7-4dd0-b6e3-cae9619a0217",
+      "name": "sdaasdadsd",
+      "phone": "6541654",
+      "type": "visitor",
+      "lastVisit": null,
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "7b34dd2f-8dac-41b2-8fb4-ac38ffec8899",
+      "name": "sad",
+      "phone": "asd",
+      "type": "visitor",
+      "lastVisit": null,
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "v15",
+      "name": "إيمان حمدان",
+      "phone": "0599117285",
+      "type": "visitor",
+      "lastVisit": "2026-05-27T06:10:15.231Z",
+      "followUpStatus": "contacted",
+      "followUpAt": "2026-06-28T04:32:42.577Z",
+      "source": null
+    },
+    {
+      "id": "v14",
+      "name": "بسام درويش",
+      "phone": "0599116051",
+      "type": "visitor",
+      "lastVisit": "2026-05-29T06:10:15.231Z",
+      "followUpStatus": "opt_out",
+      "followUpAt": "2026-05-28T06:10:15.231Z",
+      "source": null
+    },
+    {
+      "id": "اختبار_متابعة_vB",
+      "name": "اختبار_متابعة_زائر حديث",
+      "phone": "0599900102",
+      "type": "visitor",
+      "lastVisit": "2026-06-19T13:13:33.852Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "اختبار_متابعة_vD",
+      "name": "اختبار_متابعة_زائر انسحب",
+      "phone": "0599900104",
+      "type": "visitor",
+      "lastVisit": "2026-05-25T13:13:34.499Z",
+      "followUpStatus": "opt_out",
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "اختبار_متابعة_vE",
+      "name": "اختبار_متابعة_زائر بدون جلسات",
+      "phone": "0599900105",
+      "type": "visitor",
+      "lastVisit": null,
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "اختبار_متابعة_vC",
+      "name": "اختبار_متابعة_زائر تم التواصل",
+      "phone": "0599900103",
+      "type": "visitor",
+      "lastVisit": "2026-06-04T13:13:34.177Z",
+      "followUpStatus": "contacted",
+      "followUpAt": "2026-06-24T13:13:36.208Z",
+      "source": null
+    },
+    {
+      "id": "v13",
+      "name": "آية مرعي",
+      "phone": "0599114816",
+      "type": "visitor",
+      "lastVisit": "2026-05-31T06:10:15.231Z",
+      "followUpStatus": "contacted",
+      "followUpAt": "2026-06-29T08:21:54.595Z",
+      "source": null
+    },
+    {
+      "id": "ca94c78b-3249-43a6-b582-96dd5338ac2b",
+      "name": "شسي",
+      "phone": "شسي",
+      "type": "subscriber",
+      "lastVisit": null,
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "اختبار_متابعة_vA",
+      "name": "اختبار_متابعة_زائر قديم",
+      "phone": "0599900101",
+      "type": "visitor",
+      "lastVisit": "2026-06-04T13:13:33.508Z",
+      "followUpStatus": "contacted",
+      "followUpAt": "2026-06-28T06:19:26.228Z",
+      "source": null
+    },
+    {
+      "id": "v1",
+      "name": "أحمد خليل",
+      "phone": "0599100000",
+      "type": "subscriber",
+      "lastVisit": "2026-06-30T06:46:33.994Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": null
+    },
+    {
+      "id": "9a704cf4-fa33-4ae6-b44b-cb27137804ac",
+      "name": "dsa",
+      "phone": "adss",
+      "type": "visitor",
+      "lastVisit": "2026-06-30T06:49:39.804Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": "صديق / معارف"
+    },
+    {
+      "id": "4fffe099-1492-4665-85c0-cb4c83958190",
+      "name": "TraineeTestXYZ",
+      "phone": "0599222333",
+      "type": "trainee",
+      "lastVisit": "2026-06-30T07:53:38.344Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": "SourceTest123"
+    },
+    {
+      "id": "5d8904e6-d45e-43ca-a54b-0fbddc9379fb",
+      "name": "VisitorTestDEF",
+      "phone": "0599444555",
+      "type": "visitor",
+      "lastVisit": "2026-06-30T07:53:41.141Z",
+      "followUpStatus": null,
+      "followUpAt": null,
+      "source": "VisitorSourceJKL"
+    }
+  ],
+  "Session": [
+    {
+      "id": "63f11831-62cb-44df-8904-0de7f646237b",
+      "visitorId": "bb255f22-7f3b-4785-9ebb-33336544b407",
+      "checkIn": "2026-06-28T23:08:04.312Z",
+      "checkOut": "2026-06-29T07:30:03.603Z",
+      "amount": "20.00",
+      "paymentStatus": "paid",
+      "paymentMethod": "transfer",
+      "notes": null
+    },
+    {
+      "id": "a029074b-8152-4b37-801b-5a4f3529698e",
+      "visitorId": "583ce92f-3b12-48e1-873b-9536109d5233",
+      "checkIn": "2026-06-29T07:41:57.268Z",
+      "checkOut": "2026-06-29T08:03:38.289Z",
+      "amount": "10.08",
+      "paymentStatus": "paid",
+      "paymentMethod": "transfer",
+      "notes": null
+    },
+    {
+      "id": "68599446-345c-4c2d-b9bb-b3dd6d7d1477",
+      "visitorId": "6e499e29-25e7-4dd0-b6e3-cae9619a0217",
+      "checkIn": "2026-06-29T07:48:19.432Z",
+      "checkOut": "2026-06-29T08:03:47.929Z",
+      "amount": "0.77",
+      "paymentStatus": "full_debt",
+      "paymentMethod": null,
+      "notes": null
+    },
+    {
+      "id": "ec08b328-a4d1-4937-9115-7fb3cbbbcdc6",
+      "visitorId": "6bc484e7-84d4-4691-a7af-741306073028",
+      "checkIn": "2026-06-30T06:29:20.071Z",
+      "checkOut": "2026-06-30T06:30:01.910Z",
+      "amount": "0.00",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "notes": "Test "
+    },
+    {
+      "id": "eb1dd271-ff11-4c85-bcf4-74a7828dbbb7",
+      "visitorId": "6bc484e7-84d4-4691-a7af-741306073028",
+      "checkIn": "2026-06-30T06:50:29.577Z",
+      "checkOut": "2026-06-30T06:50:50.843Z",
+      "amount": "0.00",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "notes": "Test "
+    },
+    {
+      "id": "a8ffcd04-79ad-4ff0-8493-bba95a334e6d",
+      "visitorId": "9a704cf4-fa33-4ae6-b44b-cb27137804ac",
+      "checkIn": "2026-06-30T06:49:38.837Z",
+      "checkOut": "2026-06-30T06:51:00.357Z",
+      "amount": "0.07",
+      "paymentStatus": "full_debt",
+      "paymentMethod": null,
+      "notes": "sa"
+    },
+    {
+      "id": "72d9c5a2-f775-4f35-afd9-eb352acfea64",
+      "visitorId": "6bc484e7-84d4-4691-a7af-741306073028",
+      "checkIn": "2026-06-30T07:22:34.984Z",
+      "checkOut": "2026-06-30T07:39:46.988Z",
+      "amount": "0.00",
+      "paymentStatus": "full_debt",
+      "paymentMethod": null,
+      "notes": "Test"
+    },
+    {
+      "id": "2a5ae1e7-9907-465c-b6df-33a879b11f4e",
+      "visitorId": "7b34dd2f-8dac-41b2-8fb4-ac38ffec8899",
+      "checkIn": "2026-06-29T08:06:09.645Z",
+      "checkOut": "2026-06-30T07:44:00.557Z",
+      "amount": "25.00",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "notes": null
+    },
+    {
+      "id": "db87b8ed-e82e-4444-b48e-7096dde7abb9",
+      "visitorId": "ca94c78b-3249-43a6-b582-96dd5338ac2b",
+      "checkIn": "2026-06-30T04:46:21.961Z",
+      "checkOut": "2026-06-30T07:44:08.638Z",
+      "amount": "0.00",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "notes": null
+    },
+    {
+      "id": "363f3aab-7bc9-4ee2-941a-6564aa537fd6",
+      "visitorId": "v1",
+      "checkIn": "2026-06-30T06:46:33.014Z",
+      "checkOut": "2026-06-30T07:44:14.241Z",
+      "amount": "0.00",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "notes": null
+    },
+    {
+      "id": "37dae383-7775-4fd7-b68a-5e825e51ce9f",
+      "visitorId": "6bc484e7-84d4-4691-a7af-741306073028",
+      "checkIn": "2026-06-30T07:39:57.828Z",
+      "checkOut": "2026-06-30T07:44:20.109Z",
+      "amount": "0.00",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "notes": "Test"
+    },
+    {
+      "id": "15f70884-6f25-42c6-8bd1-240eb4105997",
+      "visitorId": "4fffe099-1492-4665-85c0-cb4c83958190",
+      "checkIn": "2026-06-30T07:53:37.450Z",
+      "checkOut": "2026-06-30T07:53:44.030Z",
+      "amount": "0.01",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "notes": "NotesValueABC"
+    },
+    {
+      "id": "68d3b6c0-c295-45ab-8e73-ccb7b9ac7e71",
+      "visitorId": "5d8904e6-d45e-43ca-a54b-0fbddc9379fb",
+      "checkIn": "2026-06-30T07:53:40.192Z",
+      "checkOut": "2026-06-30T07:53:45.731Z",
+      "amount": "0.00",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "notes": "VisitorNotesGHI"
+    },
+    {
+      "id": "b40dcb73-1b7e-4e2e-8099-d0e18497757d",
+      "visitorId": "6bc484e7-84d4-4691-a7af-741306073028",
+      "checkIn": "2026-06-30T07:44:46.995Z",
+      "checkOut": "2026-06-30T07:58:10.047Z",
+      "amount": "0.00",
+      "paymentStatus": "paid",
+      "paymentMethod": "cash",
+      "notes": "Testt"
+    },
+    {
+      "id": "2281fa31-b470-453a-8e28-187a1969d1f8",
+      "visitorId": "6bc484e7-84d4-4691-a7af-741306073028",
+      "checkIn": "2026-06-30T07:58:34.980Z",
+      "checkOut": null,
+      "amount": "0.00",
+      "paymentStatus": "full_debt",
+      "paymentMethod": null,
+      "notes": "Testttt"
+    },
+    {
+      "id": "bd6622a8-42a3-4da7-b910-9a300c587ca1",
+      "visitorId": "da758d7c-47dc-4b88-94af-d957df73f60b",
+      "checkIn": "2026-06-30T08:01:21.427Z",
+      "checkOut": null,
+      "amount": "0.00",
+      "paymentStatus": "full_debt",
+      "paymentMethod": null,
+      "notes": "Testttt"
+    },
+    {
+      "id": "4192e960-a8d3-466e-a311-33a72a592ed0",
+      "visitorId": "5f55a443-21f4-40fb-8b7b-e7b1b62f8b26",
+      "checkIn": "2026-06-30T08:02:16.949Z",
+      "checkOut": null,
+      "amount": "0.00",
+      "paymentStatus": "full_debt",
+      "paymentMethod": null,
+      "notes": "Test "
+    }
+  ],
+  "SnackOrder": [
+    {
+      "id": "81b467bb-97d4-4fc4-8214-f1867299f21a",
+      "sessionId": "a029074b-8152-4b37-801b-5a4f3529698e",
+      "itemId": null,
+      "qty": 1,
+      "total": "6.00",
+      "isHotDrink": true,
+      "hotDrinkName": "قهوة"
+    },
+    {
+      "id": "cc93b539-aeed-4ca3-83ff-9127c6a69b60",
+      "sessionId": "a029074b-8152-4b37-801b-5a4f3529698e",
+      "itemId": "i2",
+      "qty": 1,
+      "total": "3.00",
+      "isHotDrink": false,
+      "hotDrinkName": null
+    },
+    {
+      "id": "30e962a0-2cb1-4589-8b99-a1b608fe48d8",
+      "sessionId": "2a5ae1e7-9907-465c-b6df-33a879b11f4e",
+      "itemId": null,
+      "qty": 1,
+      "total": "5.00",
+      "isHotDrink": true,
+      "hotDrinkName": "نسكافيه"
+    }
+  ],
+  "Subscription": [
+    {
+      "id": "sub1",
+      "visitorId": "v1",
+      "packageType": "monthly",
+      "startDate": "2026-06-09T06:10:15.231Z",
+      "endDate": "2026-07-09T06:10:15.231Z",
+      "dailyQuotaHours": 6,
+      "daysUsed": 12,
+      "amountPaid": "350.00",
+      "status": "active"
+    },
+    {
+      "id": "sub2",
+      "visitorId": "v2",
+      "packageType": "monthly",
+      "startDate": "2026-05-27T06:10:15.231Z",
+      "endDate": "2026-06-26T06:10:15.231Z",
+      "dailyQuotaHours": 8,
+      "daysUsed": 25,
+      "amountPaid": "400.00",
+      "status": "active"
+    },
+    {
+      "id": "sub3",
+      "visitorId": "v3",
+      "packageType": "weekly",
+      "startDate": "2026-06-19T06:10:15.231Z",
+      "endDate": "2026-06-26T06:10:15.231Z",
+      "dailyQuotaHours": 4,
+      "daysUsed": 4,
+      "amountPaid": "100.00",
+      "status": "active"
+    },
+    {
+      "id": "sub4",
+      "visitorId": "v4",
+      "packageType": "monthly",
+      "startDate": "2026-05-15T06:10:15.231Z",
+      "endDate": "2026-06-14T06:10:15.231Z",
+      "dailyQuotaHours": 6,
+      "daysUsed": 28,
+      "amountPaid": "350.00",
+      "status": "expired"
+    },
+    {
+      "id": "sub5",
+      "visitorId": "v5",
+      "packageType": "monthly",
+      "startDate": "2026-06-14T06:10:15.231Z",
+      "endDate": "2026-07-14T06:10:15.231Z",
+      "dailyQuotaHours": 8,
+      "daysUsed": 3,
+      "amountPaid": "400.00",
+      "status": "paused"
+    },
+    {
+      "id": "226a10d0-f67e-4f3a-9a1c-a0628c7ff339",
+      "visitorId": "8d4efaae-0ff9-4c1a-97ed-8cf7d76d8551",
+      "packageType": "monthly",
+      "startDate": "2026-06-27T04:52:38.925Z",
+      "endDate": "2026-07-27T04:52:38.925Z",
+      "dailyQuotaHours": 6,
+      "daysUsed": 0,
+      "amountPaid": "350.56",
+      "status": "expired"
+    },
+    {
+      "id": "dedb1942-f351-41de-aa84-faf8e44a8285",
+      "visitorId": "8d4efaae-0ff9-4c1a-97ed-8cf7d76d8551",
+      "packageType": "weekly",
+      "startDate": "2026-06-27T04:52:40.920Z",
+      "endDate": "2026-07-04T04:52:40.920Z",
+      "dailyQuotaHours": 4,
+      "daysUsed": 0,
+      "amountPaid": "100.00",
+      "status": "active"
+    },
+    {
+      "id": "012519fe-4214-4add-aab5-48408a81a5d7",
+      "visitorId": "6bc484e7-84d4-4691-a7af-741306073028",
+      "packageType": "weekly",
+      "startDate": "2026-06-27T21:00:00.000Z",
+      "endDate": "2026-07-03T21:00:00.000Z",
+      "dailyQuotaHours": 6,
+      "daysUsed": 0,
+      "amountPaid": "150.00",
+      "status": "active"
+    },
+    {
+      "id": "124b6ad5-5c62-4684-8fbc-78958d075343",
+      "visitorId": "v4",
+      "packageType": "monthly",
+      "startDate": "2026-06-28T21:00:00.000Z",
+      "endDate": "2026-07-28T21:00:00.000Z",
+      "dailyQuotaHours": 6,
+      "daysUsed": 0,
+      "amountPaid": "350.00",
+      "status": "active"
+    },
+    {
+      "id": "86913a04-9ae1-421c-b4a2-0e6eeaebbebe",
+      "visitorId": "ca94c78b-3249-43a6-b582-96dd5338ac2b",
+      "packageType": "weekly",
+      "startDate": "2026-06-29T21:00:00.000Z",
+      "endDate": "2026-01-14T22:00:00.000Z",
+      "dailyQuotaHours": 6,
+      "daysUsed": 0,
+      "amountPaid": "350.00",
+      "status": "active"
+    }
+  ],
+  "InventoryItem": [
+    {
+      "id": "i4",
+      "name": "عصير",
+      "quantity": 3,
+      "sellPrice": "6.00",
+      "costPrice": "4.00",
+      "lastRestockDate": "2026-06-04T06:10:15.231Z",
+      "alertThreshold": 8
+    },
+    {
+      "id": "i1",
+      "name": "شيبس",
+      "quantity": 21,
+      "sellPrice": "5.00",
+      "costPrice": "3.00",
+      "lastRestockDate": "2026-06-19T06:10:15.231Z",
+      "alertThreshold": 10
+    },
+    {
+      "id": "i2",
+      "name": "بسكويت",
+      "quantity": 35,
+      "sellPrice": "3.00",
+      "costPrice": "1.50",
+      "lastRestockDate": "2026-06-28T03:35:39.302Z",
+      "alertThreshold": 10
+    },
+    {
+      "id": "i5",
+      "name": "شوكولاتة",
+      "quantity": 12,
+      "sellPrice": "4.00",
+      "costPrice": "2.50",
+      "lastRestockDate": "2026-06-29T03:24:12.557Z",
+      "alertThreshold": 10
+    },
+    {
+      "id": "i3",
+      "name": "ماء معدنية",
+      "quantity": 36,
+      "sellPrice": "2.00",
+      "costPrice": "1.00",
+      "lastRestockDate": "2026-06-21T06:10:15.231Z",
+      "alertThreshold": 15
+    },
+    {
+      "id": "i6",
+      "name": "مكسرات",
+      "quantity": 0,
+      "sellPrice": "8.00",
+      "costPrice": "5.00",
+      "lastRestockDate": "2026-06-28T04:13:31.751Z",
+      "alertThreshold": 8
+    }
+  ],
+  "Sale": [
+    {
+      "id": "0c0f2fd0-4827-43c5-8462-4050776d7faf",
+      "itemId": "hot-قهوة",
+      "itemName": "قهوة",
+      "quantity": 1,
+      "total": "6.00",
+      "sessionId": "a029074b-8152-4b37-801b-5a4f3529698e",
+      "linkedName": "dsada",
+      "paymentMethod": "cash",
+      "isHotDrink": true,
+      "date": "2026-06-29T08:02:38.330Z"
+    },
+    {
+      "id": "83ed22f0-2196-40b4-a414-7989c12098bf",
+      "itemId": "i2",
+      "itemName": "بسكويت",
+      "quantity": 1,
+      "total": "3.00",
+      "sessionId": "a029074b-8152-4b37-801b-5a4f3529698e",
+      "linkedName": "dsada",
+      "paymentMethod": "cash",
+      "isHotDrink": false,
+      "date": "2026-06-29T08:02:48.641Z"
+    },
+    {
+      "id": "2ec7e6d9-d6ad-482b-bb96-9e296c961e01",
+      "itemId": "hot-نسكافيه",
+      "itemName": "نسكافيه",
+      "quantity": 1,
+      "total": "5.00",
+      "sessionId": "2a5ae1e7-9907-465c-b6df-33a879b11f4e",
+      "linkedName": "sad",
+      "paymentMethod": "cash",
+      "isHotDrink": true,
+      "date": "2026-06-29T08:06:16.169Z"
+    },
+    {
+      "id": "5cee847b-9e6d-47dd-93d5-0f7988595da2",
+      "itemId": "i5",
+      "itemName": "شوكولاتة",
+      "quantity": 1,
+      "total": "4.00",
+      "sessionId": null,
+      "linkedName": null,
+      "paymentMethod": "cash",
+      "isHotDrink": false,
+      "date": "2026-06-30T04:46:57.377Z"
+    },
+    {
+      "id": "701c6cb6-fe99-45a4-b620-b9bae1e21675",
+      "itemId": "hot-قهوة",
+      "itemName": "قهوة",
+      "quantity": 1,
+      "total": "6.00",
+      "sessionId": null,
+      "linkedName": null,
+      "paymentMethod": "cash",
+      "isHotDrink": true,
+      "date": "2026-06-30T04:47:09.959Z"
+    }
+  ],
+  "Expense": [
+    {
+      "id": "e2",
+      "description": "إيجار الشهر",
+      "category": "rent",
+      "amount": "1500.00",
+      "date": "2026-06-16T06:10:15.231Z",
+      "notes": null
+    },
+    {
+      "id": "e3",
+      "description": "رواتب موظفين",
+      "category": "salaries",
+      "amount": "2400.00",
+      "date": "2026-06-14T06:10:15.231Z",
+      "notes": null
+    },
+    {
+      "id": "e4",
+      "description": "صيانة مكيف",
+      "category": "maintenance",
+      "amount": "220.00",
+      "date": "2026-06-10T06:10:15.231Z",
+      "notes": null
+    },
+    {
+      "id": "e5",
+      "description": "إيجار فيسبوك",
+      "category": "marketing",
+      "amount": "150.00",
+      "date": "2026-06-04T06:10:15.231Z",
+      "notes": null
+    },
+    {
+      "id": "e6",
+      "description": "أدوات تنظيف",
+      "category": "other",
+      "amount": "80.00",
+      "date": "2026-06-02T06:10:15.231Z",
+      "notes": null
+    },
+    {
+      "id": "aed56c7b-c633-4e77-a58f-5e04cf311d8c",
+      "description": "test",
+      "category": "other",
+      "amount": "500.00",
+      "date": "2026-06-26T21:00:00.000Z",
+      "notes": null
+    },
+    {
+      "id": "d69e242b-0795-4019-ae9d-94ef0c90f58b",
+      "description": "asdfas",
+      "category": "rent",
+      "amount": "123.00",
+      "date": "2026-06-27T21:00:00.000Z",
+      "notes": "assdasd"
+    },
+    {
+      "id": "b5b5cde9-1c45-4438-9783-bd174cdd7b21",
+      "description": "ثقلا",
+      "category": "electricity",
+      "amount": "345.00",
+      "date": "2026-06-28T21:00:00.000Z",
+      "notes": "يباليب"
+    },
+    {
+      "id": "4519f01c-c31c-4fd5-b944-535ef38a5e14",
+      "description": "Test expense from noor",
+      "category": "other",
+      "amount": "10.00",
+      "date": "2026-06-30T04:06:13.663Z",
+      "notes": "e2e test"
+    },
+    {
+      "id": "e1",
+      "description": "Updated by noor",
+      "category": "electricity",
+      "amount": "380.00",
+      "date": "2026-06-21T06:10:15.231Z",
+      "notes": null
+    }
+  ],
+  "Debt": [
+    {
+      "id": "6359900d-9915-46c5-b5c4-8ee991933f59",
+      "visitorId": "9a704cf4-fa33-4ae6-b44b-cb27137804ac",
+      "name": "dsa",
+      "phone": "adss",
+      "amount": "0.07",
+      "type": "session",
+      "status": "unpaid",
+      "createdAt": "2026-06-30T06:51:01.654Z",
+      "collectedAt": null,
+      "note": null
+    },
+    {
+      "id": "dd3f3e1e-181a-4d92-9af8-d687956c6d6d",
+      "visitorId": "6bc484e7-84d4-4691-a7af-741306073028",
+      "name": "Test",
+      "phone": "0597867603",
+      "amount": "0.00",
+      "type": "session",
+      "status": "unpaid",
+      "createdAt": "2026-06-30T07:39:48.072Z",
+      "collectedAt": null,
+      "note": null
+    },
+    {
+      "id": "7db1d538-ced1-4711-b3e3-a4873f2e323d",
+      "visitorId": "6e499e29-25e7-4dd0-b6e3-cae9619a0217",
+      "name": "sdaasdadsd",
+      "phone": "6541654",
+      "amount": "0.77",
+      "type": "session",
+      "status": "unpaid",
+      "createdAt": "2026-06-29T08:03:48.925Z",
+      "collectedAt": null,
+      "note": null
+    },
+    {
+      "id": "33e6862a-5f04-4160-8912-a47587dfd939",
+      "visitorId": null,
+      "name": "Test debt from noor",
+      "phone": "0599123456",
+      "amount": "50.00",
+      "type": "manual",
+      "status": "unpaid",
+      "createdAt": "2026-06-30T04:06:14.136Z",
+      "collectedAt": null,
+      "note": "e2e test"
+    }
+  ],
+  "Room": [
+    {
+      "id": "r1",
+      "name": "قاعة الاجتماعات الكبرى"
+    },
+    {
+      "id": "r2",
+      "name": "قاعة التدريب"
+    },
+    {
+      "id": "r3",
+      "name": "غرفة الاجتماعات الصغيرة"
+    }
+  ],
+  "Booking": [
+    {
+      "id": "b1",
+      "roomId": "r1",
+      "bookerName": "شركة الأمل",
+      "bookerPhone": "0599100200",
+      "purpose": "اجتماع مجلس إدارة",
+      "startTime": "2026-06-24T08:10:15.231Z",
+      "endTime": "2026-06-24T10:10:15.231Z",
+      "price": "200.00",
+      "status": "confirmed"
+    },
+    {
+      "id": "b2",
+      "roomId": "r2",
+      "bookerName": "د. سامي",
+      "bookerPhone": "0599200300",
+      "purpose": "ورشة تدريبية",
+      "startTime": "2026-06-25T06:10:15.231Z",
+      "endTime": "2026-06-25T09:10:15.231Z",
+      "price": "300.00",
+      "status": "confirmed"
+    },
+    {
+      "id": "b3",
+      "roomId": "r3",
+      "bookerName": "محمد سعيد",
+      "bookerPhone": "0599300400",
+      "purpose": "مقابلة عمل",
+      "startTime": "2026-06-23T06:10:15.231Z",
+      "endTime": "2026-06-23T07:10:15.231Z",
+      "price": "50.00",
+      "status": "confirmed"
+    },
+    {
+      "id": "45000ecb-208b-4dc6-abee-2cf247ddc6e4",
+      "roomId": "r2",
+      "bookerName": "dasd",
+      "bookerPhone": "adsd",
+      "purpose": "asd",
+      "startTime": "2026-06-14T23:15:00.000Z",
+      "endTime": "2022-12-15T02:56:00.000Z",
+      "price": "100.00",
+      "status": "confirmed"
+    }
+  ],
+  "Course": [
+    {
+      "id": "c1",
+      "name": "دورة تطوير الويب",
+      "trainer": "م. أحمد سعيد",
+      "startDate": "2026-06-14T06:10:15.231Z",
+      "endDate": "2026-07-14T06:10:15.231Z",
+      "sessionsCount": 12,
+      "pricePerTrainee": "400.00",
+      "maxSeats": 15,
+      "roomId": "r2"
+    },
+    {
+      "id": "c3",
+      "name": "دورة اللغة ",
+      "trainer": "أ. خالدas",
+      "startDate": "2026-06-28T21:00:00.000Z",
+      "endDate": "2026-07-28T21:00:00.000Z",
+      "sessionsCount": 16,
+      "pricePerTrainee": "500.00",
+      "maxSeats": 20,
+      "roomId": "r1"
+    },
+    {
+      "id": "94794c85-1c87-4290-90ad-ee4feb52d87a",
+      "name": "دورة تعديل المتدربين",
+      "trainer": "مدرب اختبار",
+      "startDate": "2026-06-28T05:00:20.411Z",
+      "endDate": "2026-07-28T05:00:20.411Z",
+      "sessionsCount": 10,
+      "pricePerTrainee": "600.00",
+      "maxSeats": 15,
+      "roomId": "r1"
+    },
+    {
+      "id": "c2",
+      "name": "دورة التصميم الجرافيكي",
+      "trainer": "أ. ليلى نجم",
+      "startDate": "2026-06-03T21:00:00.000Z",
+      "endDate": "2026-07-03T21:00:00.000Z",
+      "sessionsCount": 10,
+      "pricePerTrainee": "350.00",
+      "maxSeats": 12,
+      "roomId": "r2"
+    }
+  ],
+  "Trainee": [
+    {
+      "id": "t2",
+      "courseId": "c1",
+      "name": "هبة سليم",
+      "phone": "0599112347",
+      "amountPaid": "200.00",
+      "paymentStatus": "installment",
+      "attendancePercent": 70
+    },
+    {
+      "id": "t3",
+      "courseId": "c2",
+      "name": "مصطفى زيدان",
+      "phone": "0599113581",
+      "amountPaid": "350.00",
+      "paymentStatus": "full",
+      "attendancePercent": 100
+    },
+    {
+      "id": "t4",
+      "courseId": "c2",
+      "name": "آية مرعي",
+      "phone": "0599114816",
+      "amountPaid": "350.00",
+      "paymentStatus": "full",
+      "attendancePercent": 100
+    },
+    {
+      "id": "5d036d6b-efca-4d5c-91a3-f66ebf38af78",
+      "courseId": "c2",
+      "name": "اتب",
+      "phone": "شسي",
+      "amountPaid": "23.00",
+      "paymentStatus": "installment",
+      "attendancePercent": 0
+    },
+    {
+      "id": "t1",
+      "courseId": "c1",
+      "name": " patched",
+      "phone": "0599111112",
+      "amountPaid": "400.00",
+      "paymentStatus": "full",
+      "attendancePercent": 85
+    },
+    {
+      "id": "d96eb71a-e0bc-46c7-b054-2dfb518f9505",
+      "courseId": "c3",
+      "name": "يسبيس",
+      "phone": "شسي",
+      "amountPaid": "500.00",
+      "paymentStatus": "full",
+      "attendancePercent": 10
+    },
+    {
+      "id": "64e982bf-0692-4a49-ab97-3b245b9215e3",
+      "courseId": "94794c85-1c87-4290-90ad-ee4feb52d87a",
+      "name": "متدرب بعد",
+      "phone": "0599922222",
+      "amountPaid": "100.00",
+      "paymentStatus": "full",
+      "attendancePercent": 50
+    },
+    {
+      "id": "8ee81db3-890c-443e-aa4a-66337910c8aa",
+      "courseId": "94794c85-1c87-4290-90ad-ee4feb52d87a",
+      "name": "متدرب من كورس آخر",
+      "phone": "0599900000",
+      "amountPaid": "100.00",
+      "paymentStatus": "installment",
+      "attendancePercent": 50
+    }
+  ],
+  "Staff": [
+    {
+      "id": "u3",
+      "name": "نور الموظفة",
+      "username": "noor",
+      "role": "staff",
+      "passwordHash": "$2b$10$99hr5FHa24A4Gf1nF8aHzeKF6i1RgOa.uEp/cSIq6rFd5DNv/g5qC",
+      "failedAttempts": 0,
+      "lockedUntil": null
+    },
+    {
+      "id": "u2",
+      "name": "سامي الموظف",
+      "username": "sami",
+      "role": "manager",
+      "passwordHash": "$2b$10$99hr5FHa24A4Gf1nF8aHzeKF6i1RgOa.uEp/cSIq6rFd5DNv/g5qC",
+      "failedAttempts": 0,
+      "lockedUntil": null
+    },
+    {
+      "id": "u1",
+      "name": "المدير العام",
+      "username": "admin",
+      "role": "admin",
+      "passwordHash": "$2b$10$zT23CA7HMaLTc5SAcp/cE.urwWqXMRkqsxZ5QoYClKQDzKgVXjJIy",
+      "failedAttempts": 0,
+      "lockedUntil": null
+    },
+    {
+      "id": "22b29cce-eeba-4e15-b27a-1bbcc85ce636",
+      "name": "test",
+      "username": "debugstaff",
+      "role": "staff",
+      "passwordHash": "$2b$10$42Iib1iiVVss1GV5C2c/FOHxpXnNkrIfQpI9LorpELxdCBWVg4q6W",
+      "failedAttempts": 0,
+      "lockedUntil": null
+    }
+  ],
+  "Permission": [
+    {
+      "id": "6fc989a3-adc7-4f8b-a18c-a362bd989296",
+      "staffId": "u1",
+      "pageKey": "الرئيسية",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "dd99a12c-876c-4745-a32e-b179cdf1f8d1",
+      "staffId": "u2",
+      "pageKey": "الرئيسية",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "0ea2046a-aa56-4d7d-8fa5-b2d2c3ef83c5",
+      "staffId": "u3",
+      "pageKey": "الرئيسية",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "1fe9b2ee-f667-48fd-8ff2-7e14a0c4341b",
+      "staffId": "u1",
+      "pageKey": "داخل المساحة",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "6e50783b-f27a-4de4-887f-697be463b594",
+      "staffId": "u2",
+      "pageKey": "داخل المساحة",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "b07d11b2-6d13-451c-b8f9-83dae629f2d5",
+      "staffId": "u3",
+      "pageKey": "داخل المساحة",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "6a5ce332-900e-4721-a4e2-a782e0b42679",
+      "staffId": "u1",
+      "pageKey": "السجل",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "4fff3733-f621-4bcc-8daf-36f360dae07c",
+      "staffId": "u2",
+      "pageKey": "السجل",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "8bc395d6-e863-430e-a453-5beaa9ca0a3c",
+      "staffId": "u3",
+      "pageKey": "السجل",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "bd20d48b-d8ed-4e6c-a973-c5d4bf3e4cba",
+      "staffId": "u1",
+      "pageKey": "المشتركون",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "928aad1c-3032-44d9-ba83-6ba7a021b66e",
+      "staffId": "u2",
+      "pageKey": "المشتركون",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "46b1463d-60e8-4d4f-aa0d-7256b9e863dd",
+      "staffId": "u3",
+      "pageKey": "المشتركون",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "7a927430-9e54-4f9e-a5c1-7df8ccbaa587",
+      "staffId": "u1",
+      "pageKey": "السناكس",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "e516c840-d1a3-49dc-b188-8928f27fa70d",
+      "staffId": "u2",
+      "pageKey": "السناكس",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "9b070ba8-ebe0-4a38-8c7f-22236594447c",
+      "staffId": "u3",
+      "pageKey": "السناكس",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "2c6f9f1e-8460-4344-9dc7-d1a16f928cea",
+      "staffId": "u1",
+      "pageKey": "المشروبات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "e0d9d389-fe90-476c-a9fd-0a5f29e20d0f",
+      "staffId": "u2",
+      "pageKey": "المشروبات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "a830b1d2-c6ec-4202-a64d-d59d771a9e02",
+      "staffId": "u3",
+      "pageKey": "المشروبات",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "88779618-a28b-48f4-bbd4-1ee3442ceb81",
+      "staffId": "u1",
+      "pageKey": "المخزون",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "0415ccdc-1b38-467c-8d67-3a509559b57e",
+      "staffId": "u2",
+      "pageKey": "المخزون",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "1fb777c3-5dc6-4dc9-93f0-5e2398ad3b0e",
+      "staffId": "u3",
+      "pageKey": "المخزون",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "88965c59-41f4-4d49-b285-7ea47590c54c",
+      "staffId": "u1",
+      "pageKey": "المصروفات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "0ec1dd2d-9c01-4997-b6b2-b42cdeade68d",
+      "staffId": "u2",
+      "pageKey": "المصروفات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "1335f987-53eb-4820-a15d-115c19db62d7",
+      "staffId": "u3",
+      "pageKey": "المصروفات",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "c64164a5-e82b-41cd-bba6-c4e72b771ace",
+      "staffId": "u1",
+      "pageKey": "المديونيات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "2aa9011e-182e-442e-bbba-50c4f60f8991",
+      "staffId": "u2",
+      "pageKey": "المديونيات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "34c4c07a-a1ea-4901-b8d0-3af344ffcc55",
+      "staffId": "u3",
+      "pageKey": "المديونيات",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "67219ec3-7a4f-46f0-a8b3-8ee2afd26751",
+      "staffId": "u1",
+      "pageKey": "القاعات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "0044176a-10a6-4f73-9a8a-5bb82b60ee09",
+      "staffId": "u2",
+      "pageKey": "القاعات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "285eebc3-e8fa-4c2f-8b3d-9cd23c582433",
+      "staffId": "u3",
+      "pageKey": "القاعات",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "e2a35dbb-c110-4dcc-a7d4-aecf8a12a900",
+      "staffId": "u1",
+      "pageKey": "الدورات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "cd48019b-91ec-4db3-9a94-95e161364b6b",
+      "staffId": "u2",
+      "pageKey": "الدورات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "678b9af2-b15b-495a-bfd5-c3cc2c8d96c0",
+      "staffId": "u3",
+      "pageKey": "الدورات",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "1aa41437-3c37-48ab-83a3-280106cecf24",
+      "staffId": "u1",
+      "pageKey": "المتابعة",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "a967ea01-0525-4289-b0a5-fcd9730939e6",
+      "staffId": "u2",
+      "pageKey": "المتابعة",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "44ae6f54-585a-4dc3-97de-9bfb4d5dcd82",
+      "staffId": "u3",
+      "pageKey": "المتابعة",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "c2407d61-5c06-4efc-99fd-6b2a97d395e7",
+      "staffId": "u1",
+      "pageKey": "التقارير",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "5ddc6c8f-fe01-43f0-a162-7dd724eaa57d",
+      "staffId": "u2",
+      "pageKey": "التقارير",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "ac67ac60-0938-491a-8015-4cedb2c0d3db",
+      "staffId": "u3",
+      "pageKey": "التقارير",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    },
+    {
+      "id": "de251d5d-63d8-4bee-baef-a79343900a77",
+      "staffId": "u1",
+      "pageKey": "الإعدادات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": true
+    },
+    {
+      "id": "13612c4c-caea-48af-98ae-2228b2736d84",
+      "staffId": "u2",
+      "pageKey": "الإعدادات",
+      "canView": true,
+      "canEdit": true,
+      "canDelete": false
+    },
+    {
+      "id": "55bf1a5e-e23f-4efe-8500-40e77c96f538",
+      "staffId": "u3",
+      "pageKey": "الإعدادات",
+      "canView": true,
+      "canEdit": false,
+      "canDelete": false
+    }
+  ],
+  "LoginLog": [
+    {
+      "id": "569145bd-1bc4-4556-bf5b-9c240f43a5d3",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:08:53.200Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "l2",
+      "userId": "u2",
+      "username": "sami",
+      "at": "2026-06-24T03:10:15.231Z",
+      "status": "success",
+      "ip": "192.168.1.12",
+      "userAgent": "Mozilla/5.0"
+    },
+    {
+      "id": "l3",
+      "userId": null,
+      "username": "unknown",
+      "at": "2026-06-24T01:10:15.231Z",
+      "status": "fail",
+      "ip": "85.114.22.10",
+      "userAgent": "Mozilla/5.0"
+    },
+    {
+      "id": "l4",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-23T04:10:15.231Z",
+      "status": "success",
+      "ip": "192.168.1.15",
+      "userAgent": "Mozilla/5.0"
+    },
+    {
+      "id": "c9b318f3-6245-4cac-aed3-359fe547eae5",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:35:13.390Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "83ec10ab-47cc-44c9-bb63-894a84195223",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:20:51.264Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "116cecc0-e755-4daf-8e7f-fd10c1c3a130",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:35:24.099Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "acdd8f4f-a833-4d50-a85f-ac4259ae3540",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:21:16.676Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "86ef8f94-212c-4db4-92a3-7a0f3bb9cdbd",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-29T07:39:03.030Z",
+      "status": "success",
+      "ip": "::ffff:127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "4dea151c-ce87-4d4f-b86a-4d5ec37d8096",
+      "userId": "u2",
+      "username": "sami",
+      "at": "2026-06-24T06:37:34.350Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "6fcaeada-a6ae-4034-a617-abdb17186d03",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T06:37:35.626Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "a8c81257-9f33-424c-aa07-7bfef624c6ac",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:21:45.908Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "0436d66c-3aa9-46ad-97e5-f399b9cf35b5",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:40:01.065Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "948d6ed6-aa89-459a-ab52-ab031aa785fd",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:40:07.949Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "9a93c5e2-da4f-423e-897a-80256a381d17",
+      "userId": null,
+      "username": "stf_dbg1",
+      "at": "2026-06-27T04:23:23.385Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "d28df257-3873-4b33-9065-f20d95b4a01f",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:23:28.844Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "161df468-71a2-4019-9764-c049362733bc",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T06:42:11.569Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "b977a39e-ec9f-4bdd-b274-9ac4e6a6e9b3",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:24:52.769Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "47483722-c648-4a85-ad37-3dd4e4e86a3f",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T07:11:34.155Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "80beea67-6896-4ff1-b7af-a6ac42c67bc1",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:25:40.149Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "7a0135a9-b78a-433c-b5b3-597ae53478b5",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T12:52:53.271Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "10a25a0a-3813-4f46-bc2c-b415c22da2dd",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T12:54:26.190Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "09bd5602-f00a-46ed-a29b-3fe1acd83232",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T12:56:22.792Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "bfe5ad7c-6582-4152-8d1e-5e8ceef4398a",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:27:38.119Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "7ea1a815-3f93-4c88-b821-7dfbb35f778c",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T12:58:19.208Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "26cae270-c4db-45b2-9ab1-50872e6e1520",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T12:59:11.156Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "5e35614a-1312-46b6-8d02-53831cbbf13b",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:28:04.806Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "0568ef6f-ed88-4e83-beb8-0ee57ded46d3",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T13:05:18.290Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "cb0e2498-c05e-4f81-93b2-f32857db3566",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:29:36.447Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "f55ec109-93f1-42a5-866d-f9fe4a9305bd",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:57:12.770Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "3f4b2d1f-ef1b-4526-a5fb-a51366402dcb",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T13:15:16.578Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "c145df07-614a-477c-8058-73e416449fa1",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T13:18:23.977Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "c67b8c4f-ce0b-4d8d-90e2-ac4eb76dc990",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T13:20:20.693Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "add62e08-41db-4397-bc6d-616408e83512",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T13:20:51.359Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "1eef2044-98dc-4103-b85d-47221e2041cc",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T13:31:29.275Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "d33a5ff8-f37c-40d2-a065-341eaa86efdd",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T13:33:36.262Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "d3a3bbc1-94be-4104-a75f-3066dde5981e",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T13:34:30.340Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "68b1f4ba-8093-42b4-b7f5-a728ee04d120",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-24T13:34:30.947Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "0de99e11-5dc0-4c60-82eb-74e3748ad122",
+      "userId": null,
+      "username": "rpt_tempstaff",
+      "at": "2026-06-27T03:38:54.797Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "499e9604-06d6-4d5f-8473-e96db89daeb6",
+      "userId": null,
+      "username": "rpt_tempstaff",
+      "at": "2026-06-27T03:42:49.370Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "1c5775d0-268c-4abd-aa1b-fd2fe07bbab9",
+      "userId": null,
+      "username": "rpt_tempstaff",
+      "at": "2026-06-27T03:43:45.799Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "b549227c-1694-4fdd-9286-e9c4fbab95a0",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T03:44:26.429Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "1fa59864-8f12-47c8-97bb-23e4781a74f4",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T03:44:27.185Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "dc5860b5-e15a-4bed-825c-c67570b1b988",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T03:44:37.642Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "3435aa3e-5938-4175-a854-46335a8392ac",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T03:55:51.885Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "379fd132-1bfb-4eb0-a245-5c08e07b820e",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T03:55:58.638Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "497570ee-ec3d-4c5f-96f1-4a7bb32fb7c3",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T03:56:46.635Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "c0ba3a7b-087e-4635-b657-9152d9011e53",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T03:56:46.959Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "03559c47-5e54-46d4-8f98-ea14a753aeeb",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T03:56:53.224Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "df46e517-6872-4320-972b-257f03c547b8",
+      "userId": null,
+      "username": "rpt_tempstaff",
+      "at": "2026-06-27T03:56:53.450Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "e8f4ccbe-6365-4a81-8945-82f2042d5f48",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-29T07:17:57.309Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "6a34334d-80f9-4655-9068-8670f6f17deb",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-30T03:50:05.033Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "f666903c-b8ac-4bde-93cb-87e22ae335b7",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-30T03:54:54.890Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "88dbda53-2f24-4d53-b4d4-8257bed100df",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-30T04:04:14.383Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.8737"
+    },
+    {
+      "id": "adbeb1b0-110d-4514-99ce-fa66586a9e3f",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:10:45.360Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "9e1803b0-dd9a-417b-a8f0-fba41487d019",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-30T04:04:39.091Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.8737"
+    },
+    {
+      "id": "19ba0d4d-5885-43b2-af88-2a90cd1f098a",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-30T04:04:49.399Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.8737"
+    },
+    {
+      "id": "7910d4b6-1dbb-4edd-b6e5-4c499337bdee",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-30T04:06:12.531Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": null
+    },
+    {
+      "id": "57a08c09-ec6f-4577-9182-3cf37e3da66c",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-30T04:06:43.287Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": null
+    },
+    {
+      "id": "d2beb342-4275-4377-a7f6-6b814fdebef1",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:12:21.112Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "48741af9-ff92-4ef1-ba8e-6c79ad1f9b53",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:12:23.664Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "100f675e-a963-41fe-9813-87eb1d6f7304",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-30T04:10:17.619Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": null
+    },
+    {
+      "id": "4afbf32e-7a8c-4d90-97d8-76198e3e7135",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-30T04:10:55.220Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": null
+    },
+    {
+      "id": "42a22899-03ac-4567-9b60-f461105293d3",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:12:56.933Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "808a64ee-cb44-4ee6-be2b-be9bdb098e13",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:13:02.564Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "e5d39907-167e-4763-a461-877d159461b2",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-30T04:39:46.344Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": null
+    },
+    {
+      "id": "76760e88-b6b3-4fe6-a876-1b01faab2575",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-30T06:21:46.871Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.8737"
+    },
+    {
+      "id": "f70bdb46-17e0-40a4-81e5-2484c0ec2c20",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:13:36.682Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "e51418dc-e1e9-42f7-891f-35ea2798ef30",
+      "userId": null,
+      "username": "rpt_tempstaff",
+      "at": "2026-06-27T04:13:40.809Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "10086b94-d045-46b3-9955-c745ae44625a",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-30T06:22:24.851Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.8737"
+    },
+    {
+      "id": "53b77b86-8051-4d70-81a6-36355493f96c",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:14:27.854Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "1e700694-05fb-49d2-9995-35e66ad2927c",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-30T06:22:40.488Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.8737"
+    },
+    {
+      "id": "2c7d1a41-6873-4cc2-92a9-4c367a1ad529",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:15:04.639Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "c6cea02a-ca8a-4084-8de5-a060a1152cf9",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-30T07:52:29.465Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "343f6e66-62bb-4027-a1db-7b986f5416c4",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:16:14.407Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "5037b867-7227-43f8-805e-67d526d6cf06",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-30T07:53:36.632Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "73151226-1872-4678-bac8-7737da937dc1",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:19:10.657Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "fe24e020-6050-4ee7-8f7c-a4a41dd70123",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:34:33.151Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "3dbc5f73-dffa-4470-a00f-6863b72df356",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:37:47.511Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "7e090afd-1911-41d0-9443-5c425821553a",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:43:56.937Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "f0348753-88e0-4f38-8a21-100ed4d2cf82",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:44:33.824Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "ebf78c2b-2181-4511-95c0-28ff77568654",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:46:56.020Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "78f9d93a-ff0d-49d9-b7b6-c371f4e10dcd",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:47:03.122Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "e888e7b4-ae6c-4be3-81f5-935f3effef52",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:49:33.250Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "82444e63-8f7a-4c80-8178-7033b92f44a0",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:49:39.917Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "a057a37f-5e9b-48e7-8715-7f655a4724ca",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:50:50.469Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "77d8c9a8-ebf8-47a1-b061-6d52b4aba4a0",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:51:30.504Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "4e073486-ee9b-416b-bb86-a35475d5495e",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:53:16.329Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "d0595e41-3f6f-4c61-856b-ed8bfa03fca9",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:53:41.415Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "58386f43-e185-4979-af8e-0c1da99b4b00",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:54:19.355Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "3e89ea90-51d6-44fd-a5fe-eb0cbbc806e4",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:54:45.100Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "6494074f-aea5-4865-9398-fa257e1695d0",
+      "userId": null,
+      "username": "rpt_tempstaff",
+      "at": "2026-06-27T04:55:27.366Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "ab79940e-55cc-4930-b60e-69bc0a8c7743",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:56:00.379Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "7d34b2a7-3516-4604-ae44-863cf85de07a",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-27T04:56:06.897Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "195a6efc-7336-49ff-a225-25ae561f3404",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-27T04:57:06.159Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "f773d43e-5e48-443e-ae56-edbfb20d200f",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:29:33.287Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "a7441fb7-49bc-43b8-af6c-b3b91766efeb",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:29:39.870Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "2dcb8532-54b8-4349-aa2d-c1b7fbb72f01",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-29T07:31:24.507Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "2f046780-93e1-462f-91ce-5db61f3d808f",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:43:47.696Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "48515e0c-d3bf-46c3-82d6-e6f4e24329da",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-30T03:56:08.566Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "5580d098-f9a5-448f-a6ca-66c8cc1ecac8",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-28T04:11:35.114Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "004d9c44-6077-4126-9426-3f5f071f6473",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-28T04:11:41.892Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "af0f2463-89ef-499b-b408-ea4e8fd116ca",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-28T04:48:22.086Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "019569fe-803d-49ae-a6fe-58ad7db0c3d4",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-28T04:48:28.721Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "e244aec3-6d0c-4054-ae74-8bbcdde2a394",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-28T05:01:53.177Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "84a53e6f-c5dd-428c-b9ef-f5d0db1919f2",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-28T05:02:00.524Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "ba4bba63-04a7-4c98-ba4d-a8051b4c352d",
+      "userId": null,
+      "username": "stf_user1",
+      "at": "2026-06-28T05:35:01.157Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "44b33718-f133-49ba-b845-b1123d94d4bb",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-28T05:35:08.616Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "b7f3060e-c2e6-40e8-8b7d-203e4a7251f9",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-29T06:24:08.437Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "ae29d3f0-590f-4ad0-b87d-9c1a7aaab95d",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-29T07:06:22.303Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    },
+    {
+      "id": "8d6f7157-f5db-486c-b793-5442cca05e17",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:08:20.846Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "af190759-8f8e-4646-ad9d-d9dd1239c62b",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:08:21.088Z",
+      "status": "success",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "e7da68c2-ea51-4dba-8ffb-1c48ad1788f3",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:08:21.857Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "e76f8d0d-80f2-43d8-ac2b-1f86728fe80e",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:08:22.600Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "223ec603-5fa2-42f0-a974-c7f5f5ae5daf",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:08:23.360Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "0a7d646c-0377-4ea4-9b3b-ef88c8862adb",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:08:24.082Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "270138b3-245c-4295-8f5b-a44ff73a3b1c",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:08:24.910Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "741492e6-8855-4530-9e2f-baa7a54d2cc7",
+      "userId": "u1",
+      "username": "admin",
+      "at": "2026-06-29T07:08:25.558Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "node"
+    },
+    {
+      "id": "c5a146e2-62fb-40ea-9a07-1fe0584c21c9",
+      "userId": "u3",
+      "username": "noor",
+      "at": "2026-06-29T07:08:26.535Z",
+      "status": "fail",
+      "ip": "::1",
+      "userAgent": "node"
+    }
+  ],
+  "Settings": [
+    {
+      "id": "default",
+      "hourlyRate": "3.00",
+      "fullDayPrice": "20.00",
+      "fullDayThresholdHours": 6,
+      "hotDrinksMonthlyCost": "400.00",
+      "company": {
+        "name": "Anoon Coworking",
+        "email": "info@workspace.ps",
+        "phone": "0597867603",
+        "address": "غزة مقابل منتزه البلدية "
+      }
+    }
+  ]
+}

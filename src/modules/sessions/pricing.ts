@@ -16,7 +16,12 @@ export function calculateSessionPricing(
   const elapsedMs = Math.max(0, now - checkInTime);
   const hours = elapsedMs / (1000 * 60 * 60);
 
-  const isSub = visitorType === "subscriber" && hasActiveSubscription;
+  // Despite the name "isSub", this flag now also covers trainees getting free time.
+  // Trainees are checked in as "trainee" type by staff and don't pay hourly — their
+  // training package/course already covers the space usage.
+  const isSub =
+    (visitorType === "subscriber" && hasActiveSubscription) ||
+    visitorType === "trainee";
 
   // Time cost calculation
   const timeAmountRaw = isSub

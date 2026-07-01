@@ -35,19 +35,34 @@ async function calcDayRevenue(date: Date): Promise<number> {
   });
   const saleRev = sales.reduce((s, x) => s + Number(x.total), 0);
 
-  // 3. Course revenue: sum of trainee.amountPaid for courses active on this day
+  // 3. Course revenue: pro-rata daily share of trainee.amountPaid
+  //    (amountPaid is cumulative — divide by course duration to avoid
+  //    counting the same payment on every active day)
   const activeCourses = await prisma.course.findMany({
     where: { startDate: { lte: dayEnd }, endDate: { gte: dayStart } },
-    select: { id: true },
+    select: { id: true, startDate: true, endDate: true },
   });
   let courseRev = 0;
   if (activeCourses.length > 0) {
     const courseIds = activeCourses.map((c) => c.id);
     const trainees = await prisma.trainee.findMany({
       where: { courseId: { in: courseIds } },
-      select: { amountPaid: true },
+      select: { amountPaid: true, courseId: true },
     });
-    courseRev = trainees.reduce((s, x) => s + Number(x.amountPaid), 0);
+    const paidByCourse = new Map<string, number>();
+    for (const t of trainees) {
+      paidByCourse.set(t.courseId, (paidByCourse.get(t.courseId) ?? 0) + Number(t.amountPaid));
+    }
+    for (const course of activeCourses) {
+      const totalPaid = paidByCourse.get(course.id) ?? 0;
+      if (totalPaid > 0) {
+        const durationDays = Math.max(
+          1,
+          Math.round((new Date(course.endDate).getTime() - new Date(course.startDate).getTime()) / day),
+        );
+        courseRev += totalPaid / durationDays;
+      }
+    }
   }
 
   // 4. Booking revenue: sum of booking.price where confirmed and startTime falls on this day

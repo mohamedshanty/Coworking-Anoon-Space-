@@ -18,6 +18,7 @@ import settingsRouter from "./modules/settings/routes";
 import staffRouter from "./modules/staff/routes";
 import permissionsRouter from "./modules/staff/permRoutes";
 import loginLogsRouter from "./modules/loginLogs/routes";
+import contactsRouter from "./modules/contacts/routes";
 import { authenticate } from "./middleware/authenticate";
 import { authorize } from "./middleware/authorize";
 
@@ -82,6 +83,9 @@ router.use("/permissions", permissionsRouter);
 
 // Register login-logs routes (admin-only)
 router.use("/login-logs", loginLogsRouter);
+
+// Register contacts routes
+router.use("/contacts", contactsRouter);
 
 // Test routes for middleware verification
 router.get("/test-protected-view", authenticate, authorize("الرئيسية", "view"), (req, res) => {

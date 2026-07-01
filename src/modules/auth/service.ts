@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
+import { ChangePasswordInput } from "./schema";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -130,6 +131,24 @@ export class AuthService {
 
   private generateRefreshToken(payload: TokenPayload): string {
     return jwt.sign(payload, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRES_IN });
+  }
+
+  async changePassword(userId: string, data: ChangePasswordInput) {
+    const user = await prisma.staff.findUnique({ where: { id: userId } });
+    if (!user) throw new ApiError(404, "User not found");
+
+    const isCurrentValid = await bcrypt.compare(data.currentPassword, user.passwordHash);
+    if (!isCurrentValid) {
+      throw new ApiError(401, "Current password is incorrect");
+    }
+
+    const passwordHash = await bcrypt.hash(data.newPassword, 10);
+    await prisma.staff.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return { message: "Password changed successfully" };
   }
 
   private async logLoginAttempt(

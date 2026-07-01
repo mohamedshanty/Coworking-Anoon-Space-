@@ -26,7 +26,7 @@ export class ReportsController {
       const [sessions, sales, expenses, bookings, courses, activeSubscriptions, settings] = await Promise.all([
         prisma.session.findMany({
           where: { checkIn: { gte: fromDate, lte: toDate }, checkOut: { not: null } },
-          select: { amount: true, paymentStatus: true, visitor: { select: { type: true } } },
+          select: { sessionType: true, amount: true, paymentStatus: true, visitor: { select: { type: true } } },
         }),
         prisma.sale.findMany({
           where: { date: { gte: fromDate, lte: toDate } },
@@ -141,7 +141,7 @@ export class ReportsController {
         where: {
           checkIn: { gte: fromDate, lte: toDate },
         },
-        include: { visitor: { select: { name: true, type: true } } },
+        select: { sessionType: true, amount: true, paymentStatus: true, checkIn: true, checkOut: true, visitor: { select: { name: true, type: true } } },
         orderBy: { checkIn: "asc" },
       });
 
@@ -165,9 +165,9 @@ export class ReportsController {
             : null;
           visitsSheet.addRow({
             visitorName: s.visitor.name,
-            type: typeMap[s.visitor.type] || s.visitor.type,
+            type: typeMap[s.sessionType ?? s.visitor.type] || s.visitor.type,
             checkIn: s.checkIn.toISOString(),
-            checkOut: s.checkOut ? s.checkOut.toISOString() : "نشط",
+            checkOut: s.checkOut ? s.checkOut.toISOString() : "لم يخرج",
             duration: duration !== null ? duration : "—",
             amount: Number(s.amount),
             paymentStatus: paymentStatusMap[s.paymentStatus] || s.paymentStatus,
@@ -190,9 +190,9 @@ export class ReportsController {
         const totalRevenue = r2(paidVisits.reduce((sum, s) => sum + Number(s.amount), 0));
         const avgRevenue = paidVisits.length > 0 ? r2(totalRevenue / paidVisits.length) : 0;
 
-        const visitorCount = sessions.filter((s) => s.visitor.type === "visitor").length;
-        const subscriberCount = sessions.filter((s) => s.visitor.type === "subscriber").length;
-        const traineeCount = sessions.filter((s) => s.visitor.type === "trainee").length;
+        const visitorCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "visitor").length;
+        const subscriberCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "subscriber").length;
+        const traineeCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "trainee").length;
 
         visitsSummarySheet.addRow({ item: "إجمالي الزيارات", value: totalVisits });
         visitsSummarySheet.addRow({ item: "الزيارات المدفوعة", value: paidVisits.length });
