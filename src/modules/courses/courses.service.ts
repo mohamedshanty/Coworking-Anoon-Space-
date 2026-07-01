@@ -37,11 +37,11 @@ export class CoursesService {
   }
 
   // Trainee operations
-  async addTrainee(courseId: string, data: Prisma.TraineeCreateInput): Promise<Trainee> {
+  async addTrainee(courseId: string, data: Omit<Prisma.TraineeCreateInput, 'course'>): Promise<Trainee> {
     if (data.amountPaid) {
       (data as any).amountPaid = new Prisma.Decimal(data.amountPaid as any).toFixed(2);
     }
-    return prisma.trainee.create({ data: { ...data, courseId } });
+    return prisma.trainee.create({ data: { ...data, course: { connect: { id: courseId } } } });
   }
 
   async recordPayment(courseId: string, traineeId: string, amount: number): Promise<Trainee> {

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { debtsService } from "./service";
+import { getParam } from "../../lib/getParam";
 import { createDebtSchema, updateDebtSchema } from "./schema";
 
 export class DebtsController {
@@ -30,7 +31,7 @@ export class DebtsController {
 
   async editDebt(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       const input = updateDebtSchema.parse(req.body);
       const data = await debtsService.editDebt(id, input);
       res.status(200).json({
@@ -44,7 +45,7 @@ export class DebtsController {
 
   async deleteDebt(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       const data = await debtsService.deleteDebt(id);
       res.status(200).json({
         success: true,
@@ -57,7 +58,7 @@ export class DebtsController {
 
   async collectDebt(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       const data = await debtsService.collectDebt(id);
       res.status(200).json({
         success: true,

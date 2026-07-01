@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { expensesService } from "./service";
+import { getParam } from "../../lib/getParam";
 import { createExpenseSchema, updateExpenseSchema, byCategoryQuerySchema } from "./schema";
 
 export class ExpensesController {
@@ -30,7 +31,7 @@ export class ExpensesController {
 
   async editExpense(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       const input = updateExpenseSchema.parse(req.body);
       const data = await expensesService.editExpense(id, input);
       res.status(200).json({
@@ -44,7 +45,7 @@ export class ExpensesController {
 
   async deleteExpense(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       const data = await expensesService.deleteExpense(id);
       res.status(200).json({
         success: true,

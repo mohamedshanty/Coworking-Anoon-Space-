@@ -1,6 +1,7 @@
 // src/modules/rooms/bookings.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { BookingsService } from './bookings.service';
+import { getParam } from '../../lib/getParam';
 import { z } from 'zod';
 
 const bookingSchema = z.object({
@@ -18,14 +19,16 @@ export class BookingsController {
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
       const parsed = bookingSchema.parse(req.body);
+      const { roomId, ...rest } = parsed;
       const booking = await new BookingsService().create({
-        ...parsed,
+        ...rest,
         startTime: new Date(parsed.startTime),
         endTime: new Date(parsed.endTime),
+        room: { connect: { id: roomId } },
       });
       res.status(201).json({ success: true, data: booking });
     } catch (err) {
-      if (err.message === 'Conflict') {
+      if (err instanceof Error && err.message === 'Conflict') {
         return res.status(409).json({ success: false, message: 'Booking time conflict' });
       }
       next(err);
@@ -43,7 +46,7 @@ export class BookingsController {
 
   static async getOne(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       const booking = await new BookingsService().findOne(id);
       if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
       res.json({ success: true, data: booking });
@@ -54,7 +57,7 @@ export class BookingsController {
 
   static async update(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       const parsed = bookingSchema.partial().parse(req.body);
       const booking = await new BookingsService().update(id, {
         ...parsed,
@@ -63,7 +66,7 @@ export class BookingsController {
       });
       res.json({ success: true, data: booking });
     } catch (err) {
-      if (err.message === 'Conflict') {
+      if (err instanceof Error && err.message === 'Conflict') {
         return res.status(409).json({ success: false, message: 'Booking time conflict' });
       }
       next(err);
@@ -72,7 +75,7 @@ export class BookingsController {
 
   static async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       await new BookingsService().delete(id);
       res.status(204).send();
     } catch (err) {

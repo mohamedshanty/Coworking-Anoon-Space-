@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { followUpService } from "./service";
+import { getParam } from "../../lib/getParam";
 
 const followUpQuerySchema = z.object({
   showAll: z.enum(["true", "false"]).optional(),
@@ -23,7 +24,7 @@ export class FollowUpController {
 
   async markContacted(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { visitorId } = req.params;
+      const visitorId = getParam(req.params.visitorId, 'visitorId');
       const data = await followUpService.markContacted(visitorId);
       res.status(200).json({
         success: true,
@@ -36,7 +37,7 @@ export class FollowUpController {
 
   async optOut(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { visitorId } = req.params;
+      const visitorId = getParam(req.params.visitorId, 'visitorId');
       const data = await followUpService.optOut(visitorId);
       res.status(200).json({
         success: true,

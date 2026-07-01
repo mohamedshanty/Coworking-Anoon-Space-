@@ -141,7 +141,7 @@ export class ReportsController {
         where: {
           checkIn: { gte: fromDate, lte: toDate },
         },
-        select: { sessionType: true, amount: true, paymentStatus: true, checkIn: true, checkOut: true, visitor: { select: { name: true, type: true } } },
+          select: { sessionType: true, amount: true, paymentStatus: true, paymentMethod: true, checkIn: true, checkOut: true, visitor: { select: { name: true, type: true } } },
         orderBy: { checkIn: "asc" },
       });
 

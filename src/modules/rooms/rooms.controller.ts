@@ -1,6 +1,7 @@
 // src/modules/rooms/rooms.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { RoomsService } from './rooms.service';
+import { getParam } from '../../lib/getParam';
 import { z } from 'zod';
 
 const roomSchema = z.object({
@@ -29,7 +30,7 @@ export class RoomsController {
 
   static async getOne(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       const room = await new RoomsService().findOne(id);
       if (!room) return res.status(404).json({ success: false, message: 'Room not found' });
       res.json({ success: true, data: room });
@@ -40,7 +41,7 @@ export class RoomsController {
 
   static async update(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       const parsed = roomSchema.partial().parse(req.body);
       const room = await new RoomsService().update(id, parsed);
       res.json({ success: true, data: room });
@@ -51,7 +52,7 @@ export class RoomsController {
 
   static async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       await new RoomsService().delete(id);
       res.status(204).send();
     } catch (err) {

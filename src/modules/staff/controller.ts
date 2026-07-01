@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { staffService } from "./service";
+import { getParam } from "../../lib/getParam";
 import { createStaffSchema, updateStaffSchema } from "./schema";
 
 export class StaffController {
@@ -14,7 +15,7 @@ export class StaffController {
 
   async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const data = await staffService.getById(req.params.id);
+      const data = await staffService.getById(getParam(req.params.id));
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
@@ -34,7 +35,7 @@ export class StaffController {
   async update(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const input = updateStaffSchema.parse(req.body);
-      const data = await staffService.update(req.params.id, input);
+      const data = await staffService.update(getParam(req.params.id), input);
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
@@ -43,7 +44,7 @@ export class StaffController {
 
   async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const data = await staffService.delete(req.params.id);
+      const data = await staffService.delete(getParam(req.params.id));
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);

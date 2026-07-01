@@ -5,14 +5,15 @@ import { Prisma, Booking, BookingStatus } from '@prisma/client';
 
 export class BookingsService {
   // Helper to round Decimal to 2 places
-  private round(value: number | string): Prisma.Decimal {
+  private round(value: number | string): string {
     return new Prisma.Decimal(value).toFixed(2);
   }
 
   async create(data: Prisma.BookingCreateInput): Promise<Booking> {
     // If status is confirmed, check for conflict
-    if ((data.status as any) === 'confirmed') {
-      const conflict = await this.findConflict(data.roomId as string, data.startTime as Date, data.endTime as Date);
+    const roomId = (data.room as any)?.connect?.id as string;
+    if ((data.status as any) === 'confirmed' && roomId) {
+      const conflict = await this.findConflict(roomId, data.startTime as Date, data.endTime as Date);
       if (conflict) {
         throw new Error('Conflict');
       }

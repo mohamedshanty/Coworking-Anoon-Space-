@@ -1,6 +1,7 @@
 // src/modules/courses/courses.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { CoursesService } from './courses.service';
+import { getParam } from '../../lib/getParam';
 import { z } from 'zod';
 
 const courseSchema = z.object({
@@ -26,10 +27,12 @@ export class CoursesController {
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
       const parsed = courseSchema.parse(req.body);
+      const { roomId, ...rest } = parsed;
       const course = await new CoursesService().create({
-        ...parsed,
+        ...rest,
         startDate: new Date(parsed.startDate),
         endDate: new Date(parsed.endDate),
+        room: { connect: { id: roomId } },
       });
       res.status(201).json({ success: true, data: course });
     } catch (err) {
@@ -48,7 +51,7 @@ export class CoursesController {
 
   static async getOne(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       const course = await new CoursesService().findOne(id);
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
       res.json({ success: true, data: course });
@@ -59,7 +62,7 @@ export class CoursesController {
 
   static async update(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       const parsed = courseSchema.partial().parse(req.body);
       const course = await new CoursesService().update(id, {
         ...parsed,
@@ -74,7 +77,7 @@ export class CoursesController {
 
   static async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = getParam(req.params.id);
       await new CoursesService().delete(id);
       res.status(204).send();
     } catch (err) {
@@ -85,7 +88,7 @@ export class CoursesController {
   // Trainees endpoints
   static async getTrainees(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params; // course id
+      const id = getParam(req.params.id); // course id
       const trainees = await new CoursesService().getTrainees(id);
       res.json({ success: true, data: trainees });
     } catch (err) {
@@ -95,7 +98,7 @@ export class CoursesController {
 
   static async addTrainee(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params; // course id
+      const id = getParam(req.params.id); // course id
       const parsed = traineeSchema.parse(req.body);
       const trainee = await new CoursesService().addTrainee(id, parsed);
       res.status(201).json({ success: true, data: trainee });
@@ -106,7 +109,8 @@ export class CoursesController {
 
   static async recordPayment(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id, traineeId } = req.params;
+      const id = getParam(req.params.id);
+      const traineeId = getParam(req.params.traineeId, 'traineeId');
       const paymentSchema = z.object({
         amount: z.number().positive("Amount must be positive"),
       });
@@ -120,7 +124,8 @@ export class CoursesController {
 
   static async updateAttendance(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id, traineeId } = req.params;
+      const id = getParam(req.params.id);
+      const traineeId = getParam(req.params.traineeId, 'traineeId');
       const attendanceSchema = z.object({
         attendancePercent: z.number().min(0).max(100),
       });
@@ -134,7 +139,8 @@ export class CoursesController {
 
   static async updateTrainee(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id, traineeId } = req.params;
+      const id = getParam(req.params.id);
+      const traineeId = getParam(req.params.traineeId, 'traineeId');
       const schema = z.object({
         name: z.string().min(1).optional(),
         phone: z.string().min(1).optional(),
@@ -150,7 +156,8 @@ export class CoursesController {
 
   static async deleteTrainee(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id, traineeId } = req.params;
+      const id = getParam(req.params.id);
+      const traineeId = getParam(req.params.traineeId, 'traineeId');
       await new CoursesService().deleteTrainee(id, traineeId);
       res.status(204).send();
     } catch (err) {
