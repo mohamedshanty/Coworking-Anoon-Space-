@@ -42,4 +42,11 @@ router.patch(
   (req, res, next) => subscribersController.updateSubscriber(req, res, next)
 );
 
+// DELETE subscriber (Visitor + cascade subscriptions/sessions)
+router.delete(
+  "/:id",
+  authorize("المشتركون", "delete"),
+  (req, res, next) => subscribersController.deleteSubscriber(req, res, next)
+);
+
 export default router;

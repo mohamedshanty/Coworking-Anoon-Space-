@@ -6,7 +6,9 @@ export class ContactsController {
   async list(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const search = req.query.search as string | undefined;
-      const data = await contactsService.list(search);
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
+      const data = await contactsService.list({ search, page, limit });
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);

@@ -3,10 +3,21 @@ import { ApiError } from "../../lib/ApiError";
 import { CreateDebtInput, UpdateDebtInput } from "./schema";
 
 export class DebtsService {
-  async getDebts() {
-    return prisma.debt.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+  async getDebts(params: { page?: number; limit?: number }) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(100, Math.max(1, params.limit ?? 25));
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      prisma.debt.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.debt.count(),
+    ]);
+
+    return { items, total, page, limit };
   }
 
   async createDebt(data: CreateDebtInput) {

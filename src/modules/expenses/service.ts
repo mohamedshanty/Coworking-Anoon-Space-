@@ -3,10 +3,21 @@ import { ApiError } from "../../lib/ApiError";
 import { CreateExpenseInput, UpdateExpenseInput } from "./schema";
 
 export class ExpensesService {
-  async getExpenses() {
-    return prisma.expense.findMany({
-      orderBy: { date: "desc" },
-    });
+  async getExpenses(params: { page?: number; limit?: number }) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(100, Math.max(1, params.limit ?? 25));
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      prisma.expense.findMany({
+        orderBy: { date: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.expense.count(),
+    ]);
+
+    return { items, total, page, limit };
   }
 
   async createExpense(data: CreateExpenseInput) {

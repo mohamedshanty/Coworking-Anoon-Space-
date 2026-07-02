@@ -3,15 +3,34 @@ import { ApiError } from "../../lib/ApiError";
 import { CreateSubscriberInput, RenewSubscriptionInput, UpdateSubscriberInput } from "./schema";
 
 export class SubscribersService {
-  async getSubscribers() {
-    return prisma.visitor.findMany({
-      where: { type: "subscriber" },
-      include: {
-        subscriptions: {
-          orderBy: { startDate: "desc" },
+  async getSubscribers(params: { search?: string; page?: number; limit?: number }) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(100, Math.max(1, params.limit ?? 25));
+    const skip = (page - 1) * limit;
+
+    const where: any = { type: "subscriber" };
+    if (params.search) {
+      where.OR = [
+        { name: { contains: params.search, mode: "insensitive" } },
+        { phone: { contains: params.search, mode: "insensitive" } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.visitor.findMany({
+        where,
+        include: {
+          subscriptions: {
+            orderBy: { startDate: "desc" },
+          },
         },
-      },
-    });
+        skip,
+        take: limit,
+      }),
+      prisma.visitor.count({ where }),
+    ]);
+
+    return { items, total, page, limit };
   }
 
   async createSubscriber(data: CreateSubscriberInput) {
@@ -22,10 +41,28 @@ export class SubscribersService {
     });
 
     if (visitor) {
-      // Update existing visitor to subscriber type
+      // Check if this visitor already has a live (non-expired) subscription.
+      // Uses the same status set as renewSubscription to stay consistent.
+      const activeSub = await prisma.subscription.findFirst({
+        where: {
+          visitorId: visitor.id,
+          status: { in: ["active", "paused", "renewing"] },
+        },
+      });
+      if (activeSub) {
+        throw new ApiError(
+          409,
+          `يوجد مشترك مسجل مسبقاً بنفس رقم الهاتف: ${visitor.name}`
+        );
+      }
+      // Reactivation: visitor exists but has no live subscription — allow creating a new one.
       visitor = await prisma.visitor.update({
         where: { id: visitor.id },
-        data: { type: "subscriber", name: data.name },
+        data: {
+          type: "subscriber",
+          name: data.name,
+          ...(data.notes !== undefined ? { notes: data.notes } : {}),
+        },
       });
     } else {
       visitor = await prisma.visitor.create({
@@ -33,6 +70,7 @@ export class SubscribersService {
           name: data.name,
           phone: data.phone,
           type: "subscriber",
+          ...(data.notes !== undefined ? { notes: data.notes } : {}),
         },
       });
     }
@@ -129,6 +167,25 @@ export class SubscribersService {
     });
 
     return updated;
+  }
+
+  async deleteSubscriber(visitorId: string) {
+    const visitor = await prisma.visitor.findUnique({
+      where: { id: visitorId },
+    });
+    if (!visitor) {
+      throw new ApiError(404, "Visitor not found");
+    }
+    if (visitor.type !== "subscriber") {
+      throw new ApiError(400, "Visitor is not a subscriber");
+    }
+
+    // Cascade: Sessions (onDelete: Cascade), Subscriptions (onDelete: Cascade).
+    // Debts: onDelete: SetNull — debts survive with visitorId nulled out.
+    // This is acceptable: debts are financial records that should persist even after subscriber removal.
+    return prisma.visitor.delete({
+      where: { id: visitorId },
+    });
   }
 }
 

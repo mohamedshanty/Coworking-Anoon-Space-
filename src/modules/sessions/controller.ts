@@ -126,9 +126,22 @@ export class SessionsController {
     }
   }
 
+  async deleteSession(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const data = await sessionsService.deleteSession(id);
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { from, to, type, paymentStatus, page, limit } = req.query;
+      const { from, to, type, paymentStatus, search, page, limit } = req.query;
 
       if (!from || !to) {
         res.status(400).json({ success: false, message: "'from' and 'to' query params are required" });
@@ -140,6 +153,7 @@ export class SessionsController {
         to: to as string,
         type: type as string | undefined,
         paymentStatus: paymentStatus as string | undefined,
+        search: search as string | undefined,
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
       });

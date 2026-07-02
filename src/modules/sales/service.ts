@@ -1,6 +1,11 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
-import { CreateSnackSaleInput, CreateHotDrinkSaleInput } from "./schema";
+import {
+  CreateSnackSaleInput,
+  CreateHotDrinkSaleInput,
+  UpdateSnackSaleInput,
+  UpdateHotDrinkSaleInput,
+} from "./schema";
 
 const DRINK_PRICES: Record<string, number> = {
   "قهوة": 6,
@@ -10,26 +15,52 @@ const DRINK_PRICES: Record<string, number> = {
 };
 
 export class SalesService {
-  async getSnackSales() {
-    const sales = await prisma.sale.findMany({
-      where: { isHotDrink: false },
-      orderBy: { date: "desc" },
-    });
-    return sales.map((sale) => ({
+  async getSnackSales(params: { page?: number; limit?: number }) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(100, Math.max(1, params.limit ?? 25));
+    const skip = (page - 1) * limit;
+    const where = { isHotDrink: false };
+
+    const [sales, total] = await Promise.all([
+      prisma.sale.findMany({
+        where,
+        orderBy: { date: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.sale.count({ where }),
+    ]);
+
+    const items = sales.map((sale) => ({
       ...sale,
       total: Math.round((Number(sale.total) + Number.EPSILON) * 100) / 100,
     }));
+
+    return { items, total, page, limit };
   }
 
-  async getHotDrinkSales() {
-    const sales = await prisma.sale.findMany({
-      where: { isHotDrink: true },
-      orderBy: { date: "desc" },
-    });
-    return sales.map((sale) => ({
+  async getHotDrinkSales(params: { page?: number; limit?: number }) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(100, Math.max(1, params.limit ?? 25));
+    const skip = (page - 1) * limit;
+    const where = { isHotDrink: true };
+
+    const [sales, total] = await Promise.all([
+      prisma.sale.findMany({
+        where,
+        orderBy: { date: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.sale.count({ where }),
+    ]);
+
+    const items = sales.map((sale) => ({
       ...sale,
       total: Math.round((Number(sale.total) + Number.EPSILON) * 100) / 100,
     }));
+
+    return { items, total, page, limit };
   }
 
   async createSnackSale(data: CreateSnackSaleInput) {
@@ -101,6 +132,121 @@ export class SalesService {
         date: new Date(),
       },
     });
+  }
+
+  async editSnackSale(id: string, data: UpdateSnackSaleInput) {
+    const sale = await prisma.sale.findUnique({ where: { id } });
+    if (!sale) throw new ApiError(404, "Sale not found");
+    if (sale.isHotDrink) throw new ApiError(400, "Use hot drinks endpoint for hot drink sales");
+
+    const oldQty = sale.quantity;
+    const oldItemId = sale.itemId;
+    const newQty = data.quantity ?? oldQty;
+    const newItemId = data.itemId ?? oldItemId;
+
+    // If quantity or item changed, adjust inventory stock
+    if (newQty !== oldQty || newItemId !== oldItemId) {
+      // Restore old item stock
+      if (oldItemId) {
+        const oldItem = await prisma.inventoryItem.findUnique({ where: { id: oldItemId } });
+        if (oldItem) {
+          await prisma.inventoryItem.update({
+            where: { id: oldItemId },
+            data: { quantity: oldItem.quantity + oldQty },
+          });
+        }
+      }
+
+      // Deduct new item stock
+      if (newItemId) {
+        const newItem = await prisma.inventoryItem.findUnique({ where: { id: newItemId } });
+        if (!newItem) throw new ApiError(404, "New inventory item not found");
+        if (newItem.quantity < newQty) {
+          throw new ApiError(400, `Insufficient stock for ${newItem.name}`);
+        }
+        await prisma.inventoryItem.update({
+          where: { id: newItemId },
+          data: { quantity: newItem.quantity - newQty },
+        });
+      }
+    }
+
+    // Recalculate total from new item's sell price
+    let total = Number(sale.total);
+    if (newItemId && (data.quantity !== undefined || data.itemId !== undefined)) {
+      const item = await prisma.inventoryItem.findUnique({ where: { id: newItemId } });
+      if (item) {
+        total = Math.round((newQty * Number(item.sellPrice) + Number.EPSILON) * 100) / 100;
+      }
+    }
+
+    const itemName =
+      newItemId !== oldItemId && newItemId
+        ? (await prisma.inventoryItem.findUnique({ where: { id: newItemId } }))?.name ?? sale.itemName
+        : sale.itemName;
+
+    return prisma.sale.update({
+      where: { id },
+      data: {
+        ...(data.itemId ? { itemId: data.itemId } : {}),
+        ...(itemName !== sale.itemName ? { itemName } : {}),
+        ...(data.quantity !== undefined ? { quantity: data.quantity } : {}),
+        total,
+        ...(data.paymentMethod ? { paymentMethod: data.paymentMethod } : {}),
+      },
+    });
+  }
+
+  async deleteSnackSale(id: string) {
+    const sale = await prisma.sale.findUnique({ where: { id } });
+    if (!sale) throw new ApiError(404, "Sale not found");
+    if (sale.isHotDrink) throw new ApiError(400, "Use hot drinks endpoint for hot drink sales");
+
+    // Restore inventory stock that was deducted on creation
+    if (sale.itemId) {
+      const item = await prisma.inventoryItem.findUnique({ where: { id: sale.itemId } });
+      if (item) {
+        await prisma.inventoryItem.update({
+          where: { id: sale.itemId },
+          data: { quantity: item.quantity + sale.quantity },
+        });
+      }
+    }
+
+    return prisma.sale.delete({ where: { id } });
+  }
+
+  async editHotDrinkSale(id: string, data: UpdateHotDrinkSaleInput) {
+    const sale = await prisma.sale.findUnique({ where: { id } });
+    if (!sale) throw new ApiError(404, "Sale not found");
+    if (!sale.isHotDrink) throw new ApiError(400, "Use snacks endpoint for snack sales");
+
+    // Recalculate total if item name changed (prices are hardcoded)
+    let total = Number(sale.total);
+    if (data.itemName && data.itemName !== sale.itemName) {
+      const price = DRINK_PRICES[data.itemName] || 5;
+      total = Math.round((price + Number.EPSILON) * 100) / 100;
+    }
+
+    return prisma.sale.update({
+      where: { id },
+      data: {
+        ...(data.itemName
+          ? { itemName: data.itemName, itemId: `hot-${data.itemName}` }
+          : {}),
+        ...(data.paymentMethod ? { paymentMethod: data.paymentMethod } : {}),
+        total,
+      },
+    });
+  }
+
+  async deleteHotDrinkSale(id: string) {
+    const sale = await prisma.sale.findUnique({ where: { id } });
+    if (!sale) throw new ApiError(404, "Sale not found");
+    if (!sale.isHotDrink) throw new ApiError(400, "Use snacks endpoint for snack sales");
+
+    // Hot drinks have no inventory to restore
+    return prisma.sale.delete({ where: { id } });
   }
 }
 

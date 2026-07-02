@@ -27,6 +27,7 @@ enum PaymentMethod {
 enum SubscriptionPackage {
   monthly
   weekly
+  half_month
 }
 
 enum SubscriptionStatus {
@@ -89,6 +90,7 @@ model Visitor {
   phone          String
   type           PersonType
   source         String?
+  notes          String?
   lastVisit      DateTime?
   followUpStatus FollowUpStatus?
   followUpAt     DateTime?

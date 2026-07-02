@@ -12,5 +12,18 @@ export const createHotDrinkSaleSchema = z.object({
   paymentMethod: z.enum(["cash", "card", "transfer"]),
 });
 
+export const updateSnackSaleSchema = z.object({
+  itemId: z.string().min(1).optional(),
+  quantity: z.number().int().min(1).optional(),
+  paymentMethod: z.enum(["cash", "card", "transfer"]).optional(),
+});
+
+export const updateHotDrinkSaleSchema = z.object({
+  itemName: z.string().min(1).optional(),
+  paymentMethod: z.enum(["cash", "card", "transfer"]).optional(),
+});
+
 export type CreateSnackSaleInput = z.infer<typeof createSnackSaleSchema>;
 export type CreateHotDrinkSaleInput = z.infer<typeof createHotDrinkSaleSchema>;
+export type UpdateSnackSaleInput = z.infer<typeof updateSnackSaleSchema>;
+export type UpdateHotDrinkSaleInput = z.infer<typeof updateHotDrinkSaleSchema>;

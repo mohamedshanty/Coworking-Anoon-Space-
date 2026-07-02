@@ -71,4 +71,11 @@ router.post(
   (req, res, next) => sessionsController.addOrder(req, res, next)
 );
 
+// DELETE session (works for both live and history since same model)
+router.delete(
+  "/:id",
+  authorize("داخل المساحة", "delete"),
+  (req, res, next) => sessionsController.deleteSession(req, res, next)
+);
+
 export default router;

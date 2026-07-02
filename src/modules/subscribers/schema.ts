@@ -3,7 +3,8 @@ import { z } from "zod";
 export const createSubscriberSchema = z.object({
   name: z.string().min(1, "Name is required"),
   phone: z.string().min(1, "Phone is required"),
-  packageType: z.enum(["monthly", "weekly"]),
+  notes: z.string().optional(),
+  packageType: z.enum(["monthly", "weekly", "half_month"]),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   dailyQuotaHours: z.number().int().min(0),
@@ -11,7 +12,7 @@ export const createSubscriberSchema = z.object({
 });
 
 export const renewSubscriptionSchema = z.object({
-  packageType: z.enum(["monthly", "weekly"]),
+  packageType: z.enum(["monthly", "weekly", "half_month"]),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   dailyQuotaHours: z.number().int().min(0),

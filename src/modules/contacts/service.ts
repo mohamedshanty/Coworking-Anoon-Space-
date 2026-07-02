@@ -16,20 +16,31 @@ function normalizeName(name: string): string {
 }
 
 export class ContactsService {
-  async list(search?: string) {
-    const where = search
+  async list(params: { search?: string; page?: number; limit?: number }) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(100, Math.max(1, params.limit ?? 25));
+    const skip = (page - 1) * limit;
+
+    const where = params.search
       ? {
           OR: [
-            { fullName: { contains: search, mode: "insensitive" as const } },
-            { phone: { contains: search, mode: "insensitive" as const } },
+            { fullName: { contains: params.search, mode: "insensitive" as const } },
+            { phone: { contains: params.search, mode: "insensitive" as const } },
           ],
         }
       : {};
 
-    return prisma.contact.findMany({
-      where,
-      orderBy: { fullName: "asc" },
-    });
+    const [items, total] = await Promise.all([
+      prisma.contact.findMany({
+        where,
+        orderBy: { fullName: "asc" },
+        skip,
+        take: limit,
+      }),
+      prisma.contact.count({ where }),
+    ]);
+
+    return { items, total, page, limit };
   }
 
   async search(query: string) {

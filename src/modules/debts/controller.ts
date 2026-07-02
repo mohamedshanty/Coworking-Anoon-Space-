@@ -6,7 +6,9 @@ import { createDebtSchema, updateDebtSchema } from "./schema";
 export class DebtsController {
   async getDebts(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const data = await debtsService.getDebts();
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
+      const data = await debtsService.getDebts({ page, limit });
       res.status(200).json({
         success: true,
         data,

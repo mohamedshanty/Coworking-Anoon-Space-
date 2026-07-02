@@ -6,7 +6,9 @@ import { createExpenseSchema, updateExpenseSchema, byCategoryQuerySchema } from 
 export class ExpensesController {
   async getExpenses(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const data = await expensesService.getExpenses();
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
+      const data = await expensesService.getExpenses({ page, limit });
       res.status(200).json({
         success: true,
         data,

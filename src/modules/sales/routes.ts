@@ -21,4 +21,18 @@ router.post(
   (req, res, next) => salesController.createSnackSale(req, res, next)
 );
 
+// PATCH edit snack sale
+router.patch(
+  "/:id",
+  authorize("السناكس", "edit"),
+  (req, res, next) => salesController.editSnackSale(req, res, next)
+);
+
+// DELETE snack sale (restores inventory)
+router.delete(
+  "/:id",
+  authorize("السناكس", "delete"),
+  (req, res, next) => salesController.deleteSnackSale(req, res, next)
+);
+
 export default router;

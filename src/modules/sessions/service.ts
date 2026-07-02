@@ -161,6 +161,8 @@ export class SessionsService {
           ? { checkOut: data.checkOut ? new Date(data.checkOut) : null }
           : {}),
         ...(data.amount !== undefined ? { amount: data.amount } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes } : {}),
+        ...(data.sessionType !== undefined ? { sessionType: data.sessionType } : {}),
         ...(data.paymentStatus ? { paymentStatus: data.paymentStatus } : {}),
         ...(data.paymentMethod !== undefined ? { paymentMethod: data.paymentMethod } : {}),
       },
@@ -369,11 +371,45 @@ export class SessionsService {
     return { order, sale };
   }
 
+  async deleteSession(id: string) {
+    const session = await prisma.session.findUnique({
+      where: { id },
+      include: { visitor: true },
+    });
+    if (!session) {
+      throw new ApiError(404, "Session not found");
+    }
+
+    // Block delete if unpaid session debt exists for this visitor.
+    // checkoutUnpaid creates a Debt (type: "session") referencing the Visitor, not the Session.
+    // Deleting the session without resolving the debt would leave an orphaned financial record.
+    const unpaidDebt = await prisma.debt.findFirst({
+      where: {
+        visitorId: session.visitorId,
+        type: "session",
+        status: "unpaid",
+      },
+    });
+    if (unpaidDebt) {
+      throw new ApiError(
+        400,
+        "Cannot delete session with an unpaid debt. Collect or delete the debt first."
+      );
+    }
+
+    // SnackOrders cascade-delete via onDelete: Cascade on Session relation.
+    // Sales have onDelete: SetNull — sessionId becomes null, sale records survive.
+    return prisma.session.delete({
+      where: { id },
+    });
+  }
+
   async getHistory(params: {
     from: string;
     to: string;
     type?: string;
     paymentStatus?: string;
+    search?: string;
     page?: number;
     limit?: number;
   }) {
@@ -403,6 +439,23 @@ export class SessionsService {
 
     if (params.paymentStatus) {
       where.paymentStatus = params.paymentStatus as any;
+    }
+
+    if (params.search) {
+      const searchTerm = params.search.trim();
+      if (searchTerm) {
+        const searchFilter: Prisma.SessionWhereInput = {
+          OR: [
+            { visitor: { name: { contains: searchTerm, mode: "insensitive" } } },
+            { visitor: { phone: { contains: searchTerm, mode: "insensitive" } } },
+          ],
+        };
+        if (where.AND) {
+          (where.AND as Prisma.SessionWhereInput[]).push(searchFilter);
+        } else {
+          where.AND = [searchFilter];
+        }
+      }
     }
 
     const [sessions, total] = await Promise.all([
