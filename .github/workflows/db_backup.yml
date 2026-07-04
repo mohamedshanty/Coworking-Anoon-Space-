@@ -1,0 +1,39 @@
+name: Daily Neon DB Backup
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # 02:00 UTC daily — adjust as needed
+  workflow_dispatch: # allows manual trigger from the Actions tab
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo (for scripts)
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client (pg_dump)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Set up SSH key for backup repo
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BACKUP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Run backup script
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          BACKUP_REPO: ${{ secrets.BACKUP_REPO }}
+        run: |
+          chmod +x scripts/backup.sh
+          bash scripts/backup.sh
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Backup failed. Consider adding a Slack/Discord webhook notification here."
+          # Example: curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"⚠️ Noon DB backup failed!"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
