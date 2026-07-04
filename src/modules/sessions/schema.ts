@@ -4,6 +4,7 @@ export const checkInSchema = z.union([
   z.object({
     visitorId: z.string().min(1),
     notes: z.string().optional(),
+    hourlyRate: z.number().min(0).optional(),
   }),
   z.object({
     name: z.string().min(1),
@@ -11,6 +12,7 @@ export const checkInSchema = z.union([
     type: z.enum(["visitor", "subscriber", "trainee"]),
     source: z.string().optional(),
     notes: z.string().optional(),
+    hourlyRate: z.number().min(0).optional(),
   }),
 ]);
 

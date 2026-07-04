@@ -60,13 +60,19 @@ export class SessionsService {
 
       const effectiveType = s.sessionType ?? s.visitor.type;
 
+      // Use the session's own hourly rate; fall back to global default for
+      // sessions created before the per-session rate feature was introduced.
+      const sessionHourlyRate = s.hourlyRate != null
+        ? Number(s.hourlyRate)
+        : Number(settings.hourlyRate);
+
       const pricing = calculateSessionPricing(
         s.checkIn,
         effectiveType,
         hasActiveSub,
         s.snackOrders,
         {
-          hourlyRate: Number(settings.hourlyRate),
+          hourlyRate: sessionHourlyRate,
           fullDayPrice: Number(settings.fullDayPrice),
           fullDayThresholdHours: settings.fullDayThresholdHours,
         }
@@ -121,12 +127,26 @@ export class SessionsService {
 
     const sessionType = "type" in data ? (data as { type?: string }).type ?? null : null;
 
+    // Determine hourly rate: use custom if provided, otherwise fetch global default
+    let hourlyRate: number;
+    const customRate = "hourlyRate" in data ? (data as { hourlyRate?: number }).hourlyRate : undefined;
+    if (customRate != null && customRate > 0) {
+      hourlyRate = customRate;
+    } else {
+      const settings = await prisma.settings.findFirst();
+      if (!settings) {
+        throw new ApiError(500, "Settings not initialized in database");
+      }
+      hourlyRate = Number(settings.hourlyRate);
+    }
+
     const session = await prisma.session.create({
       data: {
         visitorId,
         sessionType,
         checkIn: new Date(),
         amount: 0,
+        hourlyRate,
         paymentStatus: "full_debt",
         notes: "notes" in data ? (data as { notes?: string }).notes ?? null : null,
       },
@@ -198,13 +218,19 @@ export class SessionsService {
 
     const effectiveType = session.sessionType ?? session.visitor.type;
 
+    // Use the session's own hourly rate; fall back to global default for
+    // sessions created before the per-session rate feature was introduced.
+    const sessionHourlyRate = session.hourlyRate != null
+      ? Number(session.hourlyRate)
+      : Number(settings.hourlyRate);
+
     const pricing = calculateSessionPricing(
       session.checkIn,
       effectiveType,
       !!activeSub,
       session.snackOrders,
       {
-        hourlyRate: Number(settings.hourlyRate),
+        hourlyRate: sessionHourlyRate,
         fullDayPrice: Number(settings.fullDayPrice),
         fullDayThresholdHours: settings.fullDayThresholdHours,
       }
@@ -250,13 +276,19 @@ export class SessionsService {
 
     const effectiveType = session.sessionType ?? session.visitor.type;
 
+    // Use the session's own hourly rate; fall back to global default for
+    // sessions created before the per-session rate feature was introduced.
+    const sessionHourlyRate = session.hourlyRate != null
+      ? Number(session.hourlyRate)
+      : Number(settings.hourlyRate);
+
     const pricing = calculateSessionPricing(
       session.checkIn,
       effectiveType,
       !!activeSub,
       session.snackOrders,
       {
-        hourlyRate: Number(settings.hourlyRate),
+        hourlyRate: sessionHourlyRate,
         fullDayPrice: Number(settings.fullDayPrice),
         fullDayThresholdHours: settings.fullDayThresholdHours,
       }
@@ -496,6 +528,7 @@ export class SessionsService {
         checkIn: s.checkIn.toISOString(),
         checkOut: s.checkOut ? s.checkOut.toISOString() : null,
         amount: Number(s.amount),
+        hourlyRate: s.hourlyRate != null ? Number(s.hourlyRate) : null,
         paymentStatus: s.paymentStatus,
         paymentMethod: s.paymentMethod,
         notes: s.notes,

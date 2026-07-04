@@ -13,7 +13,10 @@ declare global {
 
 let prisma: PrismaClient;
 
-const pool = new Pool({ connectionString });
+const pool = new Pool({
+  connectionString,
+  max: 5,
+});
 const adapter = new PrismaPg(pool);
 
 if (process.env.NODE_ENV === "production") {

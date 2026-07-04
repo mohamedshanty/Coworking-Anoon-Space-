@@ -107,6 +107,7 @@ model Session {
   checkIn       DateTime
   checkOut      DateTime?
   amount        Decimal              @db.Decimal(10, 2)
+  hourlyRate    Decimal?             @db.Decimal(10, 2)
   paymentStatus SessionPaymentStatus
   paymentMethod PaymentMethod?
   notes         String?
