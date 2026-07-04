@@ -5,62 +5,106 @@ on:
     - cron: "0 2 * * *" # 02:00 UTC daily
   workflow_dispatch:
 
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
 jobs:
   backup:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
-      - name: Checkout repo (for scripts)
+      # =============================================
+      # Checkout (no submodules — frontend submodule is broken)
+      # =============================================
+      - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
 
-      # ===============================
-      # Install PostgreSQL 18 client (IMPORTANT FIX)
-      # ===============================
-      - name: Install PostgreSQL 18 client
+      # =============================================
+      # Install PostgreSQL 16 client
+      # =============================================
+      - name: Install PostgreSQL client
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget ca-certificates gnupg
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ca-certificates gnupg curl
 
-          # Add PostgreSQL official repo
-          wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/postgresql.asc
+          # Import PostgreSQL official signing key
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --batch --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
 
-          echo "deb http://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          # Detect Ubuntu codename dynamically (no hardcoding)
+          CODENAME=$(lsb_release -cs)
+          echo "Detected Ubuntu codename: ${CODENAME}"
 
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-18
+          echo "deb http://apt.postgresql.org/pub/repos/apt ${CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
 
-          # Verify version
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-16
+
+          # Verify installation and print version for logs
+          echo "pg_dump version:"
           pg_dump --version
 
-      # ===============================
-      # SSH Setup (fixed & stable)
-      # ===============================
-      - name: Set up SSH key for backup repo
+          # Verify gzip is available
+          gzip --version | head -1
+
+      # =============================================
+      # SSH key setup
+      # =============================================
+      - name: Set up SSH key
+        env:
+          BACKUP_SSH_KEY: ${{ secrets.BACKUP_SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.BACKUP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 700 ~/.ssh
+
+          # Write key using env var (GitHub masks secrets in logs automatically)
+          printf '%s' "${BACKUP_SSH_KEY}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          # Populate known_hosts with GitHub's host keys (suppress warnings)
+          ssh-keyscan -t ed25519,rsa,ecdsa github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+          chmod 644 ~/.ssh/known_hosts
 
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
+          # Verify key was written (don't print contents)
+          if [[ -s ~/.ssh/id_ed25519 ]]; then
+            echo "SSH key written successfully ($(wc -c < ~/.ssh/id_ed25519) bytes)."
+          else
+            echo "::error::SSH key file is empty or missing."
+            exit 1
+          fi
 
-      # ===============================
+      # =============================================
       # Run backup script
-      # ===============================
+      # =============================================
       - name: Run backup script
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           BACKUP_REPO: ${{ secrets.BACKUP_REPO }}
+          # Pass the ABSOLUTE path — env blocks do NOT expand ~
+          SSH_KEY_PATH: /home/runner/.ssh/id_ed25519
         run: |
           chmod +x scripts/backup.sh
           bash scripts/backup.sh
 
-      # ===============================
+      # =============================================
+      # Cleanup sensitive files (always runs)
+      # =============================================
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/id_ed25519
+          echo "SSH key cleaned up."
+
+      # =============================================
       # Failure notification
-      # ===============================
+      # =============================================
       - name: Notify on failure
         if: failure()
         run: |
-          echo "Backup failed. Consider adding Slack/Discord webhook."
+          echo "::error::Database backup workflow failed. Check logs above for details."
