@@ -2,26 +2,53 @@ name: Daily Neon DB Backup
 
 on:
   schedule:
-    - cron: "0 2 * * *" # 02:00 UTC daily — adjust as needed
-  workflow_dispatch: # allows manual trigger from the Actions tab
+    - cron: "0 2 * * *" # 02:00 UTC daily
+  workflow_dispatch:
 
 jobs:
   backup:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo (for scripts)
         uses: actions/checkout@v4
 
-      - name: Install PostgreSQL client (pg_dump)
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      # ===============================
+      # Install PostgreSQL 18 client (IMPORTANT FIX)
+      # ===============================
+      - name: Install PostgreSQL 18 client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget ca-certificates gnupg
 
+          # Add PostgreSQL official repo
+          wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/postgresql.asc
+
+          echo "deb http://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
+
+          # Verify version
+          pg_dump --version
+
+      # ===============================
+      # SSH Setup (fixed & stable)
+      # ===============================
       - name: Set up SSH key for backup repo
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.BACKUP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
+
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+
+      # ===============================
+      # Run backup script
+      # ===============================
       - name: Run backup script
         env:
           DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
@@ -30,10 +57,10 @@ jobs:
           chmod +x scripts/backup.sh
           bash scripts/backup.sh
 
+      # ===============================
+      # Failure notification
+      # ===============================
       - name: Notify on failure
         if: failure()
         run: |
-          echo "Backup failed. Consider adding a Slack/Discord webhook notification here."
-          # Example: curl -X POST -H 'Content-type: application/json' \
-          #   --data '{"text":"⚠️ Noon DB backup failed!"}' \
-          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+          echo "Backup failed. Consider adding Slack/Discord webhook."
