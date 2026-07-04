@@ -104,13 +104,14 @@ for ((attempt = 1; attempt <= PG_DUMP_RETRIES; attempt++)); do
   # Clean previous temp dump
   rm -f "$TEMP_DUMP"
 
-  # Dump to temp file (NOT piped to gzip — allows proper exit code checking)
+  # Dump to temp file (stderr captured for diagnostics, not discarded)
+  PG_DUMP_ERR="${BACKUP_DIR}/pg_dump_error.log"
   if pg_dump "$DATABASE_URL" \
       --format=plain \
       --no-owner \
       --no-acl \
       --verbose \
-      > "$TEMP_DUMP" 2>/dev/null; then
+      > "$TEMP_DUMP" 2>"$PG_DUMP_ERR"; then
 
     # Verify dump is not empty (real Neon databases produce >1KB easily)
     if [[ -s "$TEMP_DUMP" ]]; then
@@ -126,7 +127,8 @@ for ((attempt = 1; attempt <= PG_DUMP_RETRIES; attempt++)); do
       echo "::warning::Dump file is empty. Retrying..."
     fi
   else
-    echo "::warning::pg_dump failed on attempt ${attempt}/${PG_DUMP_RETRIES} (exit code: $?)."
+    echo "::error::pg_dump failed on attempt ${attempt}/${PG_DUMP_RETRIES}. Real error below:"
+    cat "$PG_DUMP_ERR" || true
   fi
 
   # Exponential backoff: 5s, 10s, 20s...
