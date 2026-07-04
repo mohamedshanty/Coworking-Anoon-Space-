@@ -46,6 +46,12 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client-18
 
+          # Ensure the version-18 binaries take priority over any
+          # pre-installed older client (e.g. postgresql-client-16
+          # that ships on the runner image by default).
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+          export PATH="/usr/lib/postgresql/18/bin:$PATH"
+
           # Verify installation and print version for logs
           echo "pg_dump version:"
           pg_dump --version
