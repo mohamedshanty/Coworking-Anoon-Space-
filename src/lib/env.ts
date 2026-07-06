@@ -21,7 +21,7 @@ export const JWT_ACCESS_SECRET = requireEnv("JWT_ACCESS_SECRET");
 export const JWT_REFRESH_SECRET = requireEnv("JWT_REFRESH_SECRET");
 
 export const ALLOWED_ORIGINS = (
-  process.env.ALLOWED_ORIGINS || "http://localhost:5173"
+  process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:8080"
 )
   .split(",")
   .map((o) => o.trim());
