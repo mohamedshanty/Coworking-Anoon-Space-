@@ -22,6 +22,8 @@ export const renewSubscriptionSchema = z.object({
 export const updateSubscriberSchema = z.object({
   name: z.string().min(1).optional(),
   phone: z.string().min(1).optional(),
+  notes: z.string().optional(),
+  source: z.string().optional(),
 });
 
 export type CreateSubscriberInput = z.infer<typeof createSubscriberSchema>;

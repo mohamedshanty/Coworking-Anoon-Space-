@@ -163,6 +163,8 @@ export class SubscribersService {
       data: {
         ...(data.name ? { name: data.name } : {}),
         ...(data.phone ? { phone: data.phone } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes || null } : {}),
+        ...(data.source !== undefined ? { source: data.source || null } : {}),
       },
     });
 

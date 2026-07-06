@@ -86,7 +86,7 @@ export class CoursesService {
     return prisma.trainee.findMany({ where: { courseId } });
   }
 
-  async updateTrainee(courseId: string, traineeId: string, data: { name?: string; phone?: string; paymentStatus?: string }): Promise<Trainee> {
+  async updateTrainee(courseId: string, traineeId: string, data: { name?: string; phone?: string; paymentStatus?: string; amountPaid?: number }): Promise<Trainee> {
     const trainee = await prisma.trainee.findUnique({ where: { id: traineeId } });
     if (!trainee) throw new ApiError(404, "Trainee not found");
     if (trainee.courseId !== courseId) throw new ApiError(404, "Trainee not found in this course");
@@ -95,6 +95,7 @@ export class CoursesService {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.phone !== undefined) updateData.phone = data.phone;
     if (data.paymentStatus !== undefined) updateData.paymentStatus = data.paymentStatus;
+    if (data.amountPaid !== undefined) updateData.amountPaid = new Prisma.Decimal(data.amountPaid).toFixed(2);
 
     return prisma.trainee.update({ where: { id: traineeId }, data: updateData });
   }

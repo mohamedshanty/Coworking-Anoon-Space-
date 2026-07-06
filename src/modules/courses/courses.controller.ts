@@ -145,6 +145,7 @@ export class CoursesController {
         name: z.string().min(1).optional(),
         phone: z.string().min(1).optional(),
         paymentStatus: z.enum(["full", "installment"]).optional(),
+        amountPaid: z.number().min(0).optional(),
       });
       const parsed = schema.parse(req.body);
       const trainee = await new CoursesService().updateTrainee(id, traineeId, parsed);

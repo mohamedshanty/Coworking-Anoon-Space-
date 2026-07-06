@@ -24,6 +24,10 @@ export const updateSessionSchema = z.object({
   sessionType: z.string().nullable().optional(),
   paymentStatus: z.enum(["paid", "partial_debt", "full_debt"]).optional(),
   paymentMethod: z.enum(["cash", "card", "transfer"]).nullable().optional(),
+  hourlyRate: z.number().min(0).optional(),
+  discountAmount: z.number().min(0).optional(),
+  discountNote: z.string().optional(),
+  paymentAccount: z.string().optional(),
 });
 
 export const checkoutSchema = z.object({

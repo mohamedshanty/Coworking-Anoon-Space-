@@ -185,6 +185,10 @@ export class SessionsService {
         ...(data.sessionType !== undefined ? { sessionType: data.sessionType } : {}),
         ...(data.paymentStatus ? { paymentStatus: data.paymentStatus } : {}),
         ...(data.paymentMethod !== undefined ? { paymentMethod: data.paymentMethod } : {}),
+        ...(data.hourlyRate !== undefined ? { hourlyRate: data.hourlyRate } : {}),
+        ...(data.discountAmount !== undefined ? { discountAmount: data.discountAmount } : {}),
+        ...(data.discountNote !== undefined ? { discountNote: data.discountNote || null } : {}),
+        ...(data.paymentAccount !== undefined ? { paymentAccount: data.paymentAccount?.trim() || null } : {}),
       },
       include: {
         visitor: true,
