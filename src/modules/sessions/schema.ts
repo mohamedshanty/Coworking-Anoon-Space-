@@ -28,6 +28,9 @@ export const updateSessionSchema = z.object({
 
 export const checkoutSchema = z.object({
   paymentMethod: z.enum(["cash", "card", "transfer"]),
+  discountAmount: z.number().min(0).default(0),
+  discountNote: z.string().optional(),
+  paymentAccount: z.string().optional(),
 });
 
 export const addOrderSchema = z.object({

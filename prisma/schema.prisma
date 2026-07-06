@@ -100,19 +100,22 @@ model Visitor {
 }
 
 model Session {
-  id            String               @id @default(uuid())
-  visitorId     String
-  visitor       Visitor              @relation(fields: [visitorId], references: [id], onDelete: Cascade)
-  sessionType   String?
-  checkIn       DateTime
-  checkOut      DateTime?
-  amount        Decimal              @db.Decimal(10, 2)
-  hourlyRate    Decimal?             @db.Decimal(10, 2)
-  paymentStatus SessionPaymentStatus
-  paymentMethod PaymentMethod?
-  notes         String?
-  snackOrders   SnackOrder[]
-  sales         Sale[]
+  id              String               @id @default(uuid())
+  visitorId       String
+  visitor         Visitor              @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  sessionType     String?
+  checkIn         DateTime
+  checkOut        DateTime?
+  amount          Decimal              @db.Decimal(10, 2)
+  hourlyRate      Decimal?             @db.Decimal(10, 2)
+  paymentStatus   SessionPaymentStatus
+  paymentMethod   PaymentMethod?
+  notes           String?
+  discountAmount  Decimal              @default(0) @db.Decimal(10, 2)
+  discountNote    String?
+  paymentAccount  String?
+  snackOrders     SnackOrder[]
+  sales           Sale[]
 }
 
 model SnackOrder {

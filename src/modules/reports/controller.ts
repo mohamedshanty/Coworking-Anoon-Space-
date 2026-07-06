@@ -26,7 +26,7 @@ export class ReportsController {
       const [sessions, sales, expenses, bookings, courses, activeSubscriptions, settings] = await Promise.all([
         prisma.session.findMany({
           where: { checkIn: { gte: fromDate, lte: toDate }, checkOut: { not: null } },
-          select: { sessionType: true, amount: true, paymentStatus: true, visitor: { select: { type: true } } },
+          select: { sessionType: true, amount: true, paymentStatus: true, discountAmount: true, visitor: { select: { type: true } } },
         }),
         prisma.sale.findMany({
           where: { date: { gte: fromDate, lte: toDate } },
@@ -88,6 +88,11 @@ export class ReportsController {
       const totalRevenue = r(hoursRevenue + snacksRevenue + hotDrinksRevenue + coursesRevenue + roomsRevenue);
       const netProfit = r(totalRevenue - expensesTotal - hotDrinksCost);
 
+      // Total discounts given (already factored into hoursRevenue via reduced `amount`)
+      const totalDiscounts = r(
+        sessions.filter((s) => s.paymentStatus === "paid").reduce((sum, s) => sum + Number(s.discountAmount), 0)
+      );
+
       res.status(200).json({
         success: true,
         data: {
@@ -96,7 +101,7 @@ export class ReportsController {
           sales: { snacksRevenue, hotDrinksRevenue },
           expenses: { total: expensesTotal, hotDrinksCost },
           roomsCourses: { roomsRevenue, coursesRevenue },
-          financialSummary: { hoursRevenue, snacksRevenue, hotDrinksRevenue, coursesRevenue, roomsRevenue, expenses: expensesTotal, hotDrinksCost, netProfit },
+          financialSummary: { hoursRevenue, snacksRevenue, hotDrinksRevenue, coursesRevenue, roomsRevenue, expenses: expensesTotal, hotDrinksCost, netProfit, totalDiscounts },
         },
       });
     } catch (error) {
@@ -141,7 +146,7 @@ export class ReportsController {
         where: {
           checkIn: { gte: fromDate, lte: toDate },
         },
-          select: { sessionType: true, amount: true, paymentStatus: true, paymentMethod: true, checkIn: true, checkOut: true, visitor: { select: { name: true, type: true } } },
+          select: { sessionType: true, amount: true, paymentStatus: true, paymentMethod: true, checkIn: true, checkOut: true, discountAmount: true, discountNote: true, paymentAccount: true, visitor: { select: { name: true, type: true } } },
         orderBy: { checkIn: "asc" },
       });
 
@@ -155,8 +160,11 @@ export class ReportsController {
           { header: "وقت الخروج", key: "checkOut", width: 20 },
           { header: "المدة (ساعات)", key: "duration", width: 14 },
           { header: "المبلغ", key: "amount", width: 12 },
-          { header: "حالة الدفع", key: "paymentStatus", width: 14 },
+          { header: "الخصم", key: "discount", width: 12 },
+          { header: "ملاحظة الخصم", key: "discountNote", width: 16 },
           { header: "طريقة الدفع", key: "paymentMethod", width: 14 },
+          { header: "الحساب / الجهة", key: "paymentAccount", width: 18 },
+          { header: "حالة الدفع", key: "paymentStatus", width: 14 },
         ];
 
         for (const s of sessions) {
@@ -170,8 +178,11 @@ export class ReportsController {
             checkOut: s.checkOut ? s.checkOut.toISOString() : "لم يخرج",
             duration: duration !== null ? duration : "—",
             amount: Number(s.amount),
-            paymentStatus: paymentStatusMap[s.paymentStatus] || s.paymentStatus,
+            discount: Number(s.discountAmount) > 0 ? Number(s.discountAmount) : "—",
+            discountNote: s.discountNote || "—",
             paymentMethod: s.paymentMethod ? paymentMethodMap[s.paymentMethod] : "—",
+            paymentAccount: s.paymentAccount || "—",
+            paymentStatus: paymentStatusMap[s.paymentStatus] || s.paymentStatus,
           });
         }
       }
@@ -411,10 +422,15 @@ export class ReportsController {
       });
       const debtRev = collectedDebts.reduce((sum, d) => sum + Number(d.amount), 0);
 
-      // 6. Expenses
+      // 6. Total discounts given
+      const totalDiscounts = sessions
+        .filter((s) => s.checkOut !== null && s.paymentStatus === "paid")
+        .reduce((sum, s) => sum + Number(s.discountAmount), 0);
+
+      // 7. Expenses
       const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
-      // 7. hotDrinksMonthlyCost prorated
+      // 8. hotDrinksMonthlyCost prorated
       const settings = await prisma.settings.findFirst();
       const monthlyHotDrinksCost = settings ? Number(settings.hotDrinksMonthlyCost) : 0;
       const daysInRange = Math.max(1, Math.ceil((toDate.getTime() - fromDate.getTime()) / 86400000));
@@ -431,6 +447,7 @@ export class ReportsController {
       summarySheet.addRow({ item: "إيراد الدورات", amount: r(courseRev) });
       summarySheet.addRow({ item: "إيراد الحجوزات", amount: r(bookingRev) });
       summarySheet.addRow({ item: "إيراد الديون المحصلة", amount: r(debtRev) });
+      summarySheet.addRow({ item: "الخصومات", amount: r(totalDiscounts) });
       summarySheet.addRow({ item: "الإيرادات الإجمالية", amount: totalRevenue });
       summarySheet.addRow({ item: "المصروفات", amount: r(totalExpenses) });
       summarySheet.addRow({ item: "تكلفة المشروبات الساخنة (نسبة)", amount: hotDrinksProrated });

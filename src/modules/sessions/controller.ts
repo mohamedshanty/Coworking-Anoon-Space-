@@ -66,8 +66,8 @@ export class SessionsController {
   async checkout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const { paymentMethod } = checkoutSchema.parse(req.body);
-      const session = await sessionsService.checkout(id, paymentMethod);
+      const { paymentMethod, discountAmount, discountNote, paymentAccount } = checkoutSchema.parse(req.body);
+      const session = await sessionsService.checkout(id, paymentMethod, discountAmount, discountNote, paymentAccount);
 
       // Socket broadcast
       const io = req.app.get("io");

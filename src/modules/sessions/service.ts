@@ -195,7 +195,13 @@ export class SessionsService {
     return updated;
   }
 
-  async checkout(id: string, paymentMethod: "cash" | "card" | "transfer") {
+  async checkout(
+    id: string,
+    paymentMethod: "cash" | "card" | "transfer",
+    discountAmount: number = 0,
+    discountNote?: string,
+    paymentAccount?: string,
+  ) {
     const session = await prisma.session.findUnique({
       where: { id },
       include: { visitor: true, snackOrders: true },
@@ -236,13 +242,20 @@ export class SessionsService {
       }
     );
 
+    // Clamp discount: never exceed the calculated total, never go negative
+    const safeDiscount = Math.max(0, Math.min(discountAmount, pricing.totalAmount));
+    const finalAmount = Math.max(0, pricing.totalAmount - safeDiscount);
+
     const updated = await prisma.session.update({
       where: { id },
       data: {
         checkOut: new Date(),
-        amount: pricing.totalAmount,
+        amount: finalAmount,
         paymentStatus: "paid",
         paymentMethod,
+        discountAmount: safeDiscount,
+        discountNote: discountNote || null,
+        paymentAccount: paymentAccount?.trim() || null,
       },
       include: {
         visitor: true,
@@ -532,6 +545,9 @@ export class SessionsService {
         paymentStatus: s.paymentStatus,
         paymentMethod: s.paymentMethod,
         notes: s.notes,
+        discountAmount: Number(s.discountAmount),
+        discountNote: s.discountNote,
+        paymentAccount: s.paymentAccount,
         visitor: {
           id: s.visitor.id,
           name: s.visitor.name,
@@ -574,7 +590,7 @@ export class SessionsService {
           checkIn: { gte: fromDate, lte: toDate },
           checkOut: { not: null },
         },
-        select: { sessionType: true, visitorId: true, paymentStatus: true, amount: true, visitor: { select: { type: true } } },
+        select: { sessionType: true, visitorId: true, paymentStatus: true, amount: true, discountAmount: true, visitor: { select: { type: true } } },
       }),
       prisma.sale.findMany({
         where: { date: { gte: fromDate, lte: toDate } },
@@ -611,6 +627,12 @@ export class SessionsService {
 
     const netProfit = r(hoursRevenue + snacksRevenue - expensesTotal);
 
+    const totalDiscounts = r(
+      sessions
+        .filter((s) => s.paymentStatus === "paid")
+        .reduce((sum, s) => sum + Number(s.discountAmount), 0)
+    );
+
     const avgRevenuePerVisit = visitCount > 0 ? r(hoursRevenue / visitCount) : 0;
 
     const subscriberCount = sessions.filter(
@@ -627,6 +649,7 @@ export class SessionsService {
       snacksRevenue,
       expenses: expensesTotal,
       netProfit,
+      totalDiscounts,
       avgRevenuePerVisit,
       subscriberCount,
       subscriberRatio,
