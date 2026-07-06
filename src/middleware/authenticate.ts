@@ -2,11 +2,9 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma";
 import { ApiError } from "../lib/ApiError";
-import dotenv from "dotenv";
+import { JWT_ACCESS_SECRET } from "../lib/env";
 
-dotenv.config();
-
-const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "default_access_secret";
+const ACCESS_SECRET = JWT_ACCESS_SECRET;
 
 export interface AuthenticatedUser {
   id: string;

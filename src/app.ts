@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import { errorHandler } from "./middleware/errorHandler";
+import { ALLOWED_ORIGINS } from "./lib/env";
 import authRouter from "./modules/auth/routes";
 import sessionsRouter from "./modules/sessions/routes";
 import subscribersRouter from "./modules/subscribers/routes";
@@ -24,7 +26,11 @@ import { authorize } from "./middleware/authorize";
 
 const app = express();
 
-app.use(cors());
+app.use(helmet());
+app.use(cors({
+  origin: ALLOWED_ORIGINS,
+  credentials: true,
+}));
 app.use(express.json());
 
 const router = express.Router();

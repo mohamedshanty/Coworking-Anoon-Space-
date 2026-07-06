@@ -3,12 +3,10 @@ import bcrypt from "bcrypt";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { ChangePasswordInput } from "./schema";
-import dotenv from "dotenv";
+import { JWT_ACCESS_SECRET, JWT_REFRESH_SECRET } from "../../lib/env";
 
-dotenv.config();
-
-const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "default_access_secret";
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "default_refresh_secret";
+const ACCESS_SECRET = JWT_ACCESS_SECRET;
+const REFRESH_SECRET = JWT_REFRESH_SECRET;
 const ACCESS_EXPIRES_IN = "15m";
 const REFRESH_EXPIRES_IN = "7d";
 
