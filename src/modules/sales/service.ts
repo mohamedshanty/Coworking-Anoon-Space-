@@ -7,12 +7,12 @@ import {
   UpdateHotDrinkSaleInput,
 } from "./schema";
 
-const DRINK_PRICES: Record<string, number> = {
-  "قهوة": 6,
-  "نسكافيه": 5,
-  "شاي": 3,
-  "كابتشينو": 8,
-};
+async function getHotDrinkPrice(drinkName: string): Promise<number> {
+  const hotDrink = await prisma.hotDrink.findFirst({
+    where: { name: drinkName, isActive: true },
+  });
+  return hotDrink ? Number(hotDrink.price) : 0;
+}
 
 export class SalesService {
   async getSnackSales(params: { page?: number; limit?: number }) {
@@ -118,7 +118,10 @@ export class SalesService {
   }
 
   async createHotDrinkSale(data: CreateHotDrinkSaleInput) {
-    const price = DRINK_PRICES[data.itemName] || 5;
+    const price = await getHotDrinkPrice(data.itemName);
+    if (price === 0) {
+      throw new ApiError(404, `Hot drink "${data.itemName}" not found or inactive`);
+    }
     const total = Math.round((price + Number.EPSILON) * 100) / 100;
 
     return prisma.sale.create({
@@ -221,10 +224,13 @@ export class SalesService {
     if (!sale) throw new ApiError(404, "Sale not found");
     if (!sale.isHotDrink) throw new ApiError(400, "Use snacks endpoint for snack sales");
 
-    // Recalculate total if item name changed (prices are hardcoded)
+    // Recalculate total if item name changed
     let total = Number(sale.total);
     if (data.itemName && data.itemName !== sale.itemName) {
-      const price = DRINK_PRICES[data.itemName] || 5;
+      const price = await getHotDrinkPrice(data.itemName);
+      if (price === 0) {
+        throw new ApiError(404, `Hot drink "${data.itemName}" not found or inactive`);
+      }
       total = Math.round((price + Number.EPSILON) * 100) / 100;
     }
 

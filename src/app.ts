@@ -22,6 +22,7 @@ import permissionsRouter from "./modules/staff/permRoutes";
 import loginLogsRouter from "./modules/loginLogs/routes";
 import contactsRouter from "./modules/contacts/routes";
 import drinksRouter from "./modules/drinks/routes";
+import hotDrinkDefsRouter from "./modules/hot-drink-defs/routes";
 import { authenticate } from "./middleware/authenticate";
 import { authorize } from "./middleware/authorize";
 
@@ -96,6 +97,9 @@ router.use("/contacts", contactsRouter);
 
 // Register drinks routes
 router.use("/drinks", drinksRouter);
+
+// Register hot drink definitions routes
+router.use("/hot-drink-defs", hotDrinkDefsRouter);
 
 // Test routes for middleware verification
 router.get("/test-protected-view", authenticate, authorize("الرئيسية", "view"), (req, res) => {

@@ -4,12 +4,12 @@ import { ApiError } from "../../lib/ApiError";
 import { calculateSessionPricing } from "./pricing";
 import { CheckInInput, UpdateSessionInput } from "./schema";
 
-const DRINK_PRICES: Record<string, number> = {
-  "قهوة": 6,
-  "نسكافيه": 5,
-  "شاي": 3,
-  "كابتشينو": 8,
-};
+async function getHotDrinkPrice(drinkName: string): Promise<number> {
+  const hotDrink = await prisma.hotDrink.findFirst({
+    where: { name: drinkName, isActive: true },
+  });
+  return hotDrink ? Number(hotDrink.price) : 0;
+}
 
 export class SessionsService {
   async visitorLookup(query: string) {
@@ -400,7 +400,10 @@ export class SessionsService {
     if (itemId.startsWith("hot-")) {
       isHotDrink = true;
       const drinkName = itemId.replace("hot-", "");
-      const price = DRINK_PRICES[drinkName] || 5;
+      const price = await getHotDrinkPrice(drinkName);
+      if (price === 0) {
+        throw new ApiError(404, `Hot drink "${drinkName}" not found or inactive`);
+      }
       itemName = drinkName;
       total = qty * price;
       hotDrinkName = drinkName;
@@ -516,7 +519,10 @@ export class SessionsService {
 
       if (data.itemId.startsWith("hot-")) {
         const drinkName = data.itemId.replace("hot-", "");
-        const price = DRINK_PRICES[drinkName] || 5;
+        const price = await getHotDrinkPrice(drinkName);
+        if (price === 0) {
+          throw new ApiError(404, `Hot drink "${drinkName}" not found or inactive`);
+        }
         newTotal = newQty * price;
         newItemId = null;
         newHotDrinkName = drinkName;

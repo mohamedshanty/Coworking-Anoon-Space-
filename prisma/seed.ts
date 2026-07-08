@@ -28,6 +28,7 @@ async function main() {
   await prisma.staff.deleteMany({});
   await prisma.settings.deleteMany({});
   await prisma.expense.deleteMany({});
+  await prisma.hotDrink.deleteMany({});
 
   console.log("Seeding minimal admin user...");
 
@@ -59,6 +60,18 @@ async function main() {
       },
     },
   });
+
+  // Seed default hot drink definitions
+  const defaultHotDrinks = [
+    { name: "قهوة", price: 6 },
+    { name: "نسكافيه", price: 5 },
+    { name: "شاي", price: 3 },
+    { name: "كابتشينو", price: 8 },
+  ];
+
+  for (const hd of defaultHotDrinks) {
+    await prisma.hotDrink.create({ data: hd });
+  }
 
   // Grant admin full permissions on all pages
   const pages = [

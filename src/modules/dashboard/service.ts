@@ -190,10 +190,13 @@ export class DashboardService {
         ORDER BY s."checkIn" DESC
         LIMIT 1
       ) latest ON true
-      WHERE v."type" = 'visitor'
+      WHERE v."type" IN ('visitor', 'subscriber')
         AND (v."followUpStatus" IS NULL OR v."followUpStatus" != 'opt_out')
         AND (v."followUpAt" IS NULL OR v."followUpAt" < ${new Date(now.getTime() - 30 * day)})
-        AND (latest."checkIn" IS NULL OR latest."checkIn" < ${new Date(now.getTime() - 14 * day)})
+        AND (
+          (latest."checkIn" IS NULL AND v."createdAt" < ${new Date(now.getTime() - 7 * day)})
+          OR (latest."checkIn" IS NOT NULL AND latest."checkIn" < ${new Date(now.getTime() - 7 * day)})
+        )
     `;
     const followUpNeedsCount = (followUpCount as any[])[0]?.count || 0;
     if (followUpNeedsCount > 0) {
