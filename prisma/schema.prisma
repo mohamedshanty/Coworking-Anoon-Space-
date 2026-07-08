@@ -101,6 +101,7 @@ model Visitor {
   lastVisit      DateTime?
   followUpStatus FollowUpStatus?
   followUpAt     DateTime?
+  createdAt      DateTime        @default(now())
   sessions       Session[]
   subscriptions  Subscription[]
   debts          Debt[]

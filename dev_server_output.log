@@ -1,0 +1,3 @@
+﻿ظùç injected env (3) from .env // tip: ظîء override existing { override: true }
+ظùç injected env (0) from .env // tip: ظîء multiple files { path: ['.env.local', '.env'] }
+Server is running on port 5000

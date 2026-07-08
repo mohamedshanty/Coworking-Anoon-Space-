@@ -1,0 +1,417 @@
+◇ injected env (3) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+Server is running on port 5000
+(node:1584) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Socket client connected: 6Qunu0LKZ8y9KEJJAAAC
+Socket client disconnected: 6Qunu0LKZ8y9KEJJAAAC
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}
+Unhandled error: PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42703`. Message: `column v.createdAt does not exist`
+    at zr.handleRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+    at zr.handleAndLogRequestError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+    at zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+    at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: DriverAdapterError: ColumnNotFound
+        at PrismaPgAdapter.onError (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:678:11)
+        at PrismaPgAdapter.performIO (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async PrismaPgAdapter.queryRaw (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\adapter-pg\dist\index.js:604:30)
+        at async e.interpretNode (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:186:26)
+        at async e.run (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client-engine-runtime\src\interpreter\query-interpreter.ts:94:23)
+        at async e.execute (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\LocalExecutor.ts:81:12)
+        at async jt.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\core\engines\client\ClientEngine.ts:504:22)
+        at async Object.singleLoader (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:112:26)
+        at async zr.request (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:149:14)
+        at async a (D:\noonCowork\noon\coworking-backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+        at async FollowUpController.getFollowUpList (D:\noonCowork\noon\coworking-backend\src\modules\followUp\controller.ts:15:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.8.0'
+}

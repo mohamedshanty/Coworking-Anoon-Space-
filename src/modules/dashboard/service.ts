@@ -95,116 +95,157 @@ export class DashboardService {
     const todayStart = startOfDay(now);
     const todayEnd = endOfDay(now);
 
-    // liveVisitorCount: sessions where checkOut is null
-    const liveVisitorCount = await prisma.session.count({
-      where: { checkOut: null },
-    });
-
-    // todayRevenue
-    const todayRevenue = await calcDayRevenue(now);
-
-    // todayVisitCount: sessions checked in today
-    const todayVisitCount = await prisma.session.count({
-      where: {
-        checkIn: { gte: todayStart, lte: todayEnd },
-      },
-    });
-
-    // activeCoursesToday: courses where today falls between startDate and endDate
-    const activeCoursesToday = await prisma.course.count({
-      where: {
-        startDate: { lte: todayEnd },
-        endDate: { gte: todayStart },
-      },
-    });
-
-    // todayBookings: confirmed bookings for today
-    const todayBookings = await prisma.booking.count({
-      where: {
-        status: "confirmed",
-        startTime: { gte: todayStart, lte: todayEnd },
-      },
-    });
-
     // Alerts
     const alerts: any[] = [];
 
-    // Low stock inventory items
-    const lowStockItems = await prisma.$queryRaw`
-      SELECT id, name, quantity, "alertThreshold"
-      FROM "InventoryItem"
-      WHERE quantity < "alertThreshold"
-    `;
-    for (const item of lowStockItems as any[]) {
-      alerts.push({
-        type: "low_stock",
-        message: `Low stock: ${item.name} (${item.quantity}/${item.alertThreshold})`,
-        itemId: item.id,
-        quantity: item.quantity,
-        threshold: item.alertThreshold,
+    // liveVisitorCount: sessions where checkOut is null
+    let liveVisitorCount = 0;
+    try {
+      liveVisitorCount = await prisma.session.count({
+        where: { checkOut: null },
       });
+    } catch {
+      console.error("Failed to count live visitors");
+    }
+
+    // todayRevenue
+    let todayRevenue = 0;
+    try {
+      todayRevenue = await calcDayRevenue(now);
+    } catch {
+      console.error("Failed to calculate today's revenue");
+    }
+
+    // todayVisitCount: sessions checked in today
+    let todayVisitCount = 0;
+    try {
+      todayVisitCount = await prisma.session.count({
+        where: {
+          checkIn: { gte: todayStart, lte: todayEnd },
+        },
+      });
+    } catch {
+      console.error("Failed to count today's visits");
+    }
+
+    // activeCoursesToday: courses where today falls between startDate and endDate
+    let activeCoursesToday = 0;
+    try {
+      activeCoursesToday = await prisma.course.count({
+        where: {
+          startDate: { lte: todayEnd },
+          endDate: { gte: todayStart },
+        },
+      });
+    } catch {
+      console.error("Failed to count active courses");
+    }
+
+    // todayBookings: confirmed bookings for today
+    let todayBookings = 0;
+    try {
+      todayBookings = await prisma.booking.count({
+        where: {
+          status: "confirmed",
+          startTime: { gte: todayStart, lte: todayEnd },
+        },
+      });
+    } catch {
+      console.error("Failed to count today's bookings");
+    }
+
+    // Low stock inventory items
+    try {
+      const lowStockItems = await prisma.$queryRaw`
+        SELECT id, name, quantity, "alertThreshold"
+        FROM "InventoryItem"
+        WHERE quantity < "alertThreshold"
+      `;
+      for (const item of lowStockItems as any[]) {
+        alerts.push({
+          type: "low_stock",
+          message: `Low stock: ${item.name} (${item.quantity}/${item.alertThreshold})`,
+          itemId: item.id,
+          quantity: item.quantity,
+          threshold: item.alertThreshold,
+        });
+      }
+    } catch {
+      console.error("Failed to fetch low stock items");
     }
 
     // Overdue/unpaid debts
-    const unpaidDebts = await prisma.debt.findMany({
-      where: { status: "unpaid" },
-      select: { id: true, name: true, amount: true, createdAt: true },
-    });
-    for (const debt of unpaidDebts) {
-      alerts.push({
-        type: "unpaid_debt",
-        message: `Unpaid debt: ${debt.name} - ${debt.amount}`,
-        debtId: debt.id,
-        amount: Number(debt.amount),
-        createdAt: debt.createdAt,
+    try {
+      const unpaidDebts = await prisma.debt.findMany({
+        where: { status: "unpaid" },
+        select: { id: true, name: true, amount: true, createdAt: true },
       });
+      for (const debt of unpaidDebts) {
+        alerts.push({
+          type: "unpaid_debt",
+          message: `Unpaid debt: ${debt.name} - ${debt.amount}`,
+          debtId: debt.id,
+          amount: Number(debt.amount),
+          createdAt: debt.createdAt,
+        });
+      }
+    } catch {
+      console.error("Failed to fetch unpaid debts");
     }
 
     // Subscriptions expiring within 3 days
-    const threeDaysFromNow = new Date(now.getTime() + 3 * day);
-    const expiringSubs = await prisma.subscription.findMany({
-      where: {
-        status: "active",
-        endDate: { gte: now, lte: threeDaysFromNow },
-      },
-      select: { id: true, visitorId: true, endDate: true },
-    });
-    for (const sub of expiringSubs) {
-      alerts.push({
-        type: "subscription_expiring",
-        message: `Subscription expiring on ${sub.endDate.toISOString().slice(0, 10)}`,
-        subscriptionId: sub.id,
-        visitorId: sub.visitorId,
-        endDate: sub.endDate,
+    try {
+      const threeDaysFromNow = new Date(now.getTime() + 3 * day);
+      const expiringSubs = await prisma.subscription.findMany({
+        where: {
+          status: "active",
+          endDate: { gte: now, lte: threeDaysFromNow },
+        },
+        select: { id: true, visitorId: true, endDate: true },
       });
+      for (const sub of expiringSubs) {
+        alerts.push({
+          type: "subscription_expiring",
+          message: `Subscription expiring on ${sub.endDate.toISOString().slice(0, 10)}`,
+          subscriptionId: sub.id,
+          visitorId: sub.visitorId,
+          endDate: sub.endDate,
+        });
+      }
+    } catch {
+      console.error("Failed to fetch expiring subscriptions");
     }
 
     // Visitors needing follow-up (reuse Step 8 logic - default list count)
-    const followUpCount = await prisma.$queryRaw`
-      SELECT COUNT(*)::int as count
-      FROM "Visitor" v
-      LEFT JOIN LATERAL (
-        SELECT s."checkIn"
-        FROM "Session" s
-        WHERE s."visitorId" = v.id
-        ORDER BY s."checkIn" DESC
-        LIMIT 1
-      ) latest ON true
-      WHERE v."type" IN ('visitor', 'subscriber')
-        AND (v."followUpStatus" IS NULL OR v."followUpStatus" != 'opt_out')
-        AND (v."followUpAt" IS NULL OR v."followUpAt" < ${new Date(now.getTime() - 30 * day)})
-        AND (
-          (latest."checkIn" IS NULL AND v."createdAt" < ${new Date(now.getTime() - 7 * day)})
-          OR (latest."checkIn" IS NOT NULL AND latest."checkIn" < ${new Date(now.getTime() - 7 * day)})
-        )
-    `;
-    const followUpNeedsCount = (followUpCount as any[])[0]?.count || 0;
-    if (followUpNeedsCount > 0) {
-      alerts.push({
-        type: "follow_up_needed",
-        message: `${followUpNeedsCount} visitor(s) need follow-up`,
-        count: followUpNeedsCount,
-      });
+    try {
+      const followUpCount = await prisma.$queryRaw`
+        SELECT COUNT(*)::int as count
+        FROM "Visitor" v
+        LEFT JOIN LATERAL (
+          SELECT s."checkIn"
+          FROM "Session" s
+          WHERE s."visitorId" = v.id
+          ORDER BY s."checkIn" DESC
+          LIMIT 1
+        ) latest ON true
+        WHERE v."type" IN ('visitor', 'subscriber')
+          AND (v."followUpStatus" IS NULL OR v."followUpStatus" != 'opt_out')
+          AND (v."followUpAt" IS NULL OR v."followUpAt" < ${new Date(now.getTime() - 30 * day)})
+          AND (
+            (latest."checkIn" IS NULL AND v."createdAt" < ${new Date(now.getTime() - 7 * day)})
+            OR (latest."checkIn" IS NOT NULL AND latest."checkIn" < ${new Date(now.getTime() - 7 * day)})
+          )
+      `;
+      const followUpNeedsCount = (followUpCount as any[])[0]?.count || 0;
+      if (followUpNeedsCount > 0) {
+        alerts.push({
+          type: "follow_up_needed",
+          message: `${followUpNeedsCount} visitor(s) need follow-up`,
+          count: followUpNeedsCount,
+        });
+      }
+    } catch {
+      console.error("Failed to fetch follow-up count");
     }
 
     return {
