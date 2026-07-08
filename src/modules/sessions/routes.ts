@@ -71,6 +71,20 @@ router.post(
   (req, res, next) => sessionsController.addOrder(req, res, next)
 );
 
+// PATCH edit an order line item
+router.patch(
+  "/orders/:orderId",
+  authorize("داخل المساحة", "edit"),
+  (req, res, next) => sessionsController.editOrderItem(req, res, next)
+);
+
+// DELETE an order line item
+router.delete(
+  "/orders/:orderId",
+  authorize("داخل المساحة", "edit"),
+  (req, res, next) => sessionsController.deleteOrderItem(req, res, next)
+);
+
 // DELETE session (works for both live and history since same model)
 router.delete(
   "/:id",

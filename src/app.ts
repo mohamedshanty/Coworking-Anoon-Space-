@@ -21,6 +21,7 @@ import staffRouter from "./modules/staff/routes";
 import permissionsRouter from "./modules/staff/permRoutes";
 import loginLogsRouter from "./modules/loginLogs/routes";
 import contactsRouter from "./modules/contacts/routes";
+import drinksRouter from "./modules/drinks/routes";
 import { authenticate } from "./middleware/authenticate";
 import { authorize } from "./middleware/authorize";
 
@@ -92,6 +93,9 @@ router.use("/login-logs", loginLogsRouter);
 
 // Register contacts routes
 router.use("/contacts", contactsRouter);
+
+// Register drinks routes
+router.use("/drinks", drinksRouter);
 
 // Test routes for middleware verification
 router.get("/test-protected-view", authenticate, authorize("الرئيسية", "view"), (req, res) => {

@@ -168,9 +168,24 @@ export class SessionsService {
   async editSession(id: string, data: UpdateSessionInput) {
     const session = await prisma.session.findUnique({
       where: { id },
+      include: { visitor: true },
     });
     if (!session) {
       throw new ApiError(404, "Session not found");
+    }
+
+    // Handle visitor field updates (name, phone)
+    if (data.visitorName !== undefined || data.visitorPhone !== undefined) {
+      const visitorUpdate: { name?: string; phone?: string } = {};
+      if (data.visitorName !== undefined) visitorUpdate.name = data.visitorName;
+      if (data.visitorPhone !== undefined) visitorUpdate.phone = data.visitorPhone;
+
+      if (Object.keys(visitorUpdate).length > 0) {
+        await prisma.visitor.update({
+          where: { id: session.visitorId },
+          data: visitorUpdate,
+        });
+      }
     }
 
     const updated = await prisma.session.update({
@@ -189,6 +204,9 @@ export class SessionsService {
         ...(data.discountAmount !== undefined ? { discountAmount: data.discountAmount } : {}),
         ...(data.discountNote !== undefined ? { discountNote: data.discountNote || null } : {}),
         ...(data.paymentAccount !== undefined ? { paymentAccount: data.paymentAccount?.trim() || null } : {}),
+        ...(data.calculatedPrice !== undefined ? { calculatedPrice: data.calculatedPrice } : {}),
+        ...(data.finalPrice !== undefined ? { finalPrice: data.finalPrice } : {}),
+        ...(data.adjustmentNote !== undefined ? { adjustmentNote: data.adjustmentNote || null } : {}),
       },
       include: {
         visitor: true,
@@ -205,6 +223,8 @@ export class SessionsService {
     discountAmount: number = 0,
     discountNote?: string,
     paymentAccount?: string,
+    adjustedPrice?: number | null,
+    adjustmentNote?: string | null,
   ) {
     const session = await prisma.session.findUnique({
       where: { id },
@@ -246,20 +266,34 @@ export class SessionsService {
       }
     );
 
-    // Clamp discount: never exceed the calculated total, never go negative
-    const safeDiscount = Math.max(0, Math.min(discountAmount, pricing.totalAmount));
-    const finalAmount = Math.max(0, pricing.totalAmount - safeDiscount);
+    const calculatedPrice = pricing.totalAmount;
+    let finalAmount: number;
+    let safeDiscount = 0;
+
+    if (adjustedPrice != null) {
+      // Price adjustment mode: override the entire price
+      finalAmount = Math.max(0, adjustedPrice);
+      // Reset discount since we're doing a direct price override
+      safeDiscount = 0;
+    } else {
+      // Discount mode: subtract discount from calculated price
+      safeDiscount = Math.max(0, Math.min(discountAmount, pricing.totalAmount));
+      finalAmount = Math.max(0, pricing.totalAmount - safeDiscount);
+    }
 
     const updated = await prisma.session.update({
       where: { id },
       data: {
         checkOut: new Date(),
         amount: finalAmount,
+        calculatedPrice,
+        finalPrice: finalAmount,
         paymentStatus: "paid",
         paymentMethod,
         discountAmount: safeDiscount,
         discountNote: discountNote || null,
         paymentAccount: paymentAccount?.trim() || null,
+        adjustmentNote: adjustmentNote || null,
       },
       include: {
         visitor: true,
@@ -317,6 +351,8 @@ export class SessionsService {
       data: {
         checkOut: new Date(),
         amount: pricing.totalAmount,
+        calculatedPrice: pricing.totalAmount,
+        finalPrice: pricing.totalAmount,
         paymentStatus: "full_debt",
         paymentMethod: null,
       },
@@ -359,6 +395,7 @@ export class SessionsService {
     let total = 0;
     let dbItemId: string | null = null;
     let hotDrinkName: string | null = null;
+    let dbDrinkId: string | null = null;
 
     if (itemId.startsWith("hot-")) {
       isHotDrink = true;
@@ -368,6 +405,22 @@ export class SessionsService {
       total = qty * price;
       hotDrinkName = drinkName;
       // dbItemId stays null — hot drinks are not inventory items
+    } else if (itemId.startsWith("drink-")) {
+      const drinkId = itemId.replace("drink-", "");
+      const drink = await prisma.drink.findUnique({ where: { id: drinkId } });
+      if (!drink) {
+        throw new ApiError(404, "Drink not found");
+      }
+      if (drink.quantity < qty) {
+        throw new ApiError(400, `Insufficient drink stock for ${drink.name}`);
+      }
+      await prisma.drink.update({
+        where: { id: drinkId },
+        data: { quantity: drink.quantity - qty },
+      });
+      itemName = drink.name;
+      total = qty * Number(drink.sellPrice);
+      dbDrinkId = drinkId;
     } else {
       const item = await prisma.inventoryItem.findUnique({
         where: { id: itemId },
@@ -395,6 +448,7 @@ export class SessionsService {
       data: {
         sessionId,
         itemId: dbItemId,
+        drinkId: dbDrinkId,
         hotDrinkName,
         qty,
         total,
@@ -405,7 +459,7 @@ export class SessionsService {
     // Create Sale record
     const sale = await prisma.sale.create({
       data: {
-        itemId: dbItemId ?? `hot-${hotDrinkName}`,
+        itemId: dbItemId ?? dbDrinkId ?? `hot-${hotDrinkName}`,
         itemName,
         quantity: qty,
         total,
@@ -418,6 +472,170 @@ export class SessionsService {
     });
 
     return { order, sale };
+  }
+
+  async editOrderItem(orderId: string, data: { itemId?: string; qty?: number }) {
+    const order = await prisma.snackOrder.findUnique({
+      where: { id: orderId },
+      include: { session: { include: { visitor: true } }, item: true, drink: true },
+    });
+    if (!order) {
+      throw new ApiError(404, "Order not found");
+    }
+    if (order.session.checkOut) {
+      throw new ApiError(400, "Cannot edit order of checked-out session");
+    }
+
+    const oldQty = order.qty;
+    const newQty = data.qty ?? oldQty;
+    let newTotal = Number(order.total);
+    let newItemId = order.itemId;
+    let newHotDrinkName = order.hotDrinkName;
+    let newIsHotDrink = order.isHotDrink;
+    let newDrinkId = order.drinkId;
+
+    // If changing the item
+    const oldItemKey = order.itemId ?? (order.isHotDrink ? `hot-${order.hotDrinkName}` : order.drinkId ? `drink-${order.drinkId}` : "");
+    if (data.itemId && data.itemId !== oldItemKey) {
+      // Restore stock for old item
+      if (order.itemId && order.item) {
+        await prisma.inventoryItem.update({
+          where: { id: order.itemId },
+          data: { quantity: order.item.quantity + oldQty },
+        });
+      }
+      if (order.drinkId) {
+        const oldDrink = await prisma.drink.findUnique({ where: { id: order.drinkId } });
+        if (oldDrink) {
+          await prisma.drink.update({
+            where: { id: order.drinkId },
+            data: { quantity: oldDrink.quantity + oldQty },
+          });
+        }
+      }
+
+      if (data.itemId.startsWith("hot-")) {
+        const drinkName = data.itemId.replace("hot-", "");
+        const price = DRINK_PRICES[drinkName] || 5;
+        newTotal = newQty * price;
+        newItemId = null;
+        newHotDrinkName = drinkName;
+        newIsHotDrink = true;
+        newDrinkId = null;
+      } else if (data.itemId.startsWith("drink-")) {
+        const drinkId = data.itemId.replace("drink-", "");
+        const drink = await prisma.drink.findUnique({ where: { id: drinkId } });
+        if (!drink) throw new ApiError(404, "Drink not found");
+        if (drink.quantity < newQty) throw new ApiError(400, `Insufficient stock for ${drink.name}`);
+        await prisma.drink.update({
+          where: { id: drinkId },
+          data: { quantity: drink.quantity - newQty },
+        });
+        newTotal = newQty * Number(drink.sellPrice);
+        newItemId = null;
+        newHotDrinkName = null;
+        newIsHotDrink = false;
+        newDrinkId = drinkId;
+      } else {
+        const item = await prisma.inventoryItem.findUnique({ where: { id: data.itemId } });
+        if (!item) throw new ApiError(404, "Inventory item not found");
+        if (item.quantity < newQty) throw new ApiError(400, `Insufficient stock for ${item.name}`);
+        await prisma.inventoryItem.update({
+          where: { id: data.itemId },
+          data: { quantity: item.quantity - newQty },
+        });
+        newTotal = newQty * Number(item.sellPrice);
+        newItemId = data.itemId;
+        newHotDrinkName = null;
+        newIsHotDrink = false;
+        newDrinkId = null;
+      }
+    } else if (data.qty !== undefined && data.qty !== oldQty) {
+      // Same item, just quantity change
+      newTotal = newQty * (Number(order.total) / oldQty);
+      // Adjust inventory/drink stock for the difference
+      if (order.itemId && order.item) {
+        const diff = newQty - oldQty;
+        if (diff > 0) {
+          if (order.item.quantity < diff) throw new ApiError(400, `Insufficient stock for ${order.item.name}`);
+          await prisma.inventoryItem.update({
+            where: { id: order.itemId },
+            data: { quantity: order.item.quantity - diff },
+          });
+        } else if (diff < 0) {
+          await prisma.inventoryItem.update({
+            where: { id: order.itemId },
+            data: { quantity: order.item.quantity + Math.abs(diff) },
+          });
+        }
+      }
+      if (order.drinkId) {
+        const drink = await prisma.drink.findUnique({ where: { id: order.drinkId } });
+        if (drink) {
+          const diff = newQty - oldQty;
+          if (diff > 0) {
+            if (drink.quantity < diff) throw new ApiError(400, `Insufficient stock for ${drink.name}`);
+            await prisma.drink.update({
+              where: { id: order.drinkId },
+              data: { quantity: drink.quantity - diff },
+            });
+          } else if (diff < 0) {
+            await prisma.drink.update({
+              where: { id: order.drinkId },
+              data: { quantity: drink.quantity + Math.abs(diff) },
+            });
+          }
+        }
+      }
+    }
+
+    const updated = await prisma.snackOrder.update({
+      where: { id: orderId },
+      data: {
+        itemId: newItemId,
+        drinkId: newDrinkId,
+        hotDrinkName: newHotDrinkName,
+        isHotDrink: newIsHotDrink,
+        qty: newQty,
+        total: Math.round((newTotal + Number.EPSILON) * 100) / 100,
+      },
+    });
+
+    return updated;
+  }
+
+  async deleteOrderItem(orderId: string) {
+    const order = await prisma.snackOrder.findUnique({
+      where: { id: orderId },
+      include: { session: true, item: true },
+    });
+    if (!order) {
+      throw new ApiError(404, "Order not found");
+    }
+    if (order.session.checkOut) {
+      throw new ApiError(400, "Cannot delete order of checked-out session");
+    }
+
+    // Restore inventory/drink stock
+    if (order.itemId && order.item) {
+      await prisma.inventoryItem.update({
+        where: { id: order.itemId },
+        data: { quantity: order.item.quantity + order.qty },
+      });
+    }
+    if (order.drinkId) {
+      const drink = await prisma.drink.findUnique({ where: { id: order.drinkId } });
+      if (drink) {
+        await prisma.drink.update({
+          where: { id: order.drinkId },
+          data: { quantity: drink.quantity + order.qty },
+        });
+      }
+    }
+
+    await prisma.snackOrder.delete({ where: { id: orderId } });
+
+    return { success: true };
   }
 
   async deleteSession(id: string) {
@@ -552,6 +770,9 @@ export class SessionsService {
         discountAmount: Number(s.discountAmount),
         discountNote: s.discountNote,
         paymentAccount: s.paymentAccount,
+        calculatedPrice: s.calculatedPrice != null ? Number(s.calculatedPrice) : null,
+        finalPrice: s.finalPrice != null ? Number(s.finalPrice) : null,
+        adjustmentNote: s.adjustmentNote,
         visitor: {
           id: s.visitor.id,
           name: s.visitor.name,
@@ -594,7 +815,7 @@ export class SessionsService {
           checkIn: { gte: fromDate, lte: toDate },
           checkOut: { not: null },
         },
-        select: { sessionType: true, visitorId: true, paymentStatus: true, amount: true, discountAmount: true, visitor: { select: { type: true } } },
+        select: { sessionType: true, visitorId: true, paymentStatus: true, amount: true, discountAmount: true, finalPrice: true, visitor: { select: { type: true } } },
       }),
       prisma.sale.findMany({
         where: { date: { gte: fromDate, lte: toDate } },

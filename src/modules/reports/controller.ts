@@ -26,7 +26,7 @@ export class ReportsController {
       const [sessions, sales, expenses, bookings, courses, activeSubscriptions, settings] = await Promise.all([
         prisma.session.findMany({
           where: { checkIn: { gte: fromDate, lte: toDate }, checkOut: { not: null } },
-          select: { sessionType: true, amount: true, paymentStatus: true, discountAmount: true, visitor: { select: { type: true } } },
+          select: { sessionType: true, amount: true, paymentStatus: true, discountAmount: true, finalPrice: true, visitor: { select: { type: true } } },
         }),
         prisma.sale.findMany({
           where: { date: { gte: fromDate, lte: toDate } },
@@ -146,7 +146,7 @@ export class ReportsController {
         where: {
           checkIn: { gte: fromDate, lte: toDate },
         },
-          select: { sessionType: true, amount: true, paymentStatus: true, paymentMethod: true, checkIn: true, checkOut: true, discountAmount: true, discountNote: true, paymentAccount: true, visitor: { select: { name: true, type: true } } },
+          select: { sessionType: true, amount: true, paymentStatus: true, paymentMethod: true, checkIn: true, checkOut: true, discountAmount: true, discountNote: true, paymentAccount: true, calculatedPrice: true, finalPrice: true, adjustmentNote: true, visitor: { select: { name: true, type: true } } },
         orderBy: { checkIn: "asc" },
       });
 
@@ -159,9 +159,11 @@ export class ReportsController {
           { header: "وقت الدخول", key: "checkIn", width: 20 },
           { header: "وقت الخروج", key: "checkOut", width: 20 },
           { header: "المدة (ساعات)", key: "duration", width: 14 },
+          { header: "السعر المحسوب", key: "calculatedPrice", width: 14 },
           { header: "المبلغ", key: "amount", width: 12 },
           { header: "الخصم", key: "discount", width: 12 },
           { header: "ملاحظة الخصم", key: "discountNote", width: 16 },
+          { header: "ملاحظة التعديل", key: "adjustmentNote", width: 16 },
           { header: "طريقة الدفع", key: "paymentMethod", width: 14 },
           { header: "الحساب / الجهة", key: "paymentAccount", width: 18 },
           { header: "حالة الدفع", key: "paymentStatus", width: 14 },
@@ -177,9 +179,11 @@ export class ReportsController {
             checkIn: s.checkIn.toISOString(),
             checkOut: s.checkOut ? s.checkOut.toISOString() : "لم يخرج",
             duration: duration !== null ? duration : "—",
+            calculatedPrice: s.calculatedPrice != null ? Number(s.calculatedPrice) : "—",
             amount: Number(s.amount),
             discount: Number(s.discountAmount) > 0 ? Number(s.discountAmount) : "—",
             discountNote: s.discountNote || "—",
+            adjustmentNote: s.adjustmentNote || "—",
             paymentMethod: s.paymentMethod ? paymentMethodMap[s.paymentMethod] : "—",
             paymentAccount: s.paymentAccount || "—",
             paymentStatus: paymentStatusMap[s.paymentStatus] || s.paymentStatus,

@@ -28,6 +28,11 @@ export const updateSessionSchema = z.object({
   discountAmount: z.number().min(0).optional(),
   discountNote: z.string().optional(),
   paymentAccount: z.string().optional(),
+  calculatedPrice: z.number().min(0).nullable().optional(),
+  finalPrice: z.number().min(0).nullable().optional(),
+  adjustmentNote: z.string().nullable().optional(),
+  visitorName: z.string().optional(),
+  visitorPhone: z.string().optional(),
 });
 
 export const checkoutSchema = z.object({
@@ -35,6 +40,8 @@ export const checkoutSchema = z.object({
   discountAmount: z.number().min(0).default(0),
   discountNote: z.string().optional(),
   paymentAccount: z.string().optional(),
+  adjustedPrice: z.number().min(0).nullable().optional(),
+  adjustmentNote: z.string().nullable().optional(),
 });
 
 export const addOrderSchema = z.object({

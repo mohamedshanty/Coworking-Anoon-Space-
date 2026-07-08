@@ -158,6 +158,7 @@ export class SubscribersService {
       throw new ApiError(404, "Visitor not found");
     }
 
+    // Update visitor fields
     const updated = await prisma.visitor.update({
       where: { id: visitorId },
       data: {
@@ -167,6 +168,40 @@ export class SubscribersService {
         ...(data.source !== undefined ? { source: data.source || null } : {}),
       },
     });
+
+    // Update subscription fields if any are provided
+    const hasSubscriptionUpdate =
+      data.packageType !== undefined ||
+      data.startDate !== undefined ||
+      data.endDate !== undefined ||
+      data.dailyQuotaHours !== undefined ||
+      data.amountPaid !== undefined ||
+      data.status !== undefined;
+
+    if (hasSubscriptionUpdate) {
+      // Find the most recent subscription for this visitor
+      const latestSub = await prisma.subscription.findFirst({
+        where: { visitorId },
+        orderBy: { startDate: "desc" },
+      });
+
+      if (latestSub) {
+        const subUpdate: Record<string, unknown> = {};
+        if (data.packageType) subUpdate.packageType = data.packageType;
+        if (data.startDate) subUpdate.startDate = new Date(data.startDate);
+        if (data.endDate) subUpdate.endDate = new Date(data.endDate);
+        if (data.dailyQuotaHours !== undefined) subUpdate.dailyQuotaHours = data.dailyQuotaHours;
+        if (data.amountPaid !== undefined) subUpdate.amountPaid = Math.round((data.amountPaid + Number.EPSILON) * 100) / 100;
+        if (data.status) subUpdate.status = data.status;
+
+        if (Object.keys(subUpdate).length > 0) {
+          await prisma.subscription.update({
+            where: { id: latestSub.id },
+            data: subUpdate,
+          });
+        }
+      }
+    }
 
     return updated;
   }

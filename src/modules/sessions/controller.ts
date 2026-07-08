@@ -66,8 +66,8 @@ export class SessionsController {
   async checkout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const { paymentMethod, discountAmount, discountNote, paymentAccount } = checkoutSchema.parse(req.body);
-      const session = await sessionsService.checkout(id, paymentMethod, discountAmount, discountNote, paymentAccount);
+      const { paymentMethod, discountAmount, discountNote, paymentAccount, adjustedPrice, adjustmentNote } = checkoutSchema.parse(req.body);
+      const session = await sessionsService.checkout(id, paymentMethod, discountAmount, discountNote, paymentAccount, adjustedPrice, adjustmentNote);
 
       // Socket broadcast
       const io = req.app.get("io");
@@ -121,6 +121,33 @@ export class SessionsController {
         order,
         sale,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async editOrderItem(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const orderId = req.params.orderId as string;
+      const { itemId, qty } = req.body;
+      const order = await sessionsService.editOrderItem(orderId, { itemId, qty });
+
+      const io = req.app.get("io");
+      if (io) {
+        io.emit("session:order_added", { sessionId: order.sessionId, order });
+      }
+
+      res.status(200).json({ success: true, data: order });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteOrderItem(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const orderId = req.params.orderId as string;
+      const result = await sessionsService.deleteOrderItem(orderId);
+      res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

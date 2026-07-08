@@ -24,6 +24,12 @@ export const updateSubscriberSchema = z.object({
   phone: z.string().min(1).optional(),
   notes: z.string().optional(),
   source: z.string().optional(),
+  packageType: z.enum(["monthly", "weekly", "half_month"]).optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  dailyQuotaHours: z.number().int().min(0).optional(),
+  amountPaid: z.number().min(0).optional(),
+  status: z.enum(["active", "expired", "paused", "renewing"]).optional(),
 });
 
 export type CreateSubscriberInput = z.infer<typeof createSubscriberSchema>;
