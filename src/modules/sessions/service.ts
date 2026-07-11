@@ -864,7 +864,12 @@ export class SessionsService {
         .reduce((sum, s) => sum + Number(s.discountAmount), 0)
     );
 
-    const avgRevenuePerVisit = visitCount > 0 ? r(hoursRevenue / visitCount) : 0;
+    // Exclude trainee sessions from avg revenue — trainees don't pay hourly,
+    // so including them skews the metric downward.
+    const paidNonTraineeVisits = sessions.filter(
+      (s) => s.paymentStatus === "paid" && (s.sessionType ?? s.visitor.type) !== "trainee"
+    ).length;
+    const avgRevenuePerVisit = paidNonTraineeVisits > 0 ? r(hoursRevenue / paidNonTraineeVisits) : 0;
 
     const subscriberCount = sessions.filter(
       (s) =>

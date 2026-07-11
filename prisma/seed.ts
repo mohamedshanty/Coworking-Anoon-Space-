@@ -73,6 +73,12 @@ async function main() {
     await prisma.hotDrink.create({ data: hd });
   }
 
+  // Seed default rooms
+  const defaultRooms = ["قاعة الإدارة", "القاعة A", "القاعة B"];
+  for (const name of defaultRooms) {
+    await prisma.room.create({ data: { name } });
+  }
+
   // Grant admin full permissions on all pages
   const pages = [
     "الرئيسية", "داخل المساحة", "السجل", "المشتركون", "السناكس", "المشروبات",

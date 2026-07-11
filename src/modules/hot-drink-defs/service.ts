@@ -38,6 +38,17 @@ export class HotDrinkDefsService {
       throw new ApiError(404, "Hot drink not found");
     }
 
+    // Guard: block deletion if there are existing sales for this drink
+    const saleCount = await prisma.sale.count({
+      where: { itemName: existing.name, isHotDrink: true },
+    });
+    if (saleCount > 0) {
+      throw new ApiError(
+        400,
+        `Cannot delete "${existing.name}" — ${saleCount} sale record(s) exist. Deactivate it instead.`
+      );
+    }
+
     return prisma.hotDrink.delete({ where: { id } });
   }
 }
