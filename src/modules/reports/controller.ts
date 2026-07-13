@@ -146,12 +146,14 @@ export class ReportsController {
         where: {
           checkIn: { gte: fromDate, lte: toDate },
         },
-          select: { sessionType: true, amount: true, paymentStatus: true, paymentMethod: true, checkIn: true, checkOut: true, discountAmount: true, discountNote: true, paymentAccount: true, calculatedPrice: true, finalPrice: true, adjustmentNote: true, visitor: { select: { name: true, type: true } } },
+          select: { sessionType: true, amount: true, paymentStatus: true, paymentMethod: true, checkIn: true, checkOut: true, discountAmount: true, discountNote: true, paymentAccount: true, finalPrice: true, adjustmentNote: true, visitor: { select: { name: true, type: true } } },
         orderBy: { checkIn: "asc" },
       });
 
       // Sheet 1: الزيارات (Visits) — history type ONLY
       if (exportType === "history") {
+        const rn = (v: number) => Math.round(v);
+
         const visitsSheet = workbook.addWorksheet("الزيارات");
         visitsSheet.columns = [
           { header: "اسم الزائر", key: "visitorName", width: 20 },
@@ -159,7 +161,6 @@ export class ReportsController {
           { header: "وقت الدخول", key: "checkIn", width: 20 },
           { header: "وقت الخروج", key: "checkOut", width: 20 },
           { header: "المدة (ساعات)", key: "duration", width: 14 },
-          { header: "السعر المحسوب", key: "calculatedPrice", width: 14 },
           { header: "المبلغ", key: "amount", width: 12 },
           { header: "الخصم", key: "discount", width: 12 },
           { header: "ملاحظة الخصم", key: "discountNote", width: 16 },
@@ -179,9 +180,8 @@ export class ReportsController {
             checkIn: s.checkIn.toISOString(),
             checkOut: s.checkOut ? s.checkOut.toISOString() : "لم يخرج",
             duration: duration !== null ? duration : "—",
-            calculatedPrice: s.calculatedPrice != null ? Number(s.calculatedPrice) : "—",
-            amount: Number(s.amount),
-            discount: Number(s.discountAmount) > 0 ? Number(s.discountAmount) : "—",
+            amount: rn(Number(s.amount)),
+            discount: Number(s.discountAmount) > 0 ? rn(Number(s.discountAmount)) : "—",
             discountNote: s.discountNote || "—",
             adjustmentNote: s.adjustmentNote || "—",
             paymentMethod: s.paymentMethod ? paymentMethodMap[s.paymentMethod] : "—",
@@ -260,7 +260,7 @@ export class ReportsController {
           startDate: sub.startDate.toISOString().slice(0, 10),
           endDate: sub.endDate.toISOString().slice(0, 10),
           dailyQuotaHours: sub.dailyQuotaHours,
-          amountPaid: Number(sub.amountPaid),
+          amountPaid: Math.round(Number(sub.amountPaid)),
           status: subStatusMap[sub.status] || sub.status,
         });
       }
@@ -288,7 +288,7 @@ export class ReportsController {
           date: sale.date.toISOString().slice(0, 10),
           itemName: sale.itemName,
           quantity: sale.quantity,
-          total: Number(sale.total),
+          total: Math.round(Number(sale.total)),
           isHotDrink: sale.isHotDrink ? "نعم" : "لا",
           paymentMethod: paymentMethodMap[sale.paymentMethod] || sale.paymentMethod,
         });
@@ -324,7 +324,7 @@ export class ReportsController {
           date: exp.date.toISOString().slice(0, 10),
           description: exp.description,
           category: categoryMap[exp.category] || exp.category,
-          amount: Number(exp.amount),
+          amount: Math.round(Number(exp.amount)),
         });
       }
 
@@ -356,7 +356,7 @@ export class ReportsController {
           bookerOrCourse: bk.purpose,
           trainerOrBooker: bk.bookerName,
           timeOrDates: `${bk.startTime.toISOString()} - ${bk.endTime.toISOString()}`,
-          price: Number(bk.price),
+          price: Math.round(Number(bk.price)),
           traineeCount: "—",
         });
       }
