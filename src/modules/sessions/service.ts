@@ -518,14 +518,14 @@ export class SessionsService {
       }
 
       if (data.itemId.startsWith("hot-")) {
-        const drinkName = data.itemId.replace("hot-", "");
-        const price = await getHotDrinkPrice(drinkName);
-        if (price === 0) {
-          throw new ApiError(404, `Hot drink "${drinkName}" not found or inactive`);
+        const hotDrinkId = data.itemId.replace("hot-", "");
+        const hotDrink = await getHotDrinkPrice(hotDrinkId);
+        if (!hotDrink) {
+          throw new ApiError(404, `Hot drink "${hotDrinkId}" not found or inactive`);
         }
-        newTotal = newQty * price;
+        newTotal = newQty * hotDrink.price;
         newItemId = null;
-        newHotDrinkName = drinkName;
+        newHotDrinkName = hotDrink.name;
         newIsHotDrink = true;
         newDrinkId = null;
       } else if (data.itemId.startsWith("drink-")) {
