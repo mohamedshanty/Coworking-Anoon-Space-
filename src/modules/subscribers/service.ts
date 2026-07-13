@@ -3,7 +3,7 @@ import { ApiError } from "../../lib/ApiError";
 import { CreateSubscriberInput, RenewSubscriptionInput, UpdateSubscriberInput } from "./schema";
 
 export class SubscribersService {
-  async getSubscribers(params: { search?: string; page?: number; limit?: number }) {
+  async getSubscribers(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc" }) {
     const page = Math.max(1, params.page ?? 1);
     const limit = Math.min(100, Math.max(1, params.limit ?? 25));
     const skip = (page - 1) * limit;
@@ -16,6 +16,14 @@ export class SubscribersService {
       ];
     }
 
+    const subSortFields: Record<string, any> = {
+      name: { name: params.sortDir ?? "asc" },
+      phone: { phone: params.sortDir ?? "asc" },
+      source: { source: params.sortDir ?? "asc" },
+      createdAt: { createdAt: params.sortDir ?? "desc" },
+    };
+    const orderBy = subSortFields[params.sortField ?? "createdAt"] ?? { createdAt: "desc" };
+
     const [items, total] = await Promise.all([
       prisma.visitor.findMany({
         where,
@@ -24,6 +32,7 @@ export class SubscribersService {
             orderBy: { startDate: "desc" },
           },
         },
+        orderBy,
         skip,
         take: limit,
       }),

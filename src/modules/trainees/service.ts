@@ -3,7 +3,7 @@ import { ApiError } from "../../lib/ApiError";
 import { CreateTraineeInput, UpdateTraineeInput } from "./schema";
 
 export class TraineesService {
-  async getTrainees(params: { search?: string; page?: number; limit?: number }) {
+  async getTrainees(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc" }) {
     const page = Math.max(1, params.page ?? 1);
     const limit = Math.min(100, Math.max(1, params.limit ?? 25));
     const skip = (page - 1) * limit;
@@ -16,6 +16,14 @@ export class TraineesService {
       ];
     }
 
+    const traineeSortFields: Record<string, any> = {
+      name: { name: params.sortDir ?? "asc" },
+      phone: { phone: params.sortDir ?? "asc" },
+      source: { source: params.sortDir ?? "asc" },
+      createdAt: { createdAt: params.sortDir ?? "desc" },
+    };
+    const orderBy = traineeSortFields[params.sortField ?? "createdAt"] ?? { createdAt: "desc" };
+
     const [items, total] = await Promise.all([
       prisma.visitor.findMany({
         where,
@@ -27,9 +35,9 @@ export class TraineesService {
             select: { checkIn: true },
           },
         },
+        orderBy,
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
       }),
       prisma.visitor.count({ where }),
     ]);

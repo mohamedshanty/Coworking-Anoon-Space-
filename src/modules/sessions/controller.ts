@@ -168,7 +168,7 @@ export class SessionsController {
 
   async getHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { from, to, type, paymentStatus, search, page, limit } = req.query;
+      const { from, to, type, paymentStatus, search, page, limit, sortField, sortDir } = req.query;
 
       if (!from || !to) {
         res.status(400).json({ success: false, message: "'from' and 'to' query params are required" });
@@ -183,6 +183,8 @@ export class SessionsController {
         search: search as string | undefined,
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
+        sortField: sortField as string | undefined,
+        sortDir: sortDir === "asc" || sortDir === "desc" ? sortDir : undefined,
       });
 
       res.status(200).json({ success: true, data });

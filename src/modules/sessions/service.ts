@@ -685,6 +685,8 @@ export class SessionsService {
     search?: string;
     page?: number;
     limit?: number;
+    sortField?: string;
+    sortDir?: "asc" | "desc";
   }) {
     const fromDate = new Date(params.from);
     const toDate = new Date(params.to);
@@ -731,11 +733,22 @@ export class SessionsService {
       }
     }
 
+    const historySortFields: Record<string, any> = {
+      checkIn: { checkIn: params.sortDir ?? "desc" },
+      checkOut: { checkOut: params.sortDir ?? "desc" },
+      amount: { amount: params.sortDir ?? "desc" },
+      paymentStatus: { paymentStatus: params.sortDir ?? "desc" },
+      name: { visitor: { name: params.sortDir ?? "asc" } },
+      phone: { visitor: { phone: params.sortDir ?? "asc" } },
+      type: { visitor: { type: params.sortDir ?? "asc" } },
+    };
+    const orderBy = historySortFields[params.sortField ?? "checkIn"] ?? { checkIn: "desc" };
+
     const [sessions, total] = await Promise.all([
       prisma.session.findMany({
         where,
         include: { visitor: true, snackOrders: true },
-        orderBy: { checkIn: "desc" },
+        orderBy,
         skip,
         take: limit,
       }),

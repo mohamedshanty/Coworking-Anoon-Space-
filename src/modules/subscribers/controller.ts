@@ -8,7 +8,9 @@ export class SubscribersController {
       const search = req.query.search as string | undefined;
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
-      const data = await subscribersService.getSubscribers({ search, page, limit });
+      const sortField = req.query.sortField as string | undefined;
+      const sortDir = req.query.sortDir === "asc" || req.query.sortDir === "desc" ? req.query.sortDir as "asc" | "desc" : undefined;
+      const data = await subscribersService.getSubscribers({ search, page, limit, sortField, sortDir });
       res.status(200).json({
         success: true,
         data,
