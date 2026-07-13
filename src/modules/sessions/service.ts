@@ -4,11 +4,11 @@ import { ApiError } from "../../lib/ApiError";
 import { calculateSessionPricing } from "./pricing";
 import { CheckInInput, UpdateSessionInput } from "./schema";
 
-async function getHotDrinkPrice(drinkName: string): Promise<number> {
+async function getHotDrinkPrice(drinkId: string): Promise<{ price: number; name: string } | null> {
   const hotDrink = await prisma.hotDrink.findFirst({
-    where: { name: drinkName, isActive: true },
+    where: { id: drinkId, isActive: true },
   });
-  return hotDrink ? Number(hotDrink.price) : 0;
+  return hotDrink ? { price: Number(hotDrink.price), name: hotDrink.name } : null;
 }
 
 export class SessionsService {
@@ -399,14 +399,14 @@ export class SessionsService {
 
     if (itemId.startsWith("hot-")) {
       isHotDrink = true;
-      const drinkName = itemId.replace("hot-", "");
-      const price = await getHotDrinkPrice(drinkName);
-      if (price === 0) {
-        throw new ApiError(404, `Hot drink "${drinkName}" not found or inactive`);
+      const hotDrinkId = itemId.replace("hot-", "");
+      const hotDrink = await getHotDrinkPrice(hotDrinkId);
+      if (!hotDrink) {
+        throw new ApiError(404, `Hot drink not found or inactive`);
       }
-      itemName = drinkName;
-      total = qty * price;
-      hotDrinkName = drinkName;
+      itemName = hotDrink.name;
+      total = qty * hotDrink.price;
+      hotDrinkName = hotDrink.name;
       // dbItemId stays null — hot drinks are not inventory items
     } else if (itemId.startsWith("drink-")) {
       const drinkId = itemId.replace("drink-", "");
