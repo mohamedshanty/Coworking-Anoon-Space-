@@ -71,6 +71,13 @@ router.post(
   (req, res, next) => sessionsController.addOrder(req, res, next)
 );
 
+// POST add multiple snack orders atomically
+router.post(
+  "/:id/orders/batch",
+  authorize("داخل المساحة", "edit"),
+  (req, res, next) => sessionsController.addBatchOrders(req, res, next)
+);
+
 // PATCH edit an order line item
 router.patch(
   "/orders/:orderId",

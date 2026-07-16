@@ -112,6 +112,8 @@ export class SalesService {
         paymentMethod: data.paymentMethod,
         isHotDrink: false,
         date: new Date(),
+        customerName: data.customerName || null,
+        notes: data.notes || null,
         ...(sessionId ? { sessionId, linkedName } : {}),
       },
     });
@@ -133,6 +135,8 @@ export class SalesService {
         paymentMethod: data.paymentMethod,
         isHotDrink: true,
         date: new Date(),
+        customerName: data.customerName || null,
+        notes: data.notes || null,
       },
     });
   }
@@ -196,6 +200,8 @@ export class SalesService {
         ...(data.quantity !== undefined ? { quantity: data.quantity } : {}),
         total,
         ...(data.paymentMethod ? { paymentMethod: data.paymentMethod } : {}),
+        ...(data.customerName !== undefined ? { customerName: data.customerName || null } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes || null } : {}),
       },
     });
   }
@@ -242,6 +248,8 @@ export class SalesService {
           : {}),
         ...(data.paymentMethod ? { paymentMethod: data.paymentMethod } : {}),
         total,
+        ...(data.customerName !== undefined ? { customerName: data.customerName || null } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes || null } : {}),
       },
     });
   }

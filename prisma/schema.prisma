@@ -197,6 +197,8 @@ model Sale {
   sessionId     String?
   session       Session?      @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   linkedName    String?
+  customerName  String?
+  notes         String?
   paymentMethod PaymentMethod
   isHotDrink    Boolean
   date          DateTime

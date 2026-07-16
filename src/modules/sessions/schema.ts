@@ -49,7 +49,19 @@ export const addOrderSchema = z.object({
   qty: z.number().int().min(1),
 });
 
+export const addBatchOrdersSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        qty: z.number().int().min(1),
+      }),
+    )
+    .min(1, "At least one item is required"),
+});
+
 export type CheckInInput = z.infer<typeof checkInSchema>;
 export type UpdateSessionInput = z.infer<typeof updateSessionSchema>;
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 export type AddOrderInput = z.infer<typeof addOrderSchema>;
+export type AddBatchOrdersInput = z.infer<typeof addBatchOrdersSchema>;

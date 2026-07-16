@@ -3,6 +3,7 @@ import { z } from "zod";
 import ExcelJS from "exceljs";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
+import { calculateSessionPricing } from "../sessions/pricing";
 
 const exportQuerySchema = z.object({
   from: z.string().min(1, "'from' is required"),
@@ -17,6 +18,8 @@ export class ReportsController {
       const parsed = exportQuerySchema.parse(req.query);
       const fromDate = new Date(parsed.from);
       const toDate = new Date(parsed.to);
+      // TODO: Use palestineEndOfDay from src/lib/timezone.ts to fix UTC-vs-Palestine timezone bug.
+      // Sessions checked in around midnight Palestine time may be miscategorized under the wrong day.
       toDate.setHours(23, 59, 59, 999);
 
       if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
@@ -114,6 +117,8 @@ export class ReportsController {
       const parsed = exportQuerySchema.parse(req.query);
       const fromDate = new Date(parsed.from);
       const toDate = new Date(parsed.to);
+      // TODO: Use palestineEndOfDay from src/lib/timezone.ts to fix UTC-vs-Palestine timezone bug.
+      // Sessions checked in around midnight Palestine time may be miscategorized under the wrong day.
       toDate.setHours(23, 59, 59, 999);
       const exportType = parsed.type ?? "reports";
 
@@ -146,8 +151,31 @@ export class ReportsController {
         where: {
           checkIn: { gte: fromDate, lte: toDate },
         },
-          select: { sessionType: true, amount: true, paymentStatus: true, paymentMethod: true, checkIn: true, checkOut: true, discountAmount: true, discountNote: true, paymentAccount: true, finalPrice: true, adjustmentNote: true, visitor: { select: { name: true, type: true } } },
+        select: {
+          sessionType: true,
+          amount: true,
+          paymentStatus: true,
+          paymentMethod: true,
+          checkIn: true,
+          checkOut: true,
+          discountAmount: true,
+          discountNote: true,
+          paymentAccount: true,
+          finalPrice: true,
+          adjustmentNote: true,
+          hourlyRate: true,
+          visitorId: true,
+          visitor: { select: { name: true, type: true } },
+          snackOrders: { select: { total: true } },
+        },
         orderBy: { checkIn: "asc" },
+      });
+
+      // Fetch settings and active subscriptions for pricing calculation
+      const pricingSettings = await prisma.settings.findFirst();
+      const activeSubscriptions = await prisma.subscription.findMany({
+        where: { status: "active" },
+        select: { visitorId: true },
       });
 
       // Sheet 1: الزيارات (Visits) — history type ONLY
@@ -161,7 +189,9 @@ export class ReportsController {
           { header: "وقت الدخول", key: "checkIn", width: 20 },
           { header: "وقت الخروج", key: "checkOut", width: 20 },
           { header: "المدة (ساعات)", key: "duration", width: 14 },
-          { header: "المبلغ", key: "amount", width: 12 },
+          { header: "مبلغ السناكس", key: "ordersAmount", width: 14 },
+          { header: "مبلغ الساعات", key: "hoursAmount", width: 14 },
+          { header: "المبلغ الإجمالي", key: "totalAmount", width: 14 },
           { header: "الخصم", key: "discount", width: 12 },
           { header: "ملاحظة الخصم", key: "discountNote", width: 16 },
           { header: "ملاحظة التعديل", key: "adjustmentNote", width: 16 },
@@ -174,13 +204,38 @@ export class ReportsController {
           const duration = s.checkOut
             ? Math.round(((s.checkOut.getTime() - s.checkIn.getTime()) / 3600000) * 100) / 100
             : null;
+
+          const effectiveType = s.sessionType ?? s.visitor.type;
+          const hasActiveSub = activeSubscriptions.some(
+            (sub) => sub.visitorId === s.visitorId
+          );
+          const sessionHourlyRate = s.hourlyRate != null
+            ? Number(s.hourlyRate)
+            : pricingSettings
+              ? Number(pricingSettings.hourlyRate)
+              : 0;
+
+          const pricing = calculateSessionPricing(
+            s.checkIn,
+            effectiveType,
+            hasActiveSub,
+            s.snackOrders,
+            {
+              hourlyRate: sessionHourlyRate,
+              fullDayPrice: pricingSettings ? Number(pricingSettings.fullDayPrice) : 0,
+              fullDayThresholdHours: pricingSettings?.fullDayThresholdHours ?? 8,
+            }
+          );
+
           visitsSheet.addRow({
             visitorName: s.visitor.name,
             type: typeMap[s.sessionType ?? s.visitor.type] || s.visitor.type,
             checkIn: s.checkIn.toISOString(),
             checkOut: s.checkOut ? s.checkOut.toISOString() : "لم يخرج",
             duration: duration !== null ? duration : "—",
-            amount: rn(Number(s.amount)),
+            ordersAmount: rn(pricing.ordersAmount),
+            hoursAmount: rn(pricing.timeAmount),
+            totalAmount: rn(pricing.totalAmount),
             discount: Number(s.discountAmount) > 0 ? rn(Number(s.discountAmount)) : "—",
             discountNote: s.discountNote || "—",
             adjustmentNote: s.adjustmentNote || "—",

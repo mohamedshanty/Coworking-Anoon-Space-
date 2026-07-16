@@ -20,6 +20,8 @@ export class LoginLogsController {
         if (parsed.from) where.at.gte = new Date(parsed.from);
         if (parsed.to) {
           const toDate = new Date(parsed.to);
+          // TODO: Use palestineEndOfDay from src/lib/timezone.ts to fix UTC-vs-Palestine timezone bug.
+          // Logs around midnight Palestine time may be miscategorized under the wrong day.
           toDate.setHours(23, 59, 59, 999);
           where.at.lte = toDate;
         }

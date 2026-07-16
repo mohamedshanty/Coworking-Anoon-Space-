@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { sessionsService } from "./service";
-import { checkInSchema, updateSessionSchema, checkoutSchema, addOrderSchema } from "./schema";
+import { checkInSchema, updateSessionSchema, checkoutSchema, addOrderSchema, addBatchOrdersSchema } from "./schema";
 
 export class SessionsController {
   async visitorLookup(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -120,6 +120,27 @@ export class SessionsController {
         success: true,
         order,
         sale,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addBatchOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const { items } = addBatchOrdersSchema.parse(req.body);
+      const results = await sessionsService.addBatchOrders(id, { items });
+
+      const io = req.app.get("io");
+      if (io) {
+        io.emit("session:order_added", { sessionId: id });
+      }
+
+      res.status(201).json({
+        success: true,
+        data: results,
+        count: results.length,
       });
     } catch (error) {
       next(error);

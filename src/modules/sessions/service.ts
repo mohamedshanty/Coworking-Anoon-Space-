@@ -2,7 +2,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { calculateSessionPricing } from "./pricing";
-import { CheckInInput, UpdateSessionInput } from "./schema";
+import { CheckInInput, UpdateSessionInput, AddBatchOrdersInput } from "./schema";
+import { isSamePalestineDay, palestineStartOfDay, palestineEndOfDay } from "../../lib/timezone";
 
 async function getHotDrinkPrice(drinkId: string): Promise<{ price: number; name: string } | null> {
   const hotDrink = await prisma.hotDrink.findFirst({
@@ -140,29 +141,69 @@ export class SessionsService {
       hourlyRate = Number(settings.hourlyRate);
     }
 
-    const session = await prisma.session.create({
-      data: {
-        visitorId,
-        sessionType,
-        checkIn: new Date(),
-        amount: 0,
-        hourlyRate,
-        paymentStatus: "full_debt",
-        notes: "notes" in data ? (data as { notes?: string }).notes ?? null : null,
-      },
-      include: {
-        visitor: true,
-        snackOrders: true,
-      },
+    const checkInTime = new Date();
+
+    const result = await prisma.$transaction(async (tx) => {
+      const session = await tx.session.create({
+        data: {
+          visitorId,
+          sessionType,
+          checkIn: checkInTime,
+          amount: 0,
+          hourlyRate,
+          paymentStatus: "full_debt",
+          notes: "notes" in data ? (data as { notes?: string }).notes ?? null : null,
+        },
+        include: {
+          visitor: true,
+          snackOrders: true,
+        },
+      });
+
+      await tx.visitor.update({
+        where: { id: visitorId },
+        data: { lastVisit: checkInTime },
+      });
+
+      let subscriptionOverQuota = false;
+
+      const activeSub = await tx.subscription.findFirst({
+        where: { visitorId, status: "active" },
+      });
+
+      if (activeSub) {
+        const visitorSessions = await tx.session.findMany({
+          where: { visitorId },
+          select: { id: true, checkIn: true },
+        });
+
+        const alreadyCountedToday = visitorSessions.some(
+          (s) => s.id !== session.id && isSamePalestineDay(s.checkIn, checkInTime),
+        );
+
+        const totalDays = Math.max(
+          1,
+          Math.round(
+            (new Date(activeSub.endDate).getTime() - new Date(activeSub.startDate).getTime()) / 86_400_000,
+          ),
+        );
+
+        if (!alreadyCountedToday) {
+          const newDaysUsed = activeSub.daysUsed + 1;
+          await tx.subscription.update({
+            where: { id: activeSub.id },
+            data: { daysUsed: newDaysUsed },
+          });
+          subscriptionOverQuota = newDaysUsed > totalDays;
+        } else {
+          subscriptionOverQuota = activeSub.daysUsed > totalDays;
+        }
+      }
+
+      return { session, subscriptionOverQuota };
     });
 
-    // Update visitor's lastVisit
-    await prisma.visitor.update({
-      where: { id: visitorId },
-      data: { lastVisit: new Date() },
-    });
-
-    return session;
+    return { ...result.session, subscriptionOverQuota: result.subscriptionOverQuota };
   }
 
   async editSession(id: string, data: UpdateSessionInput) {
@@ -188,10 +229,84 @@ export class SessionsService {
       }
     }
 
+    const newCheckIn = data.checkIn ? new Date(data.checkIn) : null;
+    const checkInChanged = newCheckIn && !isSamePalestineDay(session.checkIn, newCheckIn);
+
+    if (checkInChanged) {
+      const result = await prisma.$transaction(async (tx) => {
+        const updated = await tx.session.update({
+          where: { id },
+          data: {
+            ...(data.checkIn ? { checkIn: newCheckIn } : {}),
+            ...(data.checkOut !== undefined
+              ? { checkOut: data.checkOut ? new Date(data.checkOut) : null }
+              : {}),
+            ...(data.amount !== undefined ? { amount: data.amount } : {}),
+            ...(data.notes !== undefined ? { notes: data.notes } : {}),
+            ...(data.sessionType !== undefined ? { sessionType: data.sessionType } : {}),
+            ...(data.paymentStatus ? { paymentStatus: data.paymentStatus } : {}),
+            ...(data.paymentMethod !== undefined ? { paymentMethod: data.paymentMethod } : {}),
+            ...(data.hourlyRate !== undefined ? { hourlyRate: data.hourlyRate } : {}),
+            ...(data.discountAmount !== undefined ? { discountAmount: data.discountAmount } : {}),
+            ...(data.discountNote !== undefined ? { discountNote: data.discountNote || null } : {}),
+            ...(data.paymentAccount !== undefined ? { paymentAccount: data.paymentAccount?.trim() || null } : {}),
+            ...(data.calculatedPrice !== undefined ? { calculatedPrice: data.calculatedPrice } : {}),
+            ...(data.finalPrice !== undefined ? { finalPrice: data.finalPrice } : {}),
+            ...(data.adjustmentNote !== undefined ? { adjustmentNote: data.adjustmentNote || null } : {}),
+          },
+          include: {
+            visitor: true,
+            snackOrders: true,
+          },
+        });
+
+        const activeSub = await tx.subscription.findFirst({
+          where: { visitorId: session.visitorId, status: "active" },
+        });
+
+        if (activeSub) {
+          const visitorSessions = await tx.session.findMany({
+            where: { visitorId: session.visitorId },
+            select: { id: true, checkIn: true },
+          });
+
+          // OLD day: was this session the only one counted?
+          const otherSessionsOnOldDay = visitorSessions.filter(
+            (s) => s.id !== id && isSamePalestineDay(s.checkIn, session.checkIn),
+          );
+          const wasOnlyOnOldDay = otherSessionsOnOldDay.length === 0;
+
+          // NEW day: is there already another session counted?
+          const otherSessionsOnNewDay = visitorSessions.filter(
+            (s) => s.id !== id && isSamePalestineDay(s.checkIn, newCheckIn!),
+          );
+          const isFirstOnNewDay = otherSessionsOnNewDay.length === 0;
+
+          let newDaysUsed = activeSub.daysUsed;
+          if (wasOnlyOnOldDay && newDaysUsed > 0) {
+            newDaysUsed -= 1;
+          }
+          if (isFirstOnNewDay) {
+            newDaysUsed += 1;
+          }
+
+          if (newDaysUsed !== activeSub.daysUsed) {
+            await tx.subscription.update({
+              where: { id: activeSub.id },
+              data: { daysUsed: newDaysUsed },
+            });
+          }
+        }
+
+        return updated;
+      });
+
+      return result;
+    }
+
     const updated = await prisma.session.update({
       where: { id },
       data: {
-        ...(data.checkIn ? { checkIn: new Date(data.checkIn) } : {}),
         ...(data.checkOut !== undefined
           ? { checkOut: data.checkOut ? new Date(data.checkOut) : null }
           : {}),
@@ -477,6 +592,115 @@ export class SessionsService {
     return { order, sale };
   }
 
+  async addBatchOrders(sessionId: string, input: AddBatchOrdersInput) {
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: { visitor: true },
+    });
+    if (!session) {
+      throw new ApiError(404, "Session not found");
+    }
+    if (session.checkOut) {
+      throw new ApiError(400, "Cannot add orders to checked-out session");
+    }
+
+    const results: { order: any; sale: any }[] = [];
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of input.items) {
+        const { itemId, qty } = item;
+
+        let isHotDrink = false;
+        let itemName = "";
+        let total = 0;
+        let dbItemId: string | null = null;
+        let hotDrinkName: string | null = null;
+        let dbDrinkId: string | null = null;
+
+        if (itemId.startsWith("hot-")) {
+          isHotDrink = true;
+          const hotDrinkId = itemId.replace("hot-", "");
+          const hotDrink = await tx.hotDrink.findFirst({
+            where: { id: hotDrinkId, isActive: true },
+          });
+          if (!hotDrink) {
+            throw new ApiError(404, `Hot drink "${hotDrinkId}" not found or inactive`);
+          }
+          itemName = hotDrink.name;
+          total = qty * Number(hotDrink.price);
+          hotDrinkName = hotDrink.name;
+        } else if (itemId.startsWith("drink-")) {
+          const drinkId = itemId.replace("drink-", "");
+          const drink = await tx.drink.findUnique({ where: { id: drinkId } });
+          if (!drink) {
+            throw new ApiError(404, `Drink "${drinkId}" not found`);
+          }
+          if (drink.quantity < qty) {
+            throw new ApiError(
+              400,
+              `Insufficient stock for ${drink.name} (requested ${qty}, available ${drink.quantity})`,
+            );
+          }
+          await tx.drink.update({
+            where: { id: drinkId },
+            data: { quantity: drink.quantity - qty },
+          });
+          itemName = drink.name;
+          total = qty * Number(drink.sellPrice);
+          dbDrinkId = drinkId;
+        } else {
+          const invItem = await tx.inventoryItem.findUnique({ where: { id: itemId } });
+          if (!invItem) {
+            throw new ApiError(404, `Inventory item "${itemId}" not found`);
+          }
+          if (invItem.quantity < qty) {
+            throw new ApiError(
+              400,
+              `Insufficient stock for ${invItem.name} (requested ${qty}, available ${invItem.quantity})`,
+            );
+          }
+          await tx.inventoryItem.update({
+            where: { id: itemId },
+            data: { quantity: invItem.quantity - qty },
+          });
+          itemName = invItem.name;
+          total = qty * Number(invItem.sellPrice);
+          dbItemId = itemId;
+        }
+
+        const order = await tx.snackOrder.create({
+          data: {
+            sessionId,
+            itemId: dbItemId,
+            drinkId: dbDrinkId,
+            hotDrinkName,
+            qty,
+            total,
+            isHotDrink,
+          },
+        });
+
+        const sale = await tx.sale.create({
+          data: {
+            itemId: dbItemId ?? dbDrinkId ?? `hot-${hotDrinkName}`,
+            itemName,
+            quantity: qty,
+            total,
+            sessionId,
+            linkedName: session.visitor.name,
+            paymentMethod: "cash",
+            isHotDrink,
+            date: new Date(),
+          },
+        });
+
+        results.push({ order, sale });
+      }
+    });
+
+    return results;
+  }
+
   async editOrderItem(orderId: string, data: { itemId?: string; qty?: number }) {
     const order = await prisma.snackOrder.findUnique({
       where: { id: orderId },
@@ -670,11 +894,47 @@ export class SessionsService {
       );
     }
 
-    // SnackOrders cascade-delete via onDelete: Cascade on Session relation.
-    // Sales have onDelete: SetNull — sessionId becomes null, sale records survive.
-    return prisma.session.delete({
-      where: { id },
+    const result = await prisma.$transaction(async (tx) => {
+      // SnackOrders cascade-delete via onDelete: Cascade on Session relation.
+      // Sales have onDelete: SetNull — sessionId becomes null, sale records survive.
+      const deleted = await tx.session.delete({
+        where: { id },
+      });
+
+      const activeSub = await tx.subscription.findFirst({
+        where: { visitorId: session.visitorId, status: "active" },
+      });
+
+      if (activeSub) {
+        const otherSessionsOnDay = await tx.session.count({
+          where: {
+            visitorId: session.visitorId,
+            id: { not: id },
+          },
+        });
+
+        // Filter to same Palestine day in JS since Prisma can't filter by timezone
+        const allVisitorSessions = await tx.session.findMany({
+          where: { visitorId: session.visitorId, id: { not: id } },
+          select: { checkIn: true },
+        });
+
+        const hasOtherSessionOnDay = allVisitorSessions.some((s) =>
+          isSamePalestineDay(s.checkIn, session.checkIn),
+        );
+
+        if (!hasOtherSessionOnDay && activeSub.daysUsed > 0) {
+          await tx.subscription.update({
+            where: { id: activeSub.id },
+            data: { daysUsed: activeSub.daysUsed - 1 },
+          });
+        }
+      }
+
+      return deleted;
     });
+
+    return result;
   }
 
   async getHistory(params: {
@@ -688,9 +948,8 @@ export class SessionsService {
     sortField?: string;
     sortDir?: "asc" | "desc";
   }) {
-    const fromDate = new Date(params.from);
-    const toDate = new Date(params.to);
-    toDate.setHours(23, 59, 59, 999);
+    const fromDate = palestineStartOfDay(new Date(params.from));
+    const toDate = palestineEndOfDay(new Date(params.to));
 
     if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
       throw new ApiError(400, "Invalid date format for 'from' or 'to'");
@@ -820,9 +1079,8 @@ export class SessionsService {
   }
 
   async getHistorySummary(params: { from: string; to: string }) {
-    const fromDate = new Date(params.from);
-    const toDate = new Date(params.to);
-    toDate.setHours(23, 59, 59, 999);
+    const fromDate = palestineStartOfDay(new Date(params.from));
+    const toDate = palestineEndOfDay(new Date(params.to));
 
     if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
       throw new ApiError(400, "Invalid date format for 'from' or 'to'");

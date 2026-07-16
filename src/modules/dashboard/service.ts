@@ -1,23 +1,12 @@
 import { prisma } from "../../lib/prisma";
+import { palestineStartOfDay, palestineEndOfDay } from "../../lib/timezone";
 
 const day = 86_400_000;
 
-function startOfDay(d: Date): Date {
-  const r = new Date(d);
-  r.setHours(0, 0, 0, 0);
-  return r;
-}
-
-function endOfDay(d: Date): Date {
-  const r = new Date(d);
-  r.setHours(23, 59, 59, 999);
-  return r;
-}
-
 // Shared revenue calculation for a single day
 async function calcDayRevenue(date: Date): Promise<number> {
-  const dayStart = startOfDay(date);
-  const dayEnd = endOfDay(date);
+  const dayStart = palestineStartOfDay(date);
+  const dayEnd = palestineEndOfDay(date);
 
   // 1. Session revenue: sum of session.amount where checkOut falls on this day
   const sessions = await prisma.session.findMany({
@@ -92,8 +81,8 @@ async function calcDayRevenue(date: Date): Promise<number> {
 export class DashboardService {
   async getSummary() {
     const now = new Date();
-    const todayStart = startOfDay(now);
-    const todayEnd = endOfDay(now);
+    const todayStart = palestineStartOfDay(now);
+    const todayEnd = palestineEndOfDay(now);
 
     // Alerts
     const alerts: any[] = [];
@@ -265,7 +254,7 @@ export class DashboardService {
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(now.getTime() - i * day);
       const revenue = await calcDayRevenue(d);
-      const dateStr = startOfDay(d).toISOString().slice(0, 10);
+      const dateStr = palestineStartOfDay(d).toISOString().slice(0, 10);
       results.push({ date: dateStr, revenue });
     }
 
