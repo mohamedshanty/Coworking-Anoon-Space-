@@ -28,6 +28,18 @@ export class SessionsController {
     }
   }
 
+  async getNewVisitors(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = await sessionsService.getNewVisitors();
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async checkIn(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const input = checkInSchema.parse(req.body);

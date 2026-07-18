@@ -89,6 +89,102 @@ export class SessionsService {
     });
   }
 
+  async getNewVisitors() {
+    // Find visitors whose total session count is exactly 1 (first-time only)
+    // We can't filter by _count in where, so we fetch all visitors with session counts and filter in JS
+    const visitorsWithCounts = await prisma.visitor.findMany({
+      include: {
+        sessions: {
+          include: { snackOrders: true },
+        },
+        _count: { select: { sessions: true } },
+      },
+    });
+
+    // Filter to only visitors with exactly 1 session
+    const visitors = visitorsWithCounts.filter((v) => v._count.sessions === 1);
+
+    const settings = await prisma.settings.findFirst();
+    if (!settings) {
+      throw new ApiError(500, "Settings not initialized in database");
+    }
+
+    const activeSubscriptions = await prisma.subscription.findMany({
+      where: { status: "active" },
+    });
+
+    return visitors.map((v) => {
+      const session = v.sessions[0];
+      if (!session) return null;
+
+      const hasActiveSub = activeSubscriptions.some(
+        (sub) => sub.visitorId === v.id
+      );
+
+      const effectiveType = session.sessionType ?? v.type;
+
+      const sessionHourlyRate = session.hourlyRate != null
+        ? Number(session.hourlyRate)
+        : Number(settings.hourlyRate);
+
+      const pricing = calculateSessionPricing(
+        session.checkIn,
+        effectiveType,
+        hasActiveSub,
+        session.snackOrders,
+        {
+          hourlyRate: sessionHourlyRate,
+          fullDayPrice: Number(settings.fullDayPrice),
+          fullDayThresholdHours: settings.fullDayThresholdHours,
+        }
+      );
+
+      // For checked-out sessions, use the stored amount (matches visitor profile & history pages).
+      // For active sessions, recalculate live so the running total stays current.
+      const amount = session.checkOut
+        ? Number(session.amount)
+        : pricing.totalAmount;
+
+      return {
+        id: session.id,
+        visitorId: v.id,
+        sessionType: session.sessionType,
+        checkIn: session.checkIn.toISOString(),
+        checkOut: session.checkOut?.toISOString() ?? null,
+        amount,
+        hourlyRate: session.hourlyRate != null ? Number(session.hourlyRate) : null,
+        paymentStatus: session.paymentStatus,
+        paymentMethod: session.paymentMethod,
+        notes: session.notes,
+        discountAmount: Number(session.discountAmount),
+        calculatedPrice: session.calculatedPrice != null ? Number(session.calculatedPrice) : null,
+        finalPrice: session.finalPrice != null ? Number(session.finalPrice) : null,
+        visitor: {
+          id: v.id,
+          name: v.name,
+          phone: v.phone,
+          type: v.type,
+          source: v.source,
+          lastVisit: v.lastVisit?.toISOString() ?? null,
+          followUpStatus: v.followUpStatus,
+          followUpAt: v.followUpAt?.toISOString() ?? null,
+          sessionCount: v._count.sessions,
+        },
+        snackOrders: session.snackOrders.map((o) => ({
+          id: o.id,
+          sessionId: o.sessionId,
+          itemId: o.itemId,
+          hotDrinkName: o.hotDrinkName,
+          qty: o.qty,
+          total: Number(o.total),
+          isHotDrink: o.isHotDrink,
+        })),
+        hours: pricing.hours,
+        isSub: pricing.isSub,
+      };
+    }).filter((v): v is NonNullable<typeof v> => v !== null);
+  }
+
   async checkIn(data: CheckInInput) {
     let visitorId: string;
 

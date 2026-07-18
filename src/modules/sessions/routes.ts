@@ -36,6 +36,13 @@ router.get(
   (req, res, next) => sessionsController.getLiveSessions(req, res, next)
 );
 
+// GET new visitors (first-time only, visit count == 1)
+router.get(
+  "/new-visitors",
+  authorize("داخل المساحة", "view"),
+  (req, res, next) => sessionsController.getNewVisitors(req, res, next)
+);
+
 // POST check-in
 router.post(
   "/",

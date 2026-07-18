@@ -105,6 +105,15 @@ model Visitor {
   sessions       Session[]
   subscriptions  Subscription[]
   debts          Debt[]
+  visitorNotes   VisitorNote[]
+}
+
+model VisitorNote {
+  id        String   @id @default(uuid())
+  visitorId String
+  visitor   Visitor  @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
 }
 
 model Session {
