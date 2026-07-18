@@ -26,7 +26,7 @@ export class ReportsController {
         throw new ApiError(400, "Invalid date format for 'from' or 'to'");
       }
 
-      const [sessions, sales, expenses, bookings, courses, activeSubscriptions, settings] = await Promise.all([
+      const [sessions, sales, expenses, bookings, courses, activeSubscriptions, settings, collectedDebts] = await Promise.all([
         prisma.session.findMany({
           where: { checkIn: { gte: fromDate, lte: toDate }, checkOut: { not: null } },
           select: { sessionType: true, amount: true, paymentStatus: true, discountAmount: true, finalPrice: true, visitor: { select: { type: true } } },
@@ -52,6 +52,13 @@ export class ReportsController {
           select: { visitorId: true, amountPaid: true },
         }),
         prisma.settings.findFirst(),
+        prisma.debt.findMany({
+          where: {
+            status: "collected",
+            collectedAt: { gte: fromDate, lte: toDate },
+          },
+          select: { amount: true },
+        }),
       ]);
 
       const r = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
@@ -87,8 +94,13 @@ export class ReportsController {
         coursesRevenue = r(trainees.reduce((sum, t) => sum + Number(t.amountPaid), 0));
       }
 
+      // Collected debt revenue (cash-basis: counts when debt is collected)
+      const debtRevenue = r(
+        collectedDebts.reduce((sum, d) => sum + Number(d.amount), 0)
+      );
+
       // Financial summary
-      const totalRevenue = r(hoursRevenue + snacksRevenue + hotDrinksRevenue + coursesRevenue + roomsRevenue);
+      const totalRevenue = r(hoursRevenue + snacksRevenue + hotDrinksRevenue + coursesRevenue + roomsRevenue + debtRevenue);
       const netProfit = r(totalRevenue - expensesTotal - hotDrinksCost);
 
       // Total discounts given (already factored into hoursRevenue via reduced `amount`)
@@ -104,7 +116,8 @@ export class ReportsController {
           sales: { snacksRevenue, hotDrinksRevenue },
           expenses: { total: expensesTotal, hotDrinksCost },
           roomsCourses: { roomsRevenue, coursesRevenue },
-          financialSummary: { hoursRevenue, snacksRevenue, hotDrinksRevenue, coursesRevenue, roomsRevenue, expenses: expensesTotal, hotDrinksCost, netProfit, totalDiscounts },
+          debtRevenue,
+          financialSummary: { hoursRevenue, snacksRevenue, hotDrinksRevenue, coursesRevenue, roomsRevenue, debtRevenue, expenses: expensesTotal, hotDrinksCost, netProfit, totalDiscounts },
         },
       });
     } catch (error) {
