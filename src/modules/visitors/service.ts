@@ -92,6 +92,10 @@ export class VisitorsService {
     const updated = await prisma.visitor.update({
       where: { id },
       data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+        ...(data.type !== undefined && { type: data.type }),
+        ...(data.source !== undefined && { source: data.source }),
         ...(data.followUpStatus !== undefined && { followUpStatus: data.followUpStatus }),
         ...(data.followUpStatus === "contacted" && { followUpAt: new Date() }),
         ...(data.notes !== undefined && { notes: data.notes }),
