@@ -403,6 +403,7 @@ export class SessionsService {
     const updated = await prisma.session.update({
       where: { id },
       data: {
+        ...(data.checkIn ? { checkIn: newCheckIn as Date } : {}),
         ...(data.checkOut !== undefined
           ? { checkOut: data.checkOut ? new Date(data.checkOut) : null }
           : {}),
