@@ -2,9 +2,16 @@ import { Router } from "express";
 import { visitorsController } from "./controller";
 import { authenticate } from "../../middleware/authenticate";
 import { authorize } from "../../middleware/authorize";
+import { n8nAuth } from "../../middleware/n8nAuth";
 
 const router = Router();
 
+// ─── N8N-protected routes (API key auth, no JWT) ──────────────────────────────
+router.get("/churned", n8nAuth, (req, res, next) => visitorsController.getChurned(req, res, next));
+router.post("/:id/whatsapp-reply", n8nAuth, (req, res, next) => visitorsController.addWhatsAppReply(req, res, next));
+router.get("/by-phone/:phone", n8nAuth, (req, res, next) => visitorsController.getByPhone(req, res, next));
+
+// ─── Admin dashboard routes (JWT + permission auth) ───────────────────────────
 router.use(authenticate);
 
 // GET visitor profile by ID

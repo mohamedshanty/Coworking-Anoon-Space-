@@ -1,6 +1,11 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
-import { AddNoteInput, UpdateVisitorInput } from "./schema";
+import { AddNoteInput, UpdateVisitorInput, WhatsAppReplyInput } from "./schema";
+
+/** Strip spaces, dashes, plus signs, and leading zeros for consistent phone matching. */
+function normalizePhone(phone: string): string {
+  return phone.replace(/[\s\-+]/g, "").replace(/^0+/, "");
+}
 
 export class VisitorsService {
   async getById(id: string) {
@@ -144,6 +149,87 @@ export class VisitorsService {
 
     await prisma.visitorNote.delete({ where: { id: noteId } });
     return { success: true };
+  }
+
+  async getChurned(days: number = 14) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+
+    const churned = await prisma.$queryRaw<
+      { id: string; name: string; phone: string; lastVisitDate: Date; totalVisits: bigint }[]
+    >`
+      SELECT
+        v."id",
+        v."name",
+        v."phone",
+        MAX(COALESCE(s."checkOut", s."checkIn")) AS "lastVisitDate",
+        COUNT(s."id") AS "totalVisits"
+      FROM "Visitor" v
+      INNER JOIN "Session" s ON s."visitorId" = v."id"
+      WHERE v."phone" IS NOT NULL AND v."phone" != ''
+      GROUP BY v."id", v."name", v."phone"
+      HAVING MAX(COALESCE(s."checkOut", s."checkIn")) < ${cutoff}
+      ORDER BY "lastVisitDate" ASC
+    `;
+
+    return churned.map((row) => ({
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      lastVisitDate: row.lastVisitDate.toISOString(),
+      totalVisits: Number(row.totalVisits),
+    }));
+  }
+
+  async addWhatsAppReply(visitorId: string, data: WhatsAppReplyInput) {
+    const visitor = await prisma.visitor.findUnique({ where: { id: visitorId } });
+    if (!visitor) {
+      throw new ApiError(404, "Visitor not found");
+    }
+
+    const timestamp = new Date(data.timestamp);
+    const content = [
+      `[WhatsApp Reply — ${timestamp.toISOString()}]`,
+      `Message: ${data.message}`,
+      ...(data.aiReply ? [`AI Reply: ${data.aiReply}`] : []),
+    ].join("\n");
+
+    const note = await prisma.visitorNote.create({
+      data: {
+        visitorId,
+        content,
+      },
+    });
+
+    return {
+      id: note.id,
+      content: note.content,
+      createdAt: note.createdAt.toISOString(),
+    };
+  }
+
+  async getByPhone(phone: string) {
+    const normalized = normalizePhone(phone);
+
+    const visitors = await prisma.$queryRaw<
+      { id: string; name: string; phone: string; type: string; createdAt: Date }[]
+    >`
+      SELECT "id", "name", "phone", "type", "createdAt"
+      FROM "Visitor"
+    `;
+
+    const match = visitors.find((v) => normalizePhone(v.phone) === normalized);
+    if (!match) {
+      throw new ApiError(404, "Visitor not found for this phone number");
+    }
+
+    return {
+      id: match.id,
+      name: match.name,
+      phone: match.phone,
+      type: match.type,
+      createdAt: match.createdAt.toISOString(),
+    };
   }
 }
 
