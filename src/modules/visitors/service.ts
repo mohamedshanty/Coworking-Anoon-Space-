@@ -7,6 +7,25 @@ function normalizePhone(phone: string): string {
   return phone.replace(/[\s\-+]/g, "").replace(/^0+/, "");
 }
 
+/** Convert a phone number to international format (970XXXXXXXXX) for output display. */
+function toInternationalFormat(phone: string): string {
+  let cleaned = phone.replace(/[\s\-()]/g, "");
+
+  if (cleaned.startsWith("+")) {
+    cleaned = cleaned.substring(1);
+  }
+
+  if (cleaned.startsWith("972") || cleaned.startsWith("970")) {
+    return cleaned;
+  }
+
+  if (cleaned.startsWith("0")) {
+    return "970" + cleaned.substring(1);
+  }
+
+  return cleaned;
+}
+
 export class VisitorsService {
   async getById(id: string) {
     const visitor = await prisma.visitor.findUnique({
@@ -175,7 +194,7 @@ export class VisitorsService {
     return churned.map((row) => ({
       id: row.id,
       name: row.name,
-      phone: row.phone,
+      phone: toInternationalFormat(row.phone),
       lastVisitDate: row.lastVisitDate.toISOString(),
       totalVisits: Number(row.totalVisits),
     }));
