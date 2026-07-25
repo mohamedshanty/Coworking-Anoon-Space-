@@ -3,6 +3,7 @@ import { z } from "zod";
 import ExcelJS from "exceljs";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
+import { getEffectiveStatus } from "../../lib/subscription";
 import { calculateSessionPricing } from "../sessions/pricing";
 
 const exportQuerySchema = z.object({
@@ -48,7 +49,7 @@ export class ReportsController {
           select: { id: true },
         }),
         prisma.subscription.findMany({
-          where: { status: "active" },
+          where: { status: "active", endDate: { gte: new Date() } },
           select: { visitorId: true, amountPaid: true },
         }),
         prisma.settings.findFirst(),
@@ -187,7 +188,7 @@ export class ReportsController {
       // Fetch settings and active subscriptions for pricing calculation
       const pricingSettings = await prisma.settings.findFirst();
       const activeSubscriptions = await prisma.subscription.findMany({
-        where: { status: "active" },
+        where: { status: "active", endDate: { gte: new Date() } },
         select: { visitorId: true },
       });
 
@@ -237,8 +238,11 @@ export class ReportsController {
               hourlyRate: sessionHourlyRate,
               fullDayPrice: pricingSettings ? Number(pricingSettings.fullDayPrice) : 0,
               fullDayThresholdHours: pricingSettings?.fullDayThresholdHours ?? 8,
-            }
+            },
+            s.checkOut
           );
+
+          const isSub = effectiveType === "subscriber" && hasActiveSub;
 
           visitsSheet.addRow({
             visitorName: s.visitor.name,
@@ -247,8 +251,8 @@ export class ReportsController {
             checkOut: s.checkOut ? s.checkOut.toISOString() : "لم يخرج",
             duration: duration !== null ? duration : "—",
             ordersAmount: rn(pricing.ordersAmount),
-            hoursAmount: rn(pricing.timeAmount),
-            totalAmount: rn(pricing.totalAmount),
+            hoursAmount: isSub ? "مشترك" : rn(pricing.timeAmount),
+            totalAmount: isSub ? rn(pricing.ordersAmount) : rn(Number(s.amount)),
             discount: Number(s.discountAmount) > 0 ? rn(Number(s.discountAmount)) : "—",
             discountNote: s.discountNote || "—",
             adjustmentNote: s.adjustmentNote || "—",
@@ -329,7 +333,7 @@ export class ReportsController {
           endDate: sub.endDate.toISOString().slice(0, 10),
           dailyQuotaHours: sub.dailyQuotaHours,
           amountPaid: Math.round(Number(sub.amountPaid)),
-          status: subStatusMap[sub.status] || sub.status,
+          status: subStatusMap[getEffectiveStatus(sub)] || sub.status,
         });
       }
 

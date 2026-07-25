@@ -3,7 +3,7 @@ import { ApiError } from "../../lib/ApiError";
 import { CreateSubscriberInput, RenewSubscriptionInput, UpdateSubscriberInput } from "./schema";
 
 export class SubscribersService {
-  async getSubscribers(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc" }) {
+  async getSubscribers(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc"; status?: string }) {
     const page = Math.max(1, params.page ?? 1);
     const limit = Math.min(100, Math.max(1, params.limit ?? 25));
     const skip = (page - 1) * limit;
@@ -13,6 +13,42 @@ export class SubscribersService {
       where.OR = [
         { name: { contains: params.search, mode: "insensitive" } },
         { phone: { contains: params.search, mode: "insensitive" } },
+      ];
+    }
+
+    const now = new Date();
+
+    if (params.status === "active") {
+      // Visitor has at least one subscription that is active AND hasn't expired yet
+      where.subscriptions = {
+        some: {
+          status: "active",
+          endDate: { gte: now },
+        },
+      };
+    } else if (params.status === "expired") {
+      // Visitor has at least one ended/expired subscription AND no active unexpired subscription
+      where.AND = [
+        {
+          subscriptions: {
+            some: {
+              OR: [
+                { status: "expired" },
+                { endDate: { lt: now } },
+              ],
+            },
+          },
+        },
+        {
+          NOT: {
+            subscriptions: {
+              some: {
+                status: "active",
+                endDate: { gte: now },
+              },
+            },
+          },
+        },
       ];
     }
 
@@ -55,7 +91,10 @@ export class SubscribersService {
       const activeSub = await prisma.subscription.findFirst({
         where: {
           visitorId: visitor.id,
-          status: { in: ["active", "paused", "renewing"] },
+          OR: [
+            { status: { in: ["paused", "renewing"] } },
+            { status: "active", endDate: { gte: new Date() } },
+          ],
         },
       });
       if (activeSub) {
@@ -144,7 +183,7 @@ export class SubscribersService {
     }
 
     const activeSub = await prisma.subscription.findFirst({
-      where: { visitorId, status: "active" },
+      where: { visitorId, status: "active", endDate: { gte: new Date() } },
     });
 
     if (!activeSub) {

@@ -186,6 +186,19 @@ export class SessionsController {
     }
   }
 
+  async dismissNewVisitor(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const data = await sessionsService.dismissNewVisitor(id);
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteSession(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;

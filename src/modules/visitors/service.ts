@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
+import { getEffectiveStatus } from "../../lib/subscription";
 import { AddNoteInput, UpdateVisitorInput } from "./schema";
 
 export class VisitorsService {
@@ -62,7 +63,7 @@ export class VisitorsService {
         dailyQuotaHours: sub.dailyQuotaHours,
         daysUsed: sub.daysUsed,
         amountPaid: Number(sub.amountPaid),
-        status: sub.status,
+        status: getEffectiveStatus(sub),
       })),
       debts: visitor.debts.map((d) => ({
         id: d.id,

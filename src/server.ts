@@ -6,6 +6,7 @@ import app from "./app";
 // Validate required env vars and load CORS origins
 import { ALLOWED_ORIGINS } from "./lib/env";
 import { prisma } from "./lib/prisma";
+import { expireStaleSubscriptions } from "./lib/subscription";
 
 const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
@@ -47,6 +48,16 @@ async function seedRooms() {
 seedRooms().catch((err) => {
   console.error("Failed to seed rooms:", err);
 });
+
+// Auto-expire stale subscriptions on startup, then every 24 hours
+expireStaleSubscriptions().catch((err) => {
+  console.error("Failed to auto-expire subscriptions on startup:", err);
+});
+setInterval(() => {
+  expireStaleSubscriptions().catch((err) => {
+    console.error("Failed to auto-expire subscriptions:", err);
+  });
+}, 24 * 60 * 60 * 1000);
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

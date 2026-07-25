@@ -9,11 +9,12 @@ export function calculateSessionPricing(
   visitorType: string,
   hasActiveSubscription: boolean,
   snackOrders: { total: number | string | any }[],
-  settings: PricingSettings
+  settings: PricingSettings,
+  checkOut?: Date | null
 ) {
   const checkInTime = new Date(checkIn).getTime();
-  const now = Date.now();
-  const elapsedMs = Math.max(0, now - checkInTime);
+  const endTime = checkOut ? new Date(checkOut).getTime() : Date.now();
+  const elapsedMs = Math.max(0, endTime - checkInTime);
   const hours = elapsedMs / (1000 * 60 * 60);
 
   // Despite the name "isSub", this flag now also covers trainees getting free time.

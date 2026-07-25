@@ -134,6 +134,7 @@ model Session {
   calculatedPrice Decimal?             @db.Decimal(10, 2)
   finalPrice      Decimal?             @db.Decimal(10, 2)
   adjustmentNote  String?
+  newVisitorDismissed Boolean      @default(false)
   snackOrders     SnackOrder[]
   sales           Sale[]
 }

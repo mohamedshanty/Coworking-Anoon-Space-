@@ -50,8 +50,9 @@ export class SessionsService {
       throw new ApiError(500, "Settings not initialized in database");
     }
 
+    const now = new Date();
     const activeSubscriptions = await prisma.subscription.findMany({
-      where: { status: "active" },
+      where: { status: "active", endDate: { gte: now } },
     });
 
     return sessions.map((s) => {
@@ -90,27 +91,29 @@ export class SessionsService {
   }
 
   async getNewVisitors() {
-    // Find visitors whose total session count is exactly 1 (first-time only)
+    // Find visitors whose total non-dismissed session count is exactly 1 (first-time only)
     // We can't filter by _count in where, so we fetch all visitors with session counts and filter in JS
     const visitorsWithCounts = await prisma.visitor.findMany({
       include: {
         sessions: {
+          where: { newVisitorDismissed: false },
           include: { snackOrders: true },
         },
         _count: { select: { sessions: true } },
       },
     });
 
-    // Filter to only visitors with exactly 1 session
-    const visitors = visitorsWithCounts.filter((v) => v._count.sessions === 1);
+    // Filter to only visitors with exactly 1 non-dismissed session
+    const visitors = visitorsWithCounts.filter((v) => v.sessions.length === 1);
 
     const settings = await prisma.settings.findFirst();
     if (!settings) {
       throw new ApiError(500, "Settings not initialized in database");
     }
 
+    const now = new Date();
     const activeSubscriptions = await prisma.subscription.findMany({
-      where: { status: "active" },
+      where: { status: "active", endDate: { gte: now } },
     });
 
     return visitors.map((v) => {
@@ -264,7 +267,7 @@ export class SessionsService {
       let subscriptionOverQuota = false;
 
       const activeSub = await tx.subscription.findFirst({
-        where: { visitorId, status: "active" },
+        where: { visitorId, status: "active", endDate: { gte: new Date() } },
       });
 
       if (activeSub) {
@@ -337,7 +340,7 @@ export class SessionsService {
             ...(data.checkOut !== undefined
               ? { checkOut: data.checkOut ? new Date(data.checkOut) : null }
               : {}),
-            ...(data.amount !== undefined ? { amount: data.amount } : {}),
+        ...(data.amount !== undefined ? { amount: Math.round(data.amount) } : {}),
             ...(data.notes !== undefined ? { notes: data.notes } : {}),
             ...(data.sessionType !== undefined ? { sessionType: data.sessionType } : {}),
             ...(data.paymentStatus ? { paymentStatus: data.paymentStatus } : {}),
@@ -357,7 +360,7 @@ export class SessionsService {
         });
 
         const activeSub = await tx.subscription.findFirst({
-          where: { visitorId: session.visitorId, status: "active" },
+          where: { visitorId: session.visitorId, status: "active", endDate: { gte: new Date() } },
         });
 
         if (activeSub) {
@@ -455,7 +458,7 @@ export class SessionsService {
     }
 
     const activeSub = await prisma.subscription.findFirst({
-      where: { visitorId: session.visitorId, status: "active" },
+      where: { visitorId: session.visitorId, status: "active", endDate: { gte: new Date() } },
     });
 
     const effectiveType = session.sessionType ?? session.visitor.type;
@@ -483,14 +486,14 @@ export class SessionsService {
     let safeDiscount = 0;
 
     if (adjustedPrice != null) {
-      // Price adjustment mode: override the entire price
-      finalAmount = Math.max(0, adjustedPrice);
+      // Price adjustment mode: override the entire price, rounded to nearest integer
+      finalAmount = Math.max(0, Math.round(adjustedPrice));
       // Reset discount since we're doing a direct price override
       safeDiscount = 0;
     } else {
       // Discount mode: subtract discount from calculated price
       safeDiscount = Math.max(0, Math.min(discountAmount, pricing.totalAmount));
-      finalAmount = Math.max(0, pricing.totalAmount - safeDiscount);
+      finalAmount = Math.max(0, Math.round(pricing.totalAmount - safeDiscount));
     }
 
     const updated = await prisma.session.update({
@@ -534,7 +537,7 @@ export class SessionsService {
     }
 
     const activeSub = await prisma.subscription.findFirst({
-      where: { visitorId: session.visitorId, status: "active" },
+      where: { visitorId: session.visitorId, status: "active", endDate: { gte: new Date() } },
     });
 
     const effectiveType = session.sessionType ?? session.visitor.type;
@@ -562,9 +565,9 @@ export class SessionsService {
       where: { id },
       data: {
         checkOut: new Date(),
-        amount: pricing.totalAmount,
+        amount: Math.round(pricing.totalAmount),
         calculatedPrice: pricing.totalAmount,
-        finalPrice: pricing.totalAmount,
+        finalPrice: Math.round(pricing.totalAmount),
         paymentStatus: "full_debt",
         paymentMethod: null,
       },
@@ -580,7 +583,7 @@ export class SessionsService {
         visitorId: session.visitorId,
         name: session.visitor.name,
         phone: session.visitor.phone,
-        amount: pricing.totalAmount,
+        amount: Math.round(pricing.totalAmount),
         type: "session",
         status: "unpaid",
         createdAt: new Date(),
@@ -965,6 +968,17 @@ export class SessionsService {
     return { success: true };
   }
 
+  async dismissNewVisitor(id: string) {
+    const session = await prisma.session.findUnique({ where: { id } });
+    if (!session) {
+      throw new ApiError(404, "Session not found");
+    }
+    return prisma.session.update({
+      where: { id },
+      data: { newVisitorDismissed: true },
+    });
+  }
+
   async deleteSession(id: string) {
     const session = await prisma.session.findUnique({
       where: { id },
@@ -999,7 +1013,7 @@ export class SessionsService {
       });
 
       const activeSub = await tx.subscription.findFirst({
-        where: { visitorId: session.visitorId, status: "active" },
+        where: { visitorId: session.visitorId, status: "active", endDate: { gte: new Date() } },
       });
 
       if (activeSub) {
@@ -1093,6 +1107,9 @@ export class SessionsService {
       checkIn: { checkIn: params.sortDir ?? "desc" },
       checkOut: { checkOut: params.sortDir ?? "desc" },
       amount: { amount: params.sortDir ?? "desc" },
+      ordersAmount: { amount: params.sortDir ?? "desc" },
+      hoursAmount: { amount: params.sortDir ?? "desc" },
+      totalAmount: { amount: params.sortDir ?? "desc" },
       paymentStatus: { paymentStatus: params.sortDir ?? "desc" },
       name: { visitor: { name: params.sortDir ?? "asc" } },
       phone: { visitor: { phone: params.sortDir ?? "asc" } },
@@ -1113,8 +1130,10 @@ export class SessionsService {
 
     const settings = await prisma.settings.findFirst();
     const activeSubscriptions = await prisma.subscription.findMany({
-      where: { status: "active" },
+      where: { status: "active", endDate: { gte: new Date() } },
     });
+
+    const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
     const data = sessions.map((s) => {
       const hasActiveSub = activeSubscriptions.some(
@@ -1130,6 +1149,25 @@ export class SessionsService {
       const isSub =
         (effectiveType === "subscriber" && hasActiveSub) ||
         effectiveType === "trainee";
+
+      const sessionHourlyRate = s.hourlyRate != null
+        ? Number(s.hourlyRate)
+        : settings
+          ? Number(settings.hourlyRate)
+          : 0;
+
+      const pricing = calculateSessionPricing(
+        s.checkIn,
+        effectiveType,
+        hasActiveSub,
+        s.snackOrders,
+        {
+          hourlyRate: sessionHourlyRate,
+          fullDayPrice: settings ? Number(settings.fullDayPrice) : 0,
+          fullDayThresholdHours: settings?.fullDayThresholdHours ?? 8,
+        },
+        s.checkOut
+      );
 
       return {
         id: s.id,
@@ -1169,6 +1207,9 @@ export class SessionsService {
         })),
         hours,
         isSub,
+        ordersAmount: r2(pricing.ordersAmount),
+        hoursAmount: r2(pricing.timeAmount),
+        totalAmount: Number(s.amount),
       };
     });
 
@@ -1200,19 +1241,26 @@ export class SessionsService {
         select: { amount: true },
       }),
       prisma.subscription.findMany({
-        where: { status: "active" },
+        where: { status: "active", endDate: { gte: new Date() } },
         select: { visitorId: true },
       }),
     ]);
 
     const r = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
+    // Determine which sessions belong to active subscribers (time covered by subscription)
+    const isSubSession = (s: { sessionType: string | null; visitorId: string; visitor: { type: string } }) => {
+      const effectiveType = s.sessionType ?? s.visitor.type;
+      return effectiveType === "subscriber" && activeSubscriptions.some((sub) => sub.visitorId === s.visitorId);
+    };
+
     const visitCount = sessions.length;
 
     // Cash-basis: only count sessions where payment was actually collected
+    // Exclude subscriber sessions — their time is covered by subscription, not paid per-visit
     const hoursRevenue = r(
       sessions
-        .filter((s) => s.paymentStatus === "paid")
+        .filter((s) => s.paymentStatus === "paid" && !isSubSession(s))
         .reduce((sum, s) => sum + Number(s.amount), 0)
     );
 
@@ -1228,22 +1276,18 @@ export class SessionsService {
 
     const totalDiscounts = r(
       sessions
-        .filter((s) => s.paymentStatus === "paid")
+        .filter((s) => s.paymentStatus === "paid" && !isSubSession(s))
         .reduce((sum, s) => sum + Number(s.discountAmount), 0)
     );
 
-    // Exclude trainee sessions from avg revenue — trainees don't pay hourly,
+    // Exclude trainee AND subscriber sessions from avg revenue — they don't pay hourly,
     // so including them skews the metric downward.
-    const paidNonTraineeVisits = sessions.filter(
-      (s) => s.paymentStatus === "paid" && (s.sessionType ?? s.visitor.type) !== "trainee"
+    const paidNonSubVisits = sessions.filter(
+      (s) => s.paymentStatus === "paid" && !isSubSession(s) && (s.sessionType ?? s.visitor.type) !== "trainee"
     ).length;
-    const avgRevenuePerVisit = paidNonTraineeVisits > 0 ? r(hoursRevenue / paidNonTraineeVisits) : 0;
+    const avgRevenuePerVisit = paidNonSubVisits > 0 ? r(hoursRevenue / paidNonSubVisits) : 0;
 
-    const subscriberCount = sessions.filter(
-      (s) =>
-        (s.sessionType ?? s.visitor.type) === "subscriber" &&
-        activeSubscriptions.some((sub) => sub.visitorId === s.visitorId)
-    ).length;
+    const subscriberCount = sessions.filter((s) => isSubSession(s)).length;
 
     const subscriberRatio = visitCount > 0 ? r((subscriberCount / visitCount) * 100) : 0;
 

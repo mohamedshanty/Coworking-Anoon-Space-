@@ -99,6 +99,13 @@ router.delete(
   (req, res, next) => sessionsController.deleteOrderItem(req, res, next)
 );
 
+// PATCH dismiss new visitor (mark session as dismissed from new visitors list)
+router.patch(
+  "/:id/dismiss-new-visitor",
+  authorize("داخل المساحة", "edit"),
+  (req, res, next) => sessionsController.dismissNewVisitor(req, res, next)
+);
+
 // DELETE session (works for both live and history since same model)
 router.delete(
   "/:id",
