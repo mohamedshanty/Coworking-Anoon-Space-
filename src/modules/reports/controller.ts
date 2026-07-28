@@ -30,7 +30,7 @@ export class ReportsController {
       const [sessions, sales, expenses, bookings, courses, activeSubscriptions, settings, collectedDebts] = await Promise.all([
         prisma.session.findMany({
           where: { checkIn: { gte: fromDate, lte: toDate }, checkOut: { not: null } },
-          select: { sessionType: true, amount: true, paymentStatus: true, discountAmount: true, finalPrice: true, visitor: { select: { type: true } } },
+          select: { sessionType: true, amount: true, paymentStatus: true, discountAmount: true, finalPrice: true, visitor: { select: { type: true } }, snackOrders: { select: { total: true } } },
         }),
         prisma.sale.findMany({
           where: { date: { gte: fromDate, lte: toDate } },
@@ -67,7 +67,10 @@ export class ReportsController {
       // Visits
       const visitCount = sessions.length;
       const hoursRevenue = r(
-        sessions.filter((s) => s.paymentStatus === "paid").reduce((sum, s) => sum + Number(s.amount), 0)
+        sessions.filter((s) => s.paymentStatus === "paid").reduce((sum, s) => {
+          const snacksTotal = s.snackOrders.reduce((snackSum, o) => snackSum + Number(o.total), 0);
+          return sum + (Number(s.amount) - snacksTotal);
+        }, 0)
       );
 
       // Subscribers
@@ -178,6 +181,7 @@ export class ReportsController {
           finalPrice: true,
           adjustmentNote: true,
           hourlyRate: true,
+          hourlyPriceOverride: true,
           visitorId: true,
           visitor: { select: { name: true, type: true } },
           snackOrders: { select: { total: true } },
@@ -251,7 +255,7 @@ export class ReportsController {
             checkOut: s.checkOut ? s.checkOut.toISOString() : "لم يخرج",
             duration: duration !== null ? duration : "—",
             ordersAmount: rn(pricing.ordersAmount),
-            hoursAmount: isSub ? "مشترك" : rn(pricing.timeAmount),
+            hoursAmount: isSub ? "مشترك" : (s.hourlyPriceOverride != null ? rn(Number(s.hourlyPriceOverride)) : rn(pricing.timeAmount)),
             totalAmount: isSub ? rn(pricing.ordersAmount) : rn(Number(s.amount)),
             discount: Number(s.discountAmount) > 0 ? rn(Number(s.discountAmount)) : "—",
             discountNote: s.discountNote || "—",
@@ -274,7 +278,10 @@ export class ReportsController {
 
         const totalVisits = sessions.length;
         const paidVisits = sessions.filter((s) => s.paymentStatus === "paid" && s.checkOut !== null);
-        const totalRevenue = r2(paidVisits.reduce((sum, s) => sum + Number(s.amount), 0));
+        const totalRevenue = r2(paidVisits.reduce((sum, s) => {
+          const snacksTotal = (s.snackOrders ?? []).reduce((snackSum: number, o: any) => snackSum + Number(o.total), 0);
+          return sum + (Number(s.amount) - snacksTotal);
+        }, 0));
         const avgRevenue = paidVisits.length > 0 ? r2(totalRevenue / paidVisits.length) : 0;
 
         const visitorCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "visitor").length;
@@ -465,9 +472,13 @@ export class ReportsController {
       ];
 
       // 1. Session revenue (cash-basis: only paid sessions count)
+      // Derive hourly revenue from stored data: hoursRevenue = amount - snacksTotal
       const sessionRev = sessions
         .filter((s) => s.checkOut !== null && s.paymentStatus === "paid")
-        .reduce((sum, s) => sum + Number(s.amount), 0);
+        .reduce((sum, s) => {
+          const snacksTotal = (s.snackOrders ?? []).reduce((snackSum: number, o: any) => snackSum + Number(o.total), 0);
+          return sum + (Number(s.amount) - snacksTotal);
+        }, 0);
 
       // 2. Sale revenue
       const saleRev = sales.reduce((sum, s) => sum + Number(s.total), 0);

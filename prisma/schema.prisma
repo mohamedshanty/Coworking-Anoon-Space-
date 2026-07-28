@@ -1,9 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
 }
 
-generator client {
-  provider = "prisma-client-js"
+model Visitor {
+  id             String          @id @default(uuid())
+  name           String
+  phone          String
+  type           PersonType
+  lastVisit      DateTime?
+  followUpStatus FollowUpStatus?
+  followUpAt     DateTime?
+  source         String?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  debts          Debt[]
+  sessions       Session[]
+  subscriptions  Subscription[]
+  visitorNotes   VisitorNote[]
+}
+
+model VisitorNote {
+  id        String   @id @default(uuid())
+  visitorId String
+  content   String
+  createdAt DateTime @default(now())
+  visitor   Visitor  @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id                  String               @id @default(uuid())
+  visitorId           String
+  checkIn             DateTime
+  checkOut            DateTime?
+  amount              Decimal              @db.Decimal(10, 2)
+  paymentStatus       SessionPaymentStatus
+  paymentMethod       PaymentMethod?
+  notes               String?
+  sessionType         String?
+  hourlyRate          Decimal?             @db.Decimal(10, 2)
+  discountAmount      Decimal              @default(0) @db.Decimal(10, 2)
+  discountNote        String?
+  paymentAccount      String?
+  adjustmentNote      String?
+  calculatedPrice     Decimal?             @db.Decimal(10, 2)
+  finalPrice          Decimal?             @db.Decimal(10, 2)
+  newVisitorDismissed Boolean              @default(false)
+  hourlyPriceOverride Decimal?             @db.Decimal(10, 2)
+  sales               Sale[]
+  visitor             Visitor              @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  snackOrders         SnackOrder[]
+}
+
+model SnackOrder {
+  id           String         @id @default(uuid())
+  sessionId    String
+  itemId       String?
+  qty          Int
+  total        Decimal        @db.Decimal(10, 2)
+  isHotDrink   Boolean
+  hotDrinkName String?
+  drinkId      String?
+  drink        Drink?         @relation(fields: [drinkId], references: [id])
+  item         InventoryItem? @relation(fields: [itemId], references: [id])
+  session      Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id              String              @id @default(uuid())
+  visitorId       String
+  packageType     SubscriptionPackage
+  startDate       DateTime
+  endDate         DateTime
+  dailyQuotaHours Int
+  daysUsed        Int
+  amountPaid      Decimal             @db.Decimal(10, 2)
+  status          SubscriptionStatus
+  visitor         Visitor             @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+}
+
+model InventoryItem {
+  id              String       @id @default(uuid())
+  name            String
+  quantity        Int
+  sellPrice       Decimal      @db.Decimal(10, 2)
+  costPrice       Decimal      @db.Decimal(10, 2)
+  lastRestockDate DateTime
+  alertThreshold  Int
+  snackOrders     SnackOrder[]
+}
+
+model HotDrink {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  price     Decimal  @db.Decimal(10, 2)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Drink {
+  id              String       @id @default(uuid())
+  name            String
+  quantity        Int
+  sellPrice       Decimal      @db.Decimal(10, 2)
+  costPrice       Decimal      @db.Decimal(10, 2)
+  lastRestockDate DateTime     @default(now())
+  alertThreshold  Int          @default(10)
+  unit            DrinkUnit    @default(PIECE)
+  orders          SnackOrder[]
+}
+
+model Sale {
+  id            String        @id @default(uuid())
+  itemId        String
+  itemName      String
+  quantity      Int
+  total         Decimal       @db.Decimal(10, 2)
+  sessionId     String?
+  linkedName    String?
+  paymentMethod PaymentMethod
+  isHotDrink    Boolean
+  date          DateTime
+  customerName  String?
+  notes         String?
+  session       Session?      @relation(fields: [sessionId], references: [id])
+}
+
+model Expense {
+  id          String          @id @default(uuid())
+  description String
+  category    ExpenseCategory
+  amount      Decimal         @db.Decimal(10, 2)
+  date        DateTime
+  notes       String?
+}
+
+model Debt {
+  id          String     @id @default(uuid())
+  visitorId   String?
+  name        String
+  phone       String
+  amount      Decimal    @db.Decimal(10, 2)
+  type        DebtType
+  status      DebtStatus
+  createdAt   DateTime
+  collectedAt DateTime?
+  note        String?
+  visitor     Visitor?   @relation(fields: [visitorId], references: [id])
+}
+
+model Room {
+  id       String    @id @default(uuid())
+  name     String
+  bookings Booking[]
+  courses  Course[]
+}
+
+model Booking {
+  id          String        @id @default(uuid())
+  roomId      String
+  bookerName  String
+  bookerPhone String
+  purpose     String
+  startTime   DateTime
+  endTime     DateTime
+  price       Decimal       @db.Decimal(10, 2)
+  status      BookingStatus
+  room        Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+model Course {
+  id              String    @id @default(uuid())
+  name            String
+  trainer         String
+  startDate       DateTime
+  endDate         DateTime
+  sessionsCount   Int
+  pricePerTrainee Decimal   @db.Decimal(10, 2)
+  maxSeats        Int
+  roomId          String
+  room            Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  trainees        Trainee[]
+}
+
+model Trainee {
+  id                String               @id @default(uuid())
+  courseId          String
+  name              String
+  phone             String
+  amountPaid        Decimal              @db.Decimal(10, 2)
+  paymentStatus     TraineePaymentStatus
+  attendancePercent Float
+  course            Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model Staff {
+  id             String       @id @default(uuid())
+  name           String
+  username       String       @unique
+  role           StaffRole
+  passwordHash   String
+  failedAttempts Int          @default(0)
+  lockedUntil    DateTime?
+  loginLogs      LoginLog[]
+  permissions    Permission[]
+}
+
+model LoginLog {
+  id        String      @id @default(uuid())
+  userId    String?
+  username  String
+  at        DateTime
+  status    LoginStatus
+  ip        String
+  userAgent String?
+  staff     Staff?      @relation(fields: [userId], references: [id])
+}
+
+model Settings {
+  id                    String  @id @default("default")
+  hourlyRate            Decimal @db.Decimal(10, 2)
+  fullDayPrice          Decimal @db.Decimal(10, 2)
+  fullDayThresholdHours Int
+  hotDrinksMonthlyCost  Decimal @db.Decimal(10, 2)
+  company               Json
+}
+
+model Permission {
+  id        String  @id @default(uuid())
+  staffId   String
+  pageKey   String
+  canView   Boolean
+  canEdit   Boolean
+  canDelete Boolean
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, pageKey])
+}
+
+model Contact {
+  id        String   @id @default(uuid())
+  fullName  String
+  phone     String   @unique
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum PersonType {
@@ -89,250 +334,4 @@ enum DrinkUnit {
   OUNCE
   GRAM
   ML
-}
-
-model Visitor {
-  id             String          @id @default(uuid())
-  name           String
-  phone          String
-  type           PersonType
-  source         String?
-  notes          String?
-  lastVisit      DateTime?
-  followUpStatus FollowUpStatus?
-  followUpAt     DateTime?
-  createdAt      DateTime        @default(now())
-  sessions       Session[]
-  subscriptions  Subscription[]
-  debts          Debt[]
-  visitorNotes   VisitorNote[]
-}
-
-model VisitorNote {
-  id        String   @id @default(uuid())
-  visitorId String
-  visitor   Visitor  @relation(fields: [visitorId], references: [id], onDelete: Cascade)
-  content   String
-  createdAt DateTime @default(now())
-}
-
-model Session {
-  id              String               @id @default(uuid())
-  visitorId       String
-  visitor         Visitor              @relation(fields: [visitorId], references: [id], onDelete: Cascade)
-  sessionType     String?
-  checkIn         DateTime
-  checkOut        DateTime?
-  amount          Decimal              @db.Decimal(10, 2)
-  hourlyRate      Decimal?             @db.Decimal(10, 2)
-  paymentStatus   SessionPaymentStatus
-  paymentMethod   PaymentMethod?
-  notes           String?
-  discountAmount  Decimal              @default(0) @db.Decimal(10, 2)
-  discountNote    String?
-  paymentAccount  String?
-  calculatedPrice Decimal?             @db.Decimal(10, 2)
-  finalPrice      Decimal?             @db.Decimal(10, 2)
-  adjustmentNote  String?
-  newVisitorDismissed Boolean      @default(false)
-  snackOrders     SnackOrder[]
-  sales           Sale[]
-}
-
-model SnackOrder {
-  id           String         @id @default(uuid())
-  sessionId    String
-  session      Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  itemId       String?
-  item         InventoryItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
-  drinkId      String?
-  drink        Drink?         @relation(fields: [drinkId], references: [id], onDelete: SetNull)
-  hotDrinkName String?
-  qty          Int
-  total        Decimal        @db.Decimal(10, 2)
-  isHotDrink   Boolean
-}
-
-model Subscription {
-  id              String              @id @default(uuid())
-  visitorId       String
-  visitor         Visitor             @relation(fields: [visitorId], references: [id], onDelete: Cascade)
-  packageType     SubscriptionPackage
-  startDate       DateTime
-  endDate         DateTime
-  dailyQuotaHours Int
-  daysUsed        Int
-  amountPaid      Decimal             @db.Decimal(10, 2)
-  status          SubscriptionStatus
-}
-
-model InventoryItem {
-  id              String       @id @default(uuid())
-  name            String
-  quantity        Int
-  sellPrice       Decimal      @db.Decimal(10, 2)
-  costPrice       Decimal      @db.Decimal(10, 2)
-  lastRestockDate DateTime
-  alertThreshold  Int
-  snackOrders     SnackOrder[]
-}
-
-model HotDrink {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  price     Decimal  @db.Decimal(10, 2)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Drink {
-  id              String        @id @default(uuid())
-  name            String
-  quantity        Int
-  unit            DrinkUnit     @default(PIECE)
-  sellPrice       Decimal       @db.Decimal(10, 2)
-  costPrice       Decimal       @db.Decimal(10, 2)
-  lastRestockDate DateTime      @default(now())
-  alertThreshold  Int           @default(10)
-  orders          SnackOrder[]
-}
-
-model Sale {
-  id            String        @id @default(uuid())
-  itemId        String
-  itemName      String
-  quantity      Int
-  total         Decimal       @db.Decimal(10, 2)
-  sessionId     String?
-  session       Session?      @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  linkedName    String?
-  customerName  String?
-  notes         String?
-  paymentMethod PaymentMethod
-  isHotDrink    Boolean
-  date          DateTime
-}
-
-model Expense {
-  id          String          @id @default(uuid())
-  description String
-  category    ExpenseCategory
-  amount      Decimal         @db.Decimal(10, 2)
-  date        DateTime
-  notes       String?
-}
-
-model Debt {
-  id          String     @id @default(uuid())
-  visitorId   String?
-  visitor     Visitor?   @relation(fields: [visitorId], references: [id], onDelete: SetNull)
-  name        String
-  phone       String
-  amount      Decimal    @db.Decimal(10, 2)
-  type        DebtType
-  status      DebtStatus
-  createdAt   DateTime
-  collectedAt DateTime?
-  note        String?
-}
-
-model Room {
-  id       String    @id @default(uuid())
-  name     String
-  bookings Booking[]
-  courses  Course[]
-}
-
-model Booking {
-  id          String        @id @default(uuid())
-  roomId      String
-  room        Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  bookerName  String
-  bookerPhone String
-  purpose     String
-  startTime   DateTime
-  endTime     DateTime
-  price       Decimal       @db.Decimal(10, 2)
-  status      BookingStatus
-}
-
-model Course {
-  id              String    @id @default(uuid())
-  name            String
-  trainer         String
-  startDate       DateTime
-  endDate         DateTime
-  sessionsCount   Int
-  pricePerTrainee Decimal   @db.Decimal(10, 2)
-  maxSeats        Int
-  roomId          String
-  room            Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  trainees        Trainee[]
-}
-
-model Trainee {
-  id                String               @id @default(uuid())
-  courseId          String
-  course            Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  name              String
-  phone             String
-  amountPaid        Decimal              @db.Decimal(10, 2)
-  paymentStatus     TraineePaymentStatus
-  attendancePercent Float
-}
-
-model Staff {
-  id             String       @id @default(uuid())
-  name           String
-  username       String       @unique
-  role           StaffRole
-  passwordHash   String
-  failedAttempts Int          @default(0)
-  lockedUntil    DateTime?
-  loginLogs      LoginLog[]
-  permissions    Permission[]
-}
-
-model LoginLog {
-  id        String      @id @default(uuid())
-  userId    String?
-  staff     Staff?      @relation(fields: [userId], references: [id], onDelete: SetNull)
-  username  String
-  at        DateTime
-  status    LoginStatus
-  ip        String
-  userAgent String?
-}
-
-model Settings {
-  id                    String  @id @default("default")
-  hourlyRate            Decimal @db.Decimal(10, 2)
-  fullDayPrice          Decimal @db.Decimal(10, 2)
-  fullDayThresholdHours Int
-  hotDrinksMonthlyCost  Decimal @db.Decimal(10, 2)
-  company               Json
-}
-
-model Permission {
-  id        String  @id @default(uuid())
-  staffId   String
-  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  pageKey   String
-  canView   Boolean
-  canEdit   Boolean
-  canDelete Boolean
-
-  @@unique([staffId, pageKey])
-}
-
-model Contact {
-  id        String   @id @default(uuid())
-  fullName  String
-  phone     String
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([phone])
 }

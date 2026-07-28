@@ -19,12 +19,12 @@ export const checkInSchema = z.union([
 export const updateSessionSchema = z.object({
   checkIn: z.string().datetime().optional(),
   checkOut: z.string().datetime().nullable().optional(),
-  amount: z.number().min(0).optional(),
   notes: z.string().nullable().optional(),
   sessionType: z.string().nullable().optional(),
   paymentStatus: z.enum(["paid", "partial_debt", "full_debt"]).optional(),
   paymentMethod: z.enum(["cash", "card", "transfer"]).nullable().optional(),
   hourlyRate: z.number().min(0).optional(),
+  hourlyPriceOverride: z.number().min(0).optional(),
   discountAmount: z.number().min(0).optional(),
   discountNote: z.string().optional(),
   paymentAccount: z.string().optional(),
@@ -40,7 +40,7 @@ export const checkoutSchema = z.object({
   discountAmount: z.number().min(0).default(0),
   discountNote: z.string().optional(),
   paymentAccount: z.string().optional(),
-  adjustedPrice: z.number().min(0).nullable().optional(),
+  hourlyPriceOverride: z.number().min(0).nullable().optional(),
   adjustmentNote: z.string().nullable().optional(),
 });
 

@@ -308,7 +308,7 @@ export class SessionsService {
   async editSession(id: string, data: UpdateSessionInput) {
     const session = await prisma.session.findUnique({
       where: { id },
-      include: { visitor: true },
+      include: { visitor: true, snackOrders: true },
     });
     if (!session) {
       throw new ApiError(404, "Session not found");
@@ -331,6 +331,15 @@ export class SessionsService {
     const newCheckIn = data.checkIn ? new Date(data.checkIn) : null;
     const checkInChanged = newCheckIn && !isSamePalestineDay(session.checkIn, newCheckIn);
 
+    const snacksTotal = session.snackOrders.reduce((sum, o) => sum + Number(o.total), 0);
+
+    let derivedAmount: number | undefined;
+    let derivedHourlyPriceOverride: number | null | undefined;
+    if (data.hourlyPriceOverride !== undefined) {
+      derivedHourlyPriceOverride = data.hourlyPriceOverride;
+      derivedAmount = Math.round((data.hourlyPriceOverride + snacksTotal + Number.EPSILON) * 100) / 100;
+    }
+
     if (checkInChanged) {
       const result = await prisma.$transaction(async (tx) => {
         const updated = await tx.session.update({
@@ -340,7 +349,8 @@ export class SessionsService {
             ...(data.checkOut !== undefined
               ? { checkOut: data.checkOut ? new Date(data.checkOut) : null }
               : {}),
-        ...(data.amount !== undefined ? { amount: Math.round(data.amount) } : {}),
+            ...(derivedAmount !== undefined ? { amount: derivedAmount } : {}),
+            ...(derivedHourlyPriceOverride !== undefined ? { hourlyPriceOverride: derivedHourlyPriceOverride } : {}),
             ...(data.notes !== undefined ? { notes: data.notes } : {}),
             ...(data.sessionType !== undefined ? { sessionType: data.sessionType } : {}),
             ...(data.paymentStatus ? { paymentStatus: data.paymentStatus } : {}),
@@ -410,7 +420,8 @@ export class SessionsService {
         ...(data.checkOut !== undefined
           ? { checkOut: data.checkOut ? new Date(data.checkOut) : null }
           : {}),
-        ...(data.amount !== undefined ? { amount: data.amount } : {}),
+        ...(derivedAmount !== undefined ? { amount: derivedAmount } : {}),
+        ...(derivedHourlyPriceOverride !== undefined ? { hourlyPriceOverride: derivedHourlyPriceOverride } : {}),
         ...(data.notes !== undefined ? { notes: data.notes } : {}),
         ...(data.sessionType !== undefined ? { sessionType: data.sessionType } : {}),
         ...(data.paymentStatus ? { paymentStatus: data.paymentStatus } : {}),
@@ -438,7 +449,7 @@ export class SessionsService {
     discountAmount: number = 0,
     discountNote?: string,
     paymentAccount?: string,
-    adjustedPrice?: number | null,
+    hourlyPriceOverride?: number | null,
     adjustmentNote?: string | null,
   ) {
     const session = await prisma.session.findUnique({
@@ -463,8 +474,6 @@ export class SessionsService {
 
     const effectiveType = session.sessionType ?? session.visitor.type;
 
-    // Use the session's own hourly rate; fall back to global default for
-    // sessions created before the per-session rate feature was introduced.
     const sessionHourlyRate = session.hourlyRate != null
       ? Number(session.hourlyRate)
       : Number(settings.hourlyRate);
@@ -482,19 +491,15 @@ export class SessionsService {
     );
 
     const calculatedPrice = pricing.totalAmount;
-    let finalAmount: number;
-    let safeDiscount = 0;
+    const snacksTotal = pricing.ordersAmount;
 
-    if (adjustedPrice != null) {
-      // Price adjustment mode: override the entire price, rounded to nearest integer
-      finalAmount = Math.max(0, Math.round(adjustedPrice));
-      // Reset discount since we're doing a direct price override
-      safeDiscount = 0;
-    } else {
-      // Discount mode: subtract discount from calculated price
-      safeDiscount = Math.max(0, Math.min(discountAmount, pricing.totalAmount));
-      finalAmount = Math.max(0, Math.round(pricing.totalAmount - safeDiscount));
-    }
+    const effectiveHourlyPrice = hourlyPriceOverride != null
+      ? hourlyPriceOverride
+      : pricing.timeAmount;
+
+    const safeDiscount = Math.max(0, Math.min(discountAmount, effectiveHourlyPrice));
+    const hourlyPortion = Math.max(0, effectiveHourlyPrice - safeDiscount);
+    const finalAmount = Math.round((hourlyPortion + snacksTotal + Number.EPSILON) * 100) / 100;
 
     const updated = await prisma.session.update({
       where: { id },
@@ -503,6 +508,7 @@ export class SessionsService {
         amount: finalAmount,
         calculatedPrice,
         finalPrice: finalAmount,
+        hourlyPriceOverride: hourlyPriceOverride ?? null,
         paymentStatus: "paid",
         paymentMethod,
         discountAmount: safeDiscount,
@@ -1177,6 +1183,7 @@ export class SessionsService {
         checkOut: s.checkOut ? s.checkOut.toISOString() : null,
         amount: Number(s.amount),
         hourlyRate: s.hourlyRate != null ? Number(s.hourlyRate) : null,
+        hourlyPriceOverride: s.hourlyPriceOverride != null ? Number(s.hourlyPriceOverride) : null,
         paymentStatus: s.paymentStatus,
         paymentMethod: s.paymentMethod,
         notes: s.notes,
@@ -1208,7 +1215,7 @@ export class SessionsService {
         hours,
         isSub,
         ordersAmount: r2(pricing.ordersAmount),
-        hoursAmount: r2(pricing.timeAmount),
+        hoursAmount: s.hourlyPriceOverride != null ? r2(Number(s.hourlyPriceOverride)) : r2(pricing.timeAmount),
         totalAmount: Number(s.amount),
       };
     });
@@ -1230,7 +1237,7 @@ export class SessionsService {
           checkIn: { gte: fromDate, lte: toDate },
           checkOut: { not: null },
         },
-        select: { sessionType: true, visitorId: true, paymentStatus: true, amount: true, discountAmount: true, finalPrice: true, visitor: { select: { type: true } } },
+        select: { sessionType: true, visitorId: true, paymentStatus: true, amount: true, discountAmount: true, finalPrice: true, visitor: { select: { type: true } }, snackOrders: { select: { total: true } } },
       }),
       prisma.sale.findMany({
         where: { date: { gte: fromDate, lte: toDate } },
@@ -1258,10 +1265,14 @@ export class SessionsService {
 
     // Cash-basis: only count sessions where payment was actually collected
     // Exclude subscriber sessions — their time is covered by subscription, not paid per-visit
+    // Derive hourly revenue from stored data: hoursRevenue = amount - snacksTotal
     const hoursRevenue = r(
       sessions
         .filter((s) => s.paymentStatus === "paid" && !isSubSession(s))
-        .reduce((sum, s) => sum + Number(s.amount), 0)
+        .reduce((sum, s) => {
+          const snacksTotal = s.snackOrders.reduce((snackSum, o) => snackSum + Number(o.total), 0);
+          return sum + (Number(s.amount) - snacksTotal);
+        }, 0)
     );
 
     const snacksRevenue = r(
