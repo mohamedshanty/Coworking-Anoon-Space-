@@ -5,7 +5,7 @@ import { CreateSubscriberInput, RenewSubscriptionInput, UpdateSubscriberInput } 
 export class SubscribersService {
   async getSubscribers(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc"; status?: string }) {
     const page = Math.max(1, params.page ?? 1);
-    const limit = Math.min(100, Math.max(1, params.limit ?? 25));
+    const limit = Math.min(1000, Math.max(1, params.limit ?? 25));
     const skip = (page - 1) * limit;
 
     const where: any = { type: "subscriber" };
