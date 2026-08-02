@@ -1,3 +1,0 @@
-◇ injected env (3) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
-◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
-Server is running on port 3001 
