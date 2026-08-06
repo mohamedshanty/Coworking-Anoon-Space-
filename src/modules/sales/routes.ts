@@ -21,6 +21,20 @@ router.post(
   (req, res, next) => salesController.createSnackSale(req, res, next)
 );
 
+// POST other sale (miscellaneous, not tied to inventory)
+router.post(
+  "/other",
+  authorize("السناكس", "edit"),
+  (req, res, next) => salesController.createOtherSale(req, res, next)
+);
+
+// POST batch sale (multiple items in one transaction)
+router.post(
+  "/batch",
+  authorize("السناكس", "edit"),
+  (req, res, next) => salesController.createBatchSale(req, res, next)
+);
+
 // PATCH edit snack sale
 router.patch(
   "/:id",

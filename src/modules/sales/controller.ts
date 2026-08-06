@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import { salesService } from "./service";
 import {
   createSnackSaleSchema,
+  createOtherSaleSchema,
+  createBatchSaleSchema,
   createHotDrinkSaleSchema,
   updateSnackSaleSchema,
   updateHotDrinkSaleSchema,
@@ -53,6 +55,32 @@ export class SalesController {
     try {
       const input = createHotDrinkSaleSchema.parse(req.body);
       const data = await salesService.createHotDrinkSale(input);
+      res.status(201).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createOtherSale(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const input = createOtherSaleSchema.parse(req.body);
+      const data = await salesService.createOtherSale(input);
+      res.status(201).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createBatchSale(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const input = createBatchSaleSchema.parse(req.body);
+      const data = await salesService.createBatchSale(input);
       res.status(201).json({
         success: true,
         data,

@@ -2,6 +2,8 @@ import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import {
   CreateSnackSaleInput,
+  CreateOtherSaleInput,
+  CreateBatchSaleInput,
   CreateHotDrinkSaleInput,
   UpdateSnackSaleInput,
   UpdateHotDrinkSaleInput,
@@ -139,6 +141,86 @@ export class SalesService {
         notes: data.notes || null,
       },
     });
+  }
+
+  async createOtherSale(data: CreateOtherSaleInput) {
+    return prisma.sale.create({
+      data: {
+        itemId: null,
+        itemName: "مصروفات أخرى",
+        quantity: 1,
+        total: data.amount,
+        paymentMethod: data.paymentMethod,
+        isHotDrink: false,
+        date: new Date(),
+        customerName: data.customerName || null,
+        notes: data.notes || null,
+      },
+    });
+  }
+
+  async createBatchSale(data: CreateBatchSaleInput) {
+    // Validate session if provided
+    let linkedName: string | null = null;
+    let sessionId: string | null = null;
+
+    if (data.sessionId) {
+      const session = await prisma.session.findUnique({
+        where: { id: data.sessionId },
+        include: { visitor: true },
+      });
+      if (!session) {
+        throw new ApiError(404, "Session not found");
+      }
+      if (session.checkOut !== null) {
+        throw new ApiError(400, "Session is no longer active (already checked out)");
+      }
+      sessionId = session.id;
+      linkedName = session.visitor.name;
+    }
+
+    const results: any[] = [];
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of data.items) {
+        const invItem = await tx.inventoryItem.findUnique({
+          where: { id: item.itemId },
+        });
+        if (!invItem) {
+          throw new ApiError(404, `Inventory item "${item.itemId}" not found`);
+        }
+        if (invItem.quantity < item.quantity) {
+          throw new ApiError(400, `Insufficient inventory stock for ${invItem.name}`);
+        }
+
+        await tx.inventoryItem.update({
+          where: { id: item.itemId },
+          data: { quantity: invItem.quantity - item.quantity },
+        });
+
+        const totalRaw = item.quantity * Number(invItem.sellPrice);
+        const total = Math.round((totalRaw + Number.EPSILON) * 100) / 100;
+
+        const sale = await tx.sale.create({
+          data: {
+            itemId: item.itemId,
+            itemName: invItem.name,
+            quantity: item.quantity,
+            total,
+            paymentMethod: data.paymentMethod,
+            isHotDrink: false,
+            date: new Date(),
+            customerName: data.customerName || null,
+            notes: data.notes || null,
+            ...(sessionId ? { sessionId, linkedName } : {}),
+          },
+        });
+
+        results.push(sale);
+      }
+    });
+
+    return results;
   }
 
   async editSnackSale(id: string, data: UpdateSnackSaleInput) {

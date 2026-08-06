@@ -116,7 +116,7 @@ model Drink {
 
 model Sale {
   id            String        @id @default(uuid())
-  itemId        String
+  itemId        String?
   itemName      String
   quantity      Int
   total         Decimal       @db.Decimal(10, 2)
