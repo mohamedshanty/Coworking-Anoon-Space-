@@ -120,7 +120,7 @@ export class SessionsController {
     try {
       const id = req.params.id as string;
       const { itemId, qty } = addOrderSchema.parse(req.body);
-      const { order, sale } = await sessionsService.addOrder(id, itemId, qty);
+      const { order, sale, walletTransaction } = await sessionsService.addOrder(id, itemId, qty);
 
       // Socket broadcast
       const io = req.app.get("io");
@@ -132,6 +132,7 @@ export class SessionsController {
         success: true,
         order,
         sale,
+        walletTransaction: walletTransaction ?? null,
       });
     } catch (error) {
       next(error);
@@ -142,7 +143,7 @@ export class SessionsController {
     try {
       const id = req.params.id as string;
       const { items } = addBatchOrdersSchema.parse(req.body);
-      const results = await sessionsService.addBatchOrders(id, { items });
+      const { results, walletTransaction } = await sessionsService.addBatchOrders(id, { items });
 
       const io = req.app.get("io");
       if (io) {
@@ -153,6 +154,7 @@ export class SessionsController {
         success: true,
         data: results,
         count: results.length,
+        walletTransaction: walletTransaction ?? null,
       });
     } catch (error) {
       next(error);

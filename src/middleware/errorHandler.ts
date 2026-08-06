@@ -52,10 +52,17 @@ export const errorHandler: ErrorRequestHandler = (
 
   // ApiError instances → their own status code
   if (err instanceof ApiError) {
-    res.status(err.statusCode).json({
+    const { statusCode, message, errors, ...rest } = err as any;
+    res.status(statusCode).json({
       success: false,
-      message: err.message,
-      ...(err.errors ? { errors: err.errors } : {}),
+      message,
+      ...(errors ? { errors } : {}),
+      ...(rest.insufficientWallet ? {
+        insufficientWallet: true,
+        walletId: rest.walletId,
+        walletBalance: rest.walletBalance,
+        orderTotal: rest.orderTotal,
+      } : {}),
     });
     return;
   }

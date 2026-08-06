@@ -70,3 +70,27 @@ export function isSamePalestineDay(a: Date, b: Date): boolean {
   const pb = getPalestineDateParts(b);
   return pa.year === pb.year && pa.month === pb.month && pa.day === pb.day;
 }
+
+/** Format a Date as a Palestine-local datetime string "DD/MM/YYYY HH:MM:SS". */
+export function formatPalestineDateTime(d: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: PALESTINE_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
+/** Format a Date as a Palestine-local date string "YYYY-MM-DD". */
+export function formatPalestineDate(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: PALESTINE_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}

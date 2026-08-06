@@ -5,6 +5,7 @@ import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { getEffectiveStatus } from "../../lib/subscription";
 import { calculateSessionPricing } from "../sessions/pricing";
+import { palestineEndOfDay, formatPalestineDateTime, formatPalestineDate } from "../../lib/timezone";
 
 const exportQuerySchema = z.object({
   from: z.string().min(1, "'from' is required"),
@@ -18,10 +19,7 @@ export class ReportsController {
     try {
       const parsed = exportQuerySchema.parse(req.query);
       const fromDate = new Date(parsed.from);
-      const toDate = new Date(parsed.to);
-      // TODO: Use palestineEndOfDay from src/lib/timezone.ts to fix UTC-vs-Palestine timezone bug.
-      // Sessions checked in around midnight Palestine time may be miscategorized under the wrong day.
-      toDate.setHours(23, 59, 59, 999);
+      const toDate = palestineEndOfDay(new Date(parsed.to));
 
       if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
         throw new ApiError(400, "Invalid date format for 'from' or 'to'");
@@ -133,10 +131,7 @@ export class ReportsController {
     try {
       const parsed = exportQuerySchema.parse(req.query);
       const fromDate = new Date(parsed.from);
-      const toDate = new Date(parsed.to);
-      // TODO: Use palestineEndOfDay from src/lib/timezone.ts to fix UTC-vs-Palestine timezone bug.
-      // Sessions checked in around midnight Palestine time may be miscategorized under the wrong day.
-      toDate.setHours(23, 59, 59, 999);
+      const toDate = palestineEndOfDay(new Date(parsed.to));
       const exportType = parsed.type ?? "reports";
 
       if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
@@ -251,8 +246,8 @@ export class ReportsController {
           visitsSheet.addRow({
             visitorName: s.visitor.name,
             type: typeMap[s.sessionType ?? s.visitor.type] || s.visitor.type,
-            checkIn: s.checkIn.toISOString(),
-            checkOut: s.checkOut ? s.checkOut.toISOString() : "لم يخرج",
+            checkIn: formatPalestineDateTime(s.checkIn),
+            checkOut: s.checkOut ? formatPalestineDateTime(s.checkOut) : "لم يخرج",
             duration: duration !== null ? duration : "—",
             ordersAmount: rn(pricing.ordersAmount),
             hoursAmount: isSub ? "مشترك" : (s.hourlyPriceOverride != null ? rn(Number(s.hourlyPriceOverride)) : rn(pricing.timeAmount)),
@@ -263,6 +258,20 @@ export class ReportsController {
             paymentMethod: s.paymentMethod ? paymentMethodMap[s.paymentMethod] : "—",
             paymentAccount: s.paymentAccount || "—",
             paymentStatus: paymentStatusMap[s.paymentStatus] || s.paymentStatus,
+          });
+
+          const typeFillColors: Record<string, string> = {
+            subscriber: "FFE6F0FF",
+            trainee: "FFFFF3E0",
+            visitor: "FFFFFFFF",
+          };
+          const rowFill = typeFillColors[effectiveType] ?? "FFFFFFFF";
+          visitsSheet.lastRow?.eachCell((cell) => {
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: rowFill },
+            };
           });
         }
       }
@@ -336,8 +345,8 @@ export class ReportsController {
         subsSheet.addRow({
           visitorName: sub.visitor.name,
           packageType: pkgMap[sub.packageType] || sub.packageType,
-          startDate: sub.startDate.toISOString().slice(0, 10),
-          endDate: sub.endDate.toISOString().slice(0, 10),
+          startDate: formatPalestineDate(sub.startDate),
+          endDate: formatPalestineDate(sub.endDate),
           dailyQuotaHours: sub.dailyQuotaHours,
           amountPaid: Math.round(Number(sub.amountPaid)),
           status: subStatusMap[getEffectiveStatus(sub)] || sub.status,
@@ -364,7 +373,7 @@ export class ReportsController {
 
       for (const sale of sales) {
         salesSheet.addRow({
-          date: sale.date.toISOString().slice(0, 10),
+          date: formatPalestineDate(sale.date),
           itemName: sale.itemName,
           quantity: sale.quantity,
           total: Math.round(Number(sale.total)),
@@ -400,7 +409,7 @@ export class ReportsController {
 
       for (const exp of expenses) {
         expensesSheet.addRow({
-          date: exp.date.toISOString().slice(0, 10),
+          date: formatPalestineDate(exp.date),
           description: exp.description,
           category: categoryMap[exp.category] || exp.category,
           amount: Math.round(Number(exp.amount)),
@@ -434,7 +443,7 @@ export class ReportsController {
           name: bk.room.name,
           bookerOrCourse: bk.purpose,
           trainerOrBooker: bk.bookerName,
-          timeOrDates: `${bk.startTime.toISOString()} - ${bk.endTime.toISOString()}`,
+          timeOrDates: `${formatPalestineDateTime(bk.startTime)} - ${formatPalestineDateTime(bk.endTime)}`,
           price: Math.round(Number(bk.price)),
           traineeCount: "—",
         });
@@ -458,7 +467,7 @@ export class ReportsController {
           name: course.room.name,
           bookerOrCourse: course.name,
           trainerOrBooker: course.trainer,
-          timeOrDates: `${course.startDate.toISOString().slice(0, 10)} - ${course.endDate.toISOString().slice(0, 10)}`,
+          timeOrDates: `${formatPalestineDate(course.startDate)} - ${formatPalestineDate(course.endDate)}`,
           price: Math.round((revenue + Number.EPSILON) * 100) / 100,
           traineeCount,
         });

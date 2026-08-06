@@ -130,6 +130,28 @@ model Sale {
   session       Session?      @relation(fields: [sessionId], references: [id])
 }
 
+model SnackWallet {
+  id           String                 @id @default(uuid())
+  visitorName  String
+  phone        String                 @unique
+  balance      Decimal                @db.Decimal(10, 2) @default(0)
+  createdAt    DateTime               @default(now())
+  transactions SnackWalletTransaction[]
+}
+
+model SnackWalletTransaction {
+  id            String        @id @default(uuid())
+  walletId      String
+  sessionId     String?
+  type          WalletTxnType
+  amount        Decimal       @db.Decimal(10, 2)
+  balanceBefore Decimal       @db.Decimal(10, 2)
+  balanceAfter  Decimal       @db.Decimal(10, 2)
+  description   String?
+  createdAt     DateTime      @default(now())
+  wallet        SnackWallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+}
+
 model Expense {
   id          String          @id @default(uuid())
   description String
@@ -267,6 +289,7 @@ enum PaymentMethod {
   cash
   card
   transfer
+  wallet
 }
 
 enum SubscriptionPackage {
@@ -334,4 +357,9 @@ enum DrinkUnit {
   OUNCE
   GRAM
   ML
+}
+
+enum WalletTxnType {
+  topup
+  deduction
 }

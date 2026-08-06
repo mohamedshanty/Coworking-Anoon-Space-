@@ -4,6 +4,7 @@ import { ApiError } from "../../lib/ApiError";
 import { calculateSessionPricing } from "./pricing";
 import { CheckInInput, UpdateSessionInput, AddBatchOrdersInput } from "./schema";
 import { isSamePalestineDay, palestineStartOfDay, palestineEndOfDay } from "../../lib/timezone";
+import { snackWalletService } from "../snack-wallet/service";
 
 async function getHotDrinkPrice(drinkId: string): Promise<{ price: number; name: string } | null> {
   const hotDrink = await prisma.hotDrink.findFirst({
@@ -680,6 +681,40 @@ export class SessionsService {
       },
     });
 
+    // Check wallet for auto-deduction
+    const wallet = await prisma.snackWallet.findUnique({
+      where: { phone: session.visitor.phone },
+    });
+
+    let walletTransaction: any = null;
+    let paymentMethod: "cash" | "wallet" = "cash";
+
+    if (wallet) {
+      const balance = Number(wallet.balance);
+      if (balance >= total) {
+        // Sufficient balance — auto-deduct
+        const result = await snackWalletService.deduct(
+          wallet.id,
+          total,
+          sessionId,
+          itemName,
+        );
+        walletTransaction = result.transaction;
+        paymentMethod = "wallet";
+      } else {
+        // Insufficient balance — return structured error for frontend to handle
+        throw Object.assign(
+          new ApiError(402, "رصيد المحفظة غير كافٍ"),
+          {
+            insufficientWallet: true,
+            walletId: wallet.id,
+            walletBalance: balance,
+            orderTotal: total,
+          },
+        );
+      }
+    }
+
     // Create Sale record
     const sale = await prisma.sale.create({
       data: {
@@ -689,13 +724,13 @@ export class SessionsService {
         total,
         sessionId,
         linkedName: session.visitor.name,
-        paymentMethod: "cash",
+        paymentMethod,
         isHotDrink,
         date: new Date(),
       },
     });
 
-    return { order, sale };
+    return { order, sale, walletTransaction };
   }
 
   async addBatchOrders(sessionId: string, input: AddBatchOrdersInput) {
@@ -710,92 +745,141 @@ export class SessionsService {
       throw new ApiError(400, "Cannot add orders to checked-out session");
     }
 
+    // Check wallet before batch processing
+    const wallet = await prisma.snackWallet.findUnique({
+      where: { phone: session.visitor.phone },
+    });
+
+    // Pre-calculate total cost of all items
+    let batchTotal = 0;
+    const itemDetails: { itemId: string; qty: number; total: number; itemName: string; isHotDrink: boolean; dbItemId: string | null; dbDrinkId: string | null; hotDrinkName: string | null }[] = [];
+
+    for (const item of input.items) {
+      const { itemId, qty } = item;
+      let isHotDrink = false;
+      let itemName = "";
+      let total = 0;
+      let dbItemId: string | null = null;
+      let hotDrinkName: string | null = null;
+      let dbDrinkId: string | null = null;
+
+      if (itemId.startsWith("hot-")) {
+        isHotDrink = true;
+        const hotDrinkId = itemId.replace("hot-", "");
+        const hotDrink = await prisma.hotDrink.findFirst({
+          where: { id: hotDrinkId, isActive: true },
+        });
+        if (!hotDrink) {
+          throw new ApiError(404, `Hot drink "${hotDrinkId}" not found or inactive`);
+        }
+        itemName = hotDrink.name;
+        total = qty * Number(hotDrink.price);
+        hotDrinkName = hotDrink.name;
+      } else if (itemId.startsWith("drink-")) {
+        const drinkId = itemId.replace("drink-", "");
+        const drink = await prisma.drink.findUnique({ where: { id: drinkId } });
+        if (!drink) {
+          throw new ApiError(404, `Drink "${drinkId}" not found`);
+        }
+        if (drink.quantity < qty) {
+          throw new ApiError(400, `Insufficient stock for ${drink.name} (requested ${qty}, available ${drink.quantity})`);
+        }
+        itemName = drink.name;
+        total = qty * Number(drink.sellPrice);
+        dbDrinkId = drinkId;
+      } else {
+        const invItem = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+        if (!invItem) {
+          throw new ApiError(404, `Inventory item "${itemId}" not found`);
+        }
+        if (invItem.quantity < qty) {
+          throw new ApiError(400, `Insufficient stock for ${invItem.name} (requested ${qty}, available ${invItem.quantity})`);
+        }
+        itemName = invItem.name;
+        total = qty * Number(invItem.sellPrice);
+        dbItemId = itemId;
+      }
+
+      batchTotal += total;
+      itemDetails.push({ itemId, qty, total, itemName, isHotDrink, dbItemId, dbDrinkId, hotDrinkName });
+    }
+
+    // Check wallet sufficiency for batch
+    let walletTransaction: any = null;
+    let paymentMethod: "cash" | "wallet" = "cash";
+
+    if (wallet) {
+      const balance = Number(wallet.balance);
+      if (balance >= batchTotal) {
+        const result = await snackWalletService.deduct(
+          wallet.id,
+          batchTotal,
+          sessionId,
+          `طلب جماعي (${input.items.length} صنف)`,
+        );
+        walletTransaction = result.transaction;
+        paymentMethod = "wallet";
+      } else {
+        throw Object.assign(
+          new ApiError(402, "رصيد المحفظة غير كافٍ"),
+          {
+            insufficientWallet: true,
+            walletId: wallet.id,
+            walletBalance: balance,
+            orderTotal: batchTotal,
+          },
+        );
+      }
+    }
+
     const results: { order: any; sale: any }[] = [];
 
     await prisma.$transaction(async (tx) => {
-      for (const item of input.items) {
-        const { itemId, qty } = item;
-
-        let isHotDrink = false;
-        let itemName = "";
-        let total = 0;
-        let dbItemId: string | null = null;
-        let hotDrinkName: string | null = null;
-        let dbDrinkId: string | null = null;
-
-        if (itemId.startsWith("hot-")) {
-          isHotDrink = true;
-          const hotDrinkId = itemId.replace("hot-", "");
-          const hotDrink = await tx.hotDrink.findFirst({
-            where: { id: hotDrinkId, isActive: true },
-          });
-          if (!hotDrink) {
-            throw new ApiError(404, `Hot drink "${hotDrinkId}" not found or inactive`);
-          }
-          itemName = hotDrink.name;
-          total = qty * Number(hotDrink.price);
-          hotDrinkName = hotDrink.name;
-        } else if (itemId.startsWith("drink-")) {
-          const drinkId = itemId.replace("drink-", "");
+      for (const detail of itemDetails) {
+        // Deduct inventory
+        if (detail.itemId.startsWith("hot-")) {
+          // no inventory deduction for hot drinks
+        } else if (detail.itemId.startsWith("drink-")) {
+          const drinkId = detail.itemId.replace("drink-", "");
           const drink = await tx.drink.findUnique({ where: { id: drinkId } });
-          if (!drink) {
-            throw new ApiError(404, `Drink "${drinkId}" not found`);
+          if (drink) {
+            await tx.drink.update({
+              where: { id: drinkId },
+              data: { quantity: drink.quantity - detail.qty },
+            });
           }
-          if (drink.quantity < qty) {
-            throw new ApiError(
-              400,
-              `Insufficient stock for ${drink.name} (requested ${qty}, available ${drink.quantity})`,
-            );
+        } else if (detail.dbItemId) {
+          const invItem = await tx.inventoryItem.findUnique({ where: { id: detail.dbItemId } });
+          if (invItem) {
+            await tx.inventoryItem.update({
+              where: { id: detail.dbItemId },
+              data: { quantity: invItem.quantity - detail.qty },
+            });
           }
-          await tx.drink.update({
-            where: { id: drinkId },
-            data: { quantity: drink.quantity - qty },
-          });
-          itemName = drink.name;
-          total = qty * Number(drink.sellPrice);
-          dbDrinkId = drinkId;
-        } else {
-          const invItem = await tx.inventoryItem.findUnique({ where: { id: itemId } });
-          if (!invItem) {
-            throw new ApiError(404, `Inventory item "${itemId}" not found`);
-          }
-          if (invItem.quantity < qty) {
-            throw new ApiError(
-              400,
-              `Insufficient stock for ${invItem.name} (requested ${qty}, available ${invItem.quantity})`,
-            );
-          }
-          await tx.inventoryItem.update({
-            where: { id: itemId },
-            data: { quantity: invItem.quantity - qty },
-          });
-          itemName = invItem.name;
-          total = qty * Number(invItem.sellPrice);
-          dbItemId = itemId;
         }
 
         const order = await tx.snackOrder.create({
           data: {
             sessionId,
-            itemId: dbItemId,
-            drinkId: dbDrinkId,
-            hotDrinkName,
-            qty,
-            total,
-            isHotDrink,
+            itemId: detail.dbItemId,
+            drinkId: detail.dbDrinkId,
+            hotDrinkName: detail.hotDrinkName,
+            qty: detail.qty,
+            total: detail.total,
+            isHotDrink: detail.isHotDrink,
           },
         });
 
         const sale = await tx.sale.create({
           data: {
-            itemId: dbItemId ?? dbDrinkId ?? `hot-${hotDrinkName}`,
-            itemName,
-            quantity: qty,
-            total,
+            itemId: detail.dbItemId ?? detail.dbDrinkId ?? `hot-${detail.hotDrinkName}`,
+            itemName: detail.itemName,
+            quantity: detail.qty,
+            total: detail.total,
             sessionId,
             linkedName: session.visitor.name,
-            paymentMethod: "cash",
-            isHotDrink,
+            paymentMethod,
+            isHotDrink: detail.isHotDrink,
             date: new Date(),
           },
         });
@@ -804,7 +888,7 @@ export class SessionsService {
       }
     });
 
-    return results;
+    return { results, walletTransaction };
   }
 
   async editOrderItem(orderId: string, data: { itemId?: string; qty?: number }) {
@@ -1134,6 +1218,23 @@ export class SessionsService {
       prisma.session.count({ where }),
     ]);
 
+    // Fetch wallet transactions for all sessions in this batch (for wallet-paid orders)
+    const sessionIds = sessions.map((s) => s.id);
+    const walletTxns = await prisma.snackWalletTransaction.findMany({
+      where: { sessionId: { in: sessionIds }, type: "deduction" },
+      select: { sessionId: true, balanceBefore: true, balanceAfter: true, amount: true },
+    });
+    const walletTxnBySession = new Map<string, { balanceBefore: number; balanceAfter: number; amount: number }>();
+    for (const txn of walletTxns) {
+      if (txn.sessionId) {
+        walletTxnBySession.set(txn.sessionId, {
+          balanceBefore: Number(txn.balanceBefore),
+          balanceAfter: Number(txn.balanceAfter),
+          amount: Number(txn.amount),
+        });
+      }
+    }
+
     const settings = await prisma.settings.findFirst();
     const activeSubscriptions = await prisma.subscription.findMany({
       where: { status: "active", endDate: { gte: new Date() } },
@@ -1217,6 +1318,7 @@ export class SessionsService {
         ordersAmount: r2(pricing.ordersAmount),
         hoursAmount: s.hourlyPriceOverride != null ? r2(Number(s.hourlyPriceOverride)) : r2(pricing.timeAmount),
         totalAmount: Number(s.amount),
+        walletPayment: walletTxnBySession.get(s.id) ?? null,
       };
     });
 
