@@ -35,6 +35,20 @@ router.post(
   (req, res, next) => snackWalletController.create(req, res, next)
 );
 
+// PATCH update wallet
+router.patch(
+  "/:id",
+  authorize("محفظة السناكس", "edit"),
+  (req, res, next) => snackWalletController.update(req, res, next)
+);
+
+// DELETE wallet
+router.delete(
+  "/:id",
+  authorize("محفظة السناكس", "delete"),
+  (req, res, next) => snackWalletController.remove(req, res, next)
+);
+
 // POST top up wallet
 router.post(
   "/:id/topup",

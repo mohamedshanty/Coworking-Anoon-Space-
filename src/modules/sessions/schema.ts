@@ -47,6 +47,7 @@ export const checkoutSchema = z.object({
 export const addOrderSchema = z.object({
   itemId: z.string().min(1),
   qty: z.number().int().min(1),
+  skipWallet: z.boolean().optional(),
 });
 
 export const addBatchOrdersSchema = z.object({
@@ -58,6 +59,7 @@ export const addBatchOrdersSchema = z.object({
       }),
     )
     .min(1, "At least one item is required"),
+  skipWallet: z.boolean().optional(),
 });
 
 export type CheckInInput = z.infer<typeof checkInSchema>;

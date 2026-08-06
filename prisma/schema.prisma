@@ -143,6 +143,7 @@ model SnackWalletTransaction {
   id            String        @id @default(uuid())
   walletId      String
   sessionId     String?
+  orderId       String?
   type          WalletTxnType
   amount        Decimal       @db.Decimal(10, 2)
   balanceBefore Decimal       @db.Decimal(10, 2)

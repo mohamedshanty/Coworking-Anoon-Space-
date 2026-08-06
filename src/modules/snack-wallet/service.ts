@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
-import { CreateWalletInput, TopUpInput } from "./schema";
+import { CreateWalletInput, TopUpInput, UpdateWalletInput } from "./schema";
 
 export class SnackWalletService {
   async getByPhone(phone: string) {
@@ -61,6 +61,41 @@ export class SnackWalletService {
     });
   }
 
+  async update(id: string, data: UpdateWalletInput) {
+    const wallet = await prisma.snackWallet.findUnique({ where: { id } });
+    if (!wallet) {
+      throw new ApiError(404, "المحفظة غير موجودة");
+    }
+
+    // If phone is changing, check uniqueness
+    if (data.phone && data.phone !== wallet.phone) {
+      const duplicate = await prisma.snackWallet.findUnique({
+        where: { phone: data.phone },
+      });
+      if (duplicate) {
+        throw new ApiError(409, "محفظة بهذا الرقم موجودة مسبقاً");
+      }
+    }
+
+    return prisma.snackWallet.update({
+      where: { id },
+      data: {
+        ...(data.visitorName !== undefined && { visitorName: data.visitorName }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+      },
+    });
+  }
+
+  async remove(id: string) {
+    const wallet = await prisma.snackWallet.findUnique({ where: { id } });
+    if (!wallet) {
+      throw new ApiError(404, "المحفظة غير موجودة");
+    }
+
+    // SnackWalletTransaction cascade-deletes via onDelete: Cascade
+    await prisma.snackWallet.delete({ where: { id } });
+  }
+
   async topUp(id: string, data: TopUpInput) {
     const wallet = await prisma.snackWallet.findUnique({ where: { id } });
     if (!wallet) {
@@ -91,7 +126,7 @@ export class SnackWalletService {
     });
   }
 
-  async deduct(walletId: string, amount: number, sessionId: string, description?: string) {
+  async deduct(walletId: string, amount: number, sessionId: string, description?: string, orderId?: string) {
     const wallet = await prisma.snackWallet.findUnique({ where: { id: walletId } });
     if (!wallet) {
       throw new ApiError(404, "المحفظة غير موجودة");
@@ -114,6 +149,7 @@ export class SnackWalletService {
         data: {
           walletId,
           sessionId,
+          orderId: orderId ?? null,
           type: "deduction",
           amount,
           balanceBefore,
@@ -124,6 +160,42 @@ export class SnackWalletService {
 
       return { wallet: updated, transaction };
     });
+  }
+
+  /**
+   * Refund wallet deductions for a session. Called inside a transaction.
+   * Finds all deduction transactions for the given session and credits them back.
+   */
+  async refundSessionDeductions(tx: any, sessionId: string) {
+    const deductions = await tx.snackWalletTransaction.findMany({
+      where: { sessionId, type: "deduction" },
+    });
+
+    for (const txn of deductions) {
+      const wallet = await tx.snackWallet.findUnique({ where: { id: txn.walletId } });
+      if (!wallet) continue; // wallet was deleted, skip
+
+      const balanceBefore = Number(wallet.balance);
+      const refundAmount = Number(txn.amount);
+      const balanceAfter = balanceBefore + refundAmount;
+
+      await tx.snackWallet.update({
+        where: { id: txn.walletId },
+        data: { balance: balanceAfter },
+      });
+
+      await tx.snackWalletTransaction.create({
+        data: {
+          walletId: txn.walletId,
+          sessionId,
+          type: "topup",
+          amount: refundAmount,
+          balanceBefore,
+          balanceAfter,
+          description: `استرداد المبلغ — تم حذف الجلسة`,
+        },
+      });
+    }
   }
 
   async getTransactions(walletId: string, params: { page?: number; limit?: number }) {

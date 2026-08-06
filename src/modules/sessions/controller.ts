@@ -119,8 +119,8 @@ export class SessionsController {
   async addOrder(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const { itemId, qty } = addOrderSchema.parse(req.body);
-      const { order, sale, walletTransaction } = await sessionsService.addOrder(id, itemId, qty);
+      const { itemId, qty, skipWallet } = addOrderSchema.parse(req.body);
+      const { order, sale, walletTransaction } = await sessionsService.addOrder(id, itemId, qty, skipWallet);
 
       // Socket broadcast
       const io = req.app.get("io");
@@ -142,8 +142,8 @@ export class SessionsController {
   async addBatchOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const { items } = addBatchOrdersSchema.parse(req.body);
-      const { results, walletTransaction } = await sessionsService.addBatchOrders(id, { items });
+      const { items, skipWallet } = addBatchOrdersSchema.parse(req.body);
+      const { results, walletTransaction } = await sessionsService.addBatchOrders(id, { items }, skipWallet);
 
       const io = req.app.get("io");
       if (io) {

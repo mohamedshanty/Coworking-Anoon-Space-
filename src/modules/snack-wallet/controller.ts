@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { snackWalletService } from "./service";
-import { createWalletSchema, topUpSchema } from "./schema";
+import { createWalletSchema, updateWalletSchema, topUpSchema } from "./schema";
 
 export class SnackWalletController {
   async lookup(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -48,6 +48,27 @@ export class SnackWalletController {
       const input = createWalletSchema.parse(req.body);
       const wallet = await snackWalletService.create(input);
       res.status(201).json({ success: true, data: wallet });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async update(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const input = updateWalletSchema.parse(req.body);
+      const wallet = await snackWalletService.update(id, input);
+      res.status(200).json({ success: true, data: wallet });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async remove(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      await snackWalletService.remove(id);
+      res.status(204).json({ success: true });
     } catch (error) {
       next(error);
     }

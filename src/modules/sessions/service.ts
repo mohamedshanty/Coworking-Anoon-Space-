@@ -600,7 +600,7 @@ export class SessionsService {
     return updated;
   }
 
-  async addOrder(sessionId: string, itemId: string, qty: number) {
+  async addOrder(sessionId: string, itemId: string, qty: number, skipWallet?: boolean) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: { visitor: true },
@@ -682,36 +682,39 @@ export class SessionsService {
     });
 
     // Check wallet for auto-deduction
-    const wallet = await prisma.snackWallet.findUnique({
-      where: { phone: session.visitor.phone },
-    });
-
     let walletTransaction: any = null;
     let paymentMethod: "cash" | "wallet" = "cash";
 
-    if (wallet) {
-      const balance = Number(wallet.balance);
-      if (balance >= total) {
-        // Sufficient balance — auto-deduct
-        const result = await snackWalletService.deduct(
-          wallet.id,
-          total,
-          sessionId,
-          itemName,
-        );
-        walletTransaction = result.transaction;
-        paymentMethod = "wallet";
-      } else {
-        // Insufficient balance — return structured error for frontend to handle
-        throw Object.assign(
-          new ApiError(402, "رصيد المحفظة غير كافٍ"),
-          {
-            insufficientWallet: true,
-            walletId: wallet.id,
-            walletBalance: balance,
-            orderTotal: total,
-          },
-        );
+    if (!skipWallet) {
+      const wallet = await prisma.snackWallet.findUnique({
+        where: { phone: session.visitor.phone },
+      });
+
+      if (wallet) {
+        const balance = Number(wallet.balance);
+        if (balance >= total) {
+          // Sufficient balance — auto-deduct
+          const result = await snackWalletService.deduct(
+            wallet.id,
+            total,
+            sessionId,
+            itemName,
+            order.id,
+          );
+          walletTransaction = result.transaction;
+          paymentMethod = "wallet";
+        } else {
+          // Insufficient balance — return structured error for frontend to handle
+          throw Object.assign(
+            new ApiError(402, "رصيد المحفظة غير كافٍ"),
+            {
+              insufficientWallet: true,
+              walletId: wallet.id,
+              walletBalance: balance,
+              orderTotal: total,
+            },
+          );
+        }
       }
     }
 
@@ -733,7 +736,7 @@ export class SessionsService {
     return { order, sale, walletTransaction };
   }
 
-  async addBatchOrders(sessionId: string, input: AddBatchOrdersInput) {
+  async addBatchOrders(sessionId: string, input: AddBatchOrdersInput, skipWallet?: boolean) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: { visitor: true },
@@ -744,11 +747,6 @@ export class SessionsService {
     if (session.checkOut) {
       throw new ApiError(400, "Cannot add orders to checked-out session");
     }
-
-    // Check wallet before batch processing
-    const wallet = await prisma.snackWallet.findUnique({
-      where: { phone: session.visitor.phone },
-    });
 
     // Pre-calculate total cost of all items
     let batchTotal = 0;
@@ -808,27 +806,33 @@ export class SessionsService {
     let walletTransaction: any = null;
     let paymentMethod: "cash" | "wallet" = "cash";
 
-    if (wallet) {
-      const balance = Number(wallet.balance);
-      if (balance >= batchTotal) {
-        const result = await snackWalletService.deduct(
-          wallet.id,
-          batchTotal,
-          sessionId,
-          `طلب جماعي (${input.items.length} صنف)`,
-        );
-        walletTransaction = result.transaction;
-        paymentMethod = "wallet";
-      } else {
-        throw Object.assign(
-          new ApiError(402, "رصيد المحفظة غير كافٍ"),
-          {
-            insufficientWallet: true,
-            walletId: wallet.id,
-            walletBalance: balance,
-            orderTotal: batchTotal,
-          },
-        );
+    if (!skipWallet) {
+      const wallet = await prisma.snackWallet.findUnique({
+        where: { phone: session.visitor.phone },
+      });
+
+      if (wallet) {
+        const balance = Number(wallet.balance);
+        if (balance >= batchTotal) {
+          const result = await snackWalletService.deduct(
+            wallet.id,
+            batchTotal,
+            sessionId,
+            `طلب جماعي (${input.items.length} صنف)`,
+          );
+          walletTransaction = result.transaction;
+          paymentMethod = "wallet";
+        } else {
+          throw Object.assign(
+            new ApiError(402, "رصيد المحفظة غير كافٍ"),
+            {
+              insufficientWallet: true,
+              walletId: wallet.id,
+              walletBalance: balance,
+              orderTotal: batchTotal,
+            },
+          );
+        }
       }
     }
 
@@ -903,9 +907,10 @@ export class SessionsService {
       throw new ApiError(400, "Cannot edit order of checked-out session");
     }
 
+    const oldTotal = Number(order.total);
     const oldQty = order.qty;
     const newQty = data.qty ?? oldQty;
-    let newTotal = Number(order.total);
+    let newTotal = oldTotal;
     let newItemId = order.itemId;
     let newHotDrinkName = order.hotDrinkName;
     let newIsHotDrink = order.isHotDrink;
@@ -972,7 +977,7 @@ export class SessionsService {
       }
     } else if (data.qty !== undefined && data.qty !== oldQty) {
       // Same item, just quantity change
-      newTotal = newQty * (Number(order.total) / oldQty);
+      newTotal = newQty * (oldTotal / oldQty);
       // Adjust inventory/drink stock for the difference
       if (order.itemId && order.item) {
         const diff = newQty - oldQty;
@@ -1009,6 +1014,109 @@ export class SessionsService {
       }
     }
 
+    const roundedNewTotal = Math.round((newTotal + Number.EPSILON) * 100) / 100;
+
+    // If total didn't change, skip wallet adjustment
+    if (roundedNewTotal === oldTotal) {
+      const updated = await prisma.snackOrder.update({
+        where: { id: orderId },
+        data: {
+          itemId: newItemId,
+          drinkId: newDrinkId,
+          hotDrinkName: newHotDrinkName,
+          isHotDrink: newIsHotDrink,
+          qty: newQty,
+          total: roundedNewTotal,
+        },
+      });
+      return updated;
+    }
+
+    // Wallet adjustment: refund old deduction, then deduct new amount if wallet-paid
+    const existingWalletTxn = await prisma.snackWalletTransaction.findFirst({
+      where: { orderId, type: "deduction" },
+    });
+
+    if (existingWalletTxn) {
+      const wallet = await prisma.snackWallet.findUnique({
+        where: { id: existingWalletTxn.walletId },
+      });
+      if (!wallet) {
+        throw new ApiError(404, "المحفظة غير موجودة");
+      }
+
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Refund old amount
+        const refundBalBefore = Number(wallet.balance);
+        const refundAmount = Number(existingWalletTxn.amount);
+        const refundBalAfter = refundBalBefore + refundAmount;
+
+        await tx.snackWallet.update({
+          where: { id: wallet.id },
+          data: { balance: refundBalAfter },
+        });
+
+        await tx.snackWalletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            sessionId: order.sessionId,
+            orderId,
+            type: "topup",
+            amount: refundAmount,
+            balanceBefore: refundBalBefore,
+            balanceAfter: refundBalAfter,
+            description: `استرداد المبلغ — تعديل الطلب`,
+          },
+        });
+
+        // 2. Deduct new amount if wallet has sufficient balance
+        const freshWallet = await tx.snackWallet.findUnique({ where: { id: wallet.id } });
+        const freshBalance = Number(freshWallet!.balance);
+
+        if (freshBalance >= roundedNewTotal) {
+          const deductBalBefore = freshBalance;
+          const deductBalAfter = freshBalance - roundedNewTotal;
+
+          await tx.snackWallet.update({
+            where: { id: wallet.id },
+            data: { balance: deductBalAfter },
+          });
+
+          await tx.snackWalletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              sessionId: order.sessionId,
+              orderId,
+              type: "deduction",
+              amount: roundedNewTotal,
+              balanceBefore: deductBalBefore,
+              balanceAfter: deductBalAfter,
+              description: `خصم المحفظة — تعديل الطلب`,
+            },
+          });
+        }
+        // If insufficient balance after refund, the order becomes cash-paid
+        // (the old deduction was already refunded)
+
+        const updated = await tx.snackOrder.update({
+          where: { id: orderId },
+          data: {
+            itemId: newItemId,
+            drinkId: newDrinkId,
+            hotDrinkName: newHotDrinkName,
+            isHotDrink: newIsHotDrink,
+            qty: newQty,
+            total: roundedNewTotal,
+          },
+        });
+
+        return updated;
+      });
+
+      return result;
+    }
+
+    // No existing wallet transaction — order was cash-paid, just update it
     const updated = await prisma.snackOrder.update({
       where: { id: orderId },
       data: {
@@ -1017,7 +1125,7 @@ export class SessionsService {
         hotDrinkName: newHotDrinkName,
         isHotDrink: newIsHotDrink,
         qty: newQty,
-        total: Math.round((newTotal + Number.EPSILON) * 100) / 100,
+        total: roundedNewTotal,
       },
     });
 
@@ -1036,26 +1144,62 @@ export class SessionsService {
       throw new ApiError(400, "Cannot delete order of checked-out session");
     }
 
-    // Restore inventory/drink stock
-    if (order.itemId && order.item) {
-      await prisma.inventoryItem.update({
-        where: { id: order.itemId },
-        data: { quantity: order.item.quantity + order.qty },
+    const result = await prisma.$transaction(async (tx) => {
+      // Refund wallet deduction for this specific order if it exists
+      const walletTxn = await tx.snackWalletTransaction.findFirst({
+        where: { orderId, type: "deduction" },
       });
-    }
-    if (order.drinkId) {
-      const drink = await prisma.drink.findUnique({ where: { id: order.drinkId } });
-      if (drink) {
-        await prisma.drink.update({
-          where: { id: order.drinkId },
-          data: { quantity: drink.quantity + order.qty },
+
+      if (walletTxn) {
+        const wallet = await tx.snackWallet.findUnique({ where: { id: walletTxn.walletId } });
+        if (wallet) {
+          const balanceBefore = Number(wallet.balance);
+          const refundAmount = Number(walletTxn.amount);
+          const balanceAfter = balanceBefore + refundAmount;
+
+          await tx.snackWallet.update({
+            where: { id: walletTxn.walletId },
+            data: { balance: balanceAfter },
+          });
+
+          await tx.snackWalletTransaction.create({
+            data: {
+              walletId: walletTxn.walletId,
+              sessionId: order.sessionId,
+              orderId,
+              type: "topup",
+              amount: refundAmount,
+              balanceBefore,
+              balanceAfter,
+              description: `استرداد المبلغ — تم حذف الطلب`,
+            },
+          });
+        }
+      }
+
+      // Restore inventory/drink stock
+      if (order.itemId && order.item) {
+        await tx.inventoryItem.update({
+          where: { id: order.itemId },
+          data: { quantity: order.item.quantity + order.qty },
         });
       }
-    }
+      if (order.drinkId) {
+        const drink = await tx.drink.findUnique({ where: { id: order.drinkId } });
+        if (drink) {
+          await tx.drink.update({
+            where: { id: order.drinkId },
+            data: { quantity: drink.quantity + order.qty },
+          });
+        }
+      }
 
-    await prisma.snackOrder.delete({ where: { id: orderId } });
+      await tx.snackOrder.delete({ where: { id: orderId } });
 
-    return { success: true };
+      return { refunded: !!walletTxn, refundAmount: walletTxn ? Number(walletTxn.amount) : 0 };
+    });
+
+    return result;
   }
 
   async dismissNewVisitor(id: string) {
@@ -1096,6 +1240,9 @@ export class SessionsService {
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      // Refund any wallet deductions for this session before deleting
+      await snackWalletService.refundSessionDeductions(tx, id);
+
       // SnackOrders cascade-delete via onDelete: Cascade on Session relation.
       // Sales have onDelete: SetNull — sessionId becomes null, sale records survive.
       const deleted = await tx.session.delete({
