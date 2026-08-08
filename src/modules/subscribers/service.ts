@@ -80,6 +80,10 @@ export class SubscribersService {
 
   async createSubscriber(data: CreateSubscriberInput) {
     const roundedAmount = Math.round((data.amountPaid + Number.EPSILON) * 100) / 100;
+    const paymentType = data.paymentType ?? "full";
+    const totalFee = paymentType === "installment" && data.totalFee != null
+      ? Math.round((data.totalFee + Number.EPSILON) * 100) / 100
+      : roundedAmount;
 
     let visitor = await prisma.visitor.findFirst({
       where: { phone: data.phone },
@@ -123,20 +127,44 @@ export class SubscribersService {
       });
     }
 
-    const subscription = await prisma.subscription.create({
-      data: {
-        visitorId: visitor.id,
-        packageType: data.packageType,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        dailyQuotaHours: data.dailyQuotaHours,
-        daysUsed: 0,
-        amountPaid: roundedAmount,
-        status: "active",
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const subscription = await tx.subscription.create({
+        data: {
+          visitorId: visitor.id,
+          packageType: data.packageType,
+          startDate: new Date(data.startDate),
+          endDate: new Date(data.endDate),
+          dailyQuotaHours: data.dailyQuotaHours,
+          daysUsed: 0,
+          totalFee,
+          amountPaid: roundedAmount,
+          status: "active",
+        },
+      });
+
+      // If installment and there's a remaining balance, create a debt record
+      let debt = null;
+      if (paymentType === "installment" && totalFee > roundedAmount) {
+        const remainingBalance = Math.round((totalFee - roundedAmount + Number.EPSILON) * 100) / 100;
+        debt = await tx.debt.create({
+          data: {
+            visitorId: visitor.id,
+            subscriptionId: subscription.id,
+            name: data.name,
+            phone: data.phone,
+            amount: remainingBalance,
+            type: "subscription",
+            status: "unpaid",
+            createdAt: new Date(),
+            note: `متبقي من اشتراك ${data.packageType === "monthly" ? "الشهري" : data.packageType === "half_month" ? "نصف الشهري" : "الأسبوعي"}`,
+          },
+        });
+      }
+
+      return { subscription, debt };
     });
 
-    return { visitor, subscription };
+    return { visitor, subscription: result.subscription };
   }
 
   async renewSubscription(visitorId: string, data: RenewSubscriptionInput) {
@@ -148,6 +176,10 @@ export class SubscribersService {
     }
 
     const roundedAmount = Math.round((data.amountPaid + Number.EPSILON) * 100) / 100;
+    const paymentType = data.paymentType ?? "full";
+    const totalFee = paymentType === "installment" && data.totalFee != null
+      ? Math.round((data.totalFee + Number.EPSILON) * 100) / 100
+      : roundedAmount;
 
     // Find and expire previous active/paused subscriptions
     await prisma.subscription.updateMany({
@@ -158,20 +190,44 @@ export class SubscribersService {
       data: { status: "expired" },
     });
 
-    const newSub = await prisma.subscription.create({
-      data: {
-        visitorId,
-        packageType: data.packageType,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        dailyQuotaHours: data.dailyQuotaHours,
-        daysUsed: 0,
-        amountPaid: roundedAmount,
-        status: "active",
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const newSub = await tx.subscription.create({
+        data: {
+          visitorId,
+          packageType: data.packageType,
+          startDate: new Date(data.startDate),
+          endDate: new Date(data.endDate),
+          dailyQuotaHours: data.dailyQuotaHours,
+          daysUsed: 0,
+          totalFee,
+          amountPaid: roundedAmount,
+          status: "active",
+        },
+      });
+
+      // If installment and there's a remaining balance, create a debt record
+      let debt = null;
+      if (paymentType === "installment" && totalFee > roundedAmount) {
+        const remainingBalance = Math.round((totalFee - roundedAmount + Number.EPSILON) * 100) / 100;
+        debt = await tx.debt.create({
+          data: {
+            visitorId,
+            subscriptionId: newSub.id,
+            name: visitor.name,
+            phone: visitor.phone,
+            amount: remainingBalance,
+            type: "subscription",
+            status: "unpaid",
+            createdAt: new Date(),
+            note: `متبقي من تجديد الاشتراك ${data.packageType === "monthly" ? "الشهري" : data.packageType === "half_month" ? "نصف الشهري" : "الأسبوعي"}`,
+          },
+        });
+      }
+
+      return { subscription: newSub, debt };
     });
 
-    return newSub;
+    return result.subscription;
   }
 
   async pauseSubscription(visitorId: string) {
@@ -206,18 +262,37 @@ export class SubscribersService {
       throw new ApiError(404, "Visitor not found");
     }
 
-    // Update visitor fields
-    const updated = await prisma.visitor.update({
-      where: { id: visitorId },
-      data: {
-        ...(data.name ? { name: data.name } : {}),
-        ...(data.phone ? { phone: data.phone } : {}),
-        ...(data.notes !== undefined ? { notes: data.notes || null } : {}),
-        ...(data.source !== undefined ? { source: data.source || null } : {}),
-      },
+    const newName = data.name ?? undefined;
+    const newPhone = data.phone ?? undefined;
+
+    // Wrap in transaction so visitor, subscription, and debt name are consistent
+    const updated = await prisma.$transaction(async (tx) => {
+      // Update visitor fields
+      const vis = await tx.visitor.update({
+        where: { id: visitorId },
+        data: {
+          ...(newName ? { name: newName } : {}),
+          ...(newPhone ? { phone: newPhone } : {}),
+          ...(data.notes !== undefined ? { notes: data.notes || null } : {}),
+          ...(data.source !== undefined ? { source: data.source || null } : {}),
+        },
+      });
+
+      // Sync name/phone to all linked debts (unpaid + collected)
+      if (newName || newPhone) {
+        const debtUpdate: Record<string, unknown> = {};
+        if (newName) debtUpdate.name = newName;
+        if (newPhone) debtUpdate.phone = newPhone;
+        await tx.debt.updateMany({
+          where: { visitorId },
+          data: debtUpdate,
+        });
+      }
+
+      return vis;
     });
 
-    // Update subscription fields if any are provided
+    // Update subscription fields if any are provided (outside transaction — non-critical)
     const hasSubscriptionUpdate =
       data.packageType !== undefined ||
       data.startDate !== undefined ||
@@ -227,7 +302,6 @@ export class SubscribersService {
       data.status !== undefined;
 
     if (hasSubscriptionUpdate) {
-      // Find the most recent subscription for this visitor
       const latestSub = await prisma.subscription.findFirst({
         where: { visitorId },
         orderBy: { startDate: "desc" },

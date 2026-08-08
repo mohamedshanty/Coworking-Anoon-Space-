@@ -9,6 +9,8 @@ export const createSubscriberSchema = z.object({
   endDate: z.string().datetime(),
   dailyQuotaHours: z.number().int().min(0),
   amountPaid: z.number().min(0),
+  paymentType: z.enum(["full", "installment"]).default("full"),
+  totalFee: z.number().min(0).optional(),
 });
 
 export const renewSubscriptionSchema = z.object({
@@ -17,6 +19,8 @@ export const renewSubscriptionSchema = z.object({
   endDate: z.string().datetime(),
   dailyQuotaHours: z.number().int().min(0),
   amountPaid: z.number().min(0),
+  paymentType: z.enum(["full", "installment"]).default("full"),
+  totalFee: z.number().min(0).optional(),
 });
 
 export const updateSubscriberSchema = z.object({

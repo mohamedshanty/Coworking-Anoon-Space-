@@ -77,9 +77,11 @@ model Subscription {
   endDate         DateTime
   dailyQuotaHours Int
   daysUsed        Int
+  totalFee        Decimal             @db.Decimal(10, 2)
   amountPaid      Decimal             @db.Decimal(10, 2)
   status          SubscriptionStatus
   visitor         Visitor             @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  debts           Debt[]
 }
 
 model InventoryItem {
@@ -163,17 +165,19 @@ model Expense {
 }
 
 model Debt {
-  id          String     @id @default(uuid())
-  visitorId   String?
-  name        String
-  phone       String
-  amount      Decimal    @db.Decimal(10, 2)
-  type        DebtType
-  status      DebtStatus
-  createdAt   DateTime
-  collectedAt DateTime?
-  note        String?
-  visitor     Visitor?   @relation(fields: [visitorId], references: [id])
+  id             String        @id @default(uuid())
+  visitorId      String?
+  subscriptionId String?
+  name           String
+  phone          String
+  amount         Decimal       @db.Decimal(10, 2)
+  type           DebtType
+  status         DebtStatus
+  createdAt      DateTime
+  collectedAt    DateTime?
+  note           String?
+  visitor        Visitor?      @relation(fields: [visitorId], references: [id])
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 }
 
 model Room {
@@ -318,6 +322,7 @@ enum ExpenseCategory {
 enum DebtType {
   session
   manual
+  subscription
 }
 
 enum DebtStatus {

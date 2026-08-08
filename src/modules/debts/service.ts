@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
-import { CreateDebtInput, UpdateDebtInput } from "./schema";
+import { CreateDebtInput, UpdateDebtInput, CollectPartialDebtInput } from "./schema";
 
 export class DebtsService {
   async getDebts(params: { page?: number; limit?: number }) {
@@ -11,6 +11,7 @@ export class DebtsService {
     const [items, total] = await Promise.all([
       prisma.debt.findMany({
         orderBy: { createdAt: "desc" },
+        include: { subscription: true },
         skip,
         take: limit,
       }),
@@ -26,6 +27,7 @@ export class DebtsService {
     return prisma.debt.create({
       data: {
         visitorId: data.visitorId || null,
+        subscriptionId: data.subscriptionId || null,
         name: data.name,
         phone: data.phone,
         amount: roundedAmount,
@@ -87,13 +89,84 @@ export class DebtsService {
       throw new ApiError(400, "Debt is already collected");
     }
 
-    return prisma.debt.update({
-      where: { id },
-      data: {
-        status: "collected",
-        collectedAt: new Date(),
-      },
+    const paidNow = Number(debt.amount);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedDebt = await tx.debt.update({
+        where: { id },
+        data: {
+          status: "collected",
+          amount: 0,
+          collectedAt: new Date(),
+        },
+      });
+
+      // Sync Subscription.amountPaid if this is a subscription debt
+      if (debt.subscriptionId && paidNow > 0) {
+        const sub = await tx.subscription.findUnique({ where: { id: debt.subscriptionId } });
+        if (sub) {
+          const newAmountPaid = Math.round((Number(sub.amountPaid) + paidNow + Number.EPSILON) * 100) / 100;
+          await tx.subscription.update({
+            where: { id: debt.subscriptionId },
+            data: { amountPaid: newAmountPaid },
+          });
+        }
+      }
+
+      return updatedDebt;
     });
+
+    return result;
+  }
+
+  async collectPartialDebt(id: string, data: CollectPartialDebtInput) {
+    const debt = await prisma.debt.findUnique({
+      where: { id },
+    });
+    if (!debt) {
+      throw new ApiError(404, "Debt not found");
+    }
+    if (debt.status === "collected") {
+      throw new ApiError(400, "Debt is already collected");
+    }
+
+    const paidAmount = Math.round((data.amount + Number.EPSILON) * 100) / 100;
+    const currentAmount = Number(debt.amount);
+
+    if (paidAmount > currentAmount) {
+      throw new ApiError(400, "Payment amount exceeds remaining balance");
+    }
+
+    const newBalance = Math.round((currentAmount - paidAmount + Number.EPSILON) * 100) / 100;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // If fully paid, mark as collected
+      const updatedDebt = newBalance <= 0
+        ? await tx.debt.update({
+            where: { id },
+            data: { amount: 0, status: "collected", collectedAt: new Date() },
+          })
+        : await tx.debt.update({
+            where: { id },
+            data: { amount: newBalance },
+          });
+
+      // Sync Subscription.amountPaid if this is a subscription debt
+      if (debt.subscriptionId && paidAmount > 0) {
+        const sub = await tx.subscription.findUnique({ where: { id: debt.subscriptionId } });
+        if (sub) {
+          const newAmountPaid = Math.round((Number(sub.amountPaid) + paidAmount + Number.EPSILON) * 100) / 100;
+          await tx.subscription.update({
+            where: { id: debt.subscriptionId },
+            data: { amountPaid: newAmountPaid },
+          });
+        }
+      }
+
+      return updatedDebt;
+    });
+
+    return result;
   }
 }
 

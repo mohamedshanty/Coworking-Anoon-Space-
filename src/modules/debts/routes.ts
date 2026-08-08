@@ -21,11 +21,18 @@ router.post(
   (req, res, next) => debtsController.createDebt(req, res, next)
 );
 
-// POST collect unpaid debt
+// POST collect unpaid debt (full)
 router.post(
   "/:id/collect",
   authorize("المديونيات", "edit"),
   (req, res, next) => debtsController.collectDebt(req, res, next)
+);
+
+// POST collect partial payment on a debt
+router.post(
+  "/:id/collect-partial",
+  authorize("المديونيات", "edit"),
+  (req, res, next) => debtsController.collectPartialDebt(req, res, next)
 );
 
 // PATCH edit details
