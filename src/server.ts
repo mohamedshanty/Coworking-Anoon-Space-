@@ -1,12 +1,14 @@
 import http from "http";
 import dotenv from "dotenv";
 import { Server } from "socket.io";
+import cron from "node-cron";
 import app from "./app";
 
 // Validate required env vars and load CORS origins
 import { ALLOWED_ORIGINS } from "./lib/env";
 import { prisma } from "./lib/prisma";
 import { expireStaleSubscriptions } from "./lib/subscription";
+import { generateAndSendDailyReport } from "./lib/daily-report";
 
 const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
@@ -58,6 +60,20 @@ setInterval(() => {
     console.error("Failed to auto-expire subscriptions:", err);
   });
 }, 24 * 60 * 60 * 1000);
+
+// Daily financial report email cron job
+const dailyReportCron = process.env.DAILY_REPORT_CRON || "55 23 * * *";
+if (cron.validate(dailyReportCron)) {
+  cron.schedule(dailyReportCron, () => {
+    console.log(`[DailyReport] Cron triggered at ${new Date().toISOString()}`);
+    generateAndSendDailyReport().catch((err) => {
+      console.error("[DailyReport] Cron job failed:", err);
+    });
+  });
+  console.log(`[DailyReport] Cron scheduled: ${dailyReportCron}`);
+} else {
+  console.warn(`[DailyReport] Invalid cron expression: ${dailyReportCron}. Daily report email disabled.`);
+}
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
