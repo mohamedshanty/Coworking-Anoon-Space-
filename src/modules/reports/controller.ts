@@ -5,7 +5,8 @@ import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { getEffectiveStatus } from "../../lib/subscription";
 import { calculateSessionPricing } from "../sessions/pricing";
-import { palestineEndOfDay, formatPalestineDateTime, formatPalestineDate } from "../../lib/timezone";
+import { palestineStartOfDay, palestineEndOfDay, formatPalestineDateTime, formatPalestineDate } from "../../lib/timezone";
+import { calculateRevenue } from "../../lib/revenue";
 
 const exportQuerySchema = z.object({
   from: z.string().min(1, "'from' is required"),
@@ -18,108 +19,55 @@ export class ReportsController {
   async getPreview(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const parsed = exportQuerySchema.parse(req.query);
-      const fromDate = new Date(parsed.from);
+      const fromDate = palestineStartOfDay(new Date(parsed.from));
       const toDate = palestineEndOfDay(new Date(parsed.to));
 
       if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
         throw new ApiError(400, "Invalid date format for 'from' or 'to'");
       }
 
-      const [sessions, sales, expenses, bookings, courses, activeSubscriptions, settings, collectedDebts] = await Promise.all([
-        prisma.session.findMany({
-          where: { checkIn: { gte: fromDate, lte: toDate }, checkOut: { not: null } },
-          select: { sessionType: true, amount: true, paymentStatus: true, discountAmount: true, finalPrice: true, visitor: { select: { type: true } }, snackOrders: { select: { total: true } } },
-        }),
-        prisma.sale.findMany({
-          where: { date: { gte: fromDate, lte: toDate } },
-          select: { total: true, isHotDrink: true },
-        }),
-        prisma.expense.findMany({
-          where: { date: { gte: fromDate, lte: toDate } },
-          select: { amount: true },
-        }),
-        prisma.booking.findMany({
-          where: { startTime: { gte: fromDate, lte: toDate }, status: "confirmed" },
-          select: { price: true },
-        }),
-        prisma.course.findMany({
-          where: { startDate: { lte: toDate }, endDate: { gte: fromDate } },
-          select: { id: true },
-        }),
+      const [rev, activeSubscriptions, sessionData] = await Promise.all([
+        calculateRevenue(fromDate, toDate),
         prisma.subscription.findMany({
           where: { status: "active", endDate: { gte: new Date() } },
           select: { visitorId: true, amountPaid: true },
         }),
-        prisma.settings.findFirst(),
-        prisma.debt.findMany({
-          where: {
-            status: "collected",
-            collectedAt: { gte: fromDate, lte: toDate },
-          },
-          select: { amount: true },
+        prisma.session.findMany({
+          where: { checkIn: { gte: fromDate, lte: toDate }, checkOut: { not: null } },
+          select: { sessionType: true, visitor: { select: { type: true } } },
         }),
       ]);
 
       const r = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
       // Visits
-      const visitCount = sessions.length;
-      const hoursRevenue = r(
-        sessions.filter((s) => s.paymentStatus === "paid").reduce((sum, s) => {
-          const snacksTotal = s.snackOrders.reduce((snackSum, o) => snackSum + Number(o.total), 0);
-          return sum + (Number(s.amount) - snacksTotal);
-        }, 0)
-      );
+      const visitCount = sessionData.length;
 
       // Subscribers
       const activeCount = activeSubscriptions.length;
       const totalPaid = r(activeSubscriptions.reduce((sum, s) => sum + Number(s.amountPaid), 0));
 
-      // Sales (snacks vs hot drinks)
-      const snacksRevenue = r(sales.filter((s) => !s.isHotDrink).reduce((sum, s) => sum + Number(s.total), 0));
-      const hotDrinksRevenue = r(sales.filter((s) => s.isHotDrink).reduce((sum, s) => sum + Number(s.total), 0));
-
-      // Expenses
-      const expensesTotal = r(expenses.reduce((sum, e) => sum + Number(e.amount), 0));
-      const monthlyHotDrinksCost = settings ? Number(settings.hotDrinksMonthlyCost) : 0;
-      const daysInRange = Math.max(1, Math.ceil((toDate.getTime() - fromDate.getTime()) / 86400000));
-      const hotDrinksCost = r(monthlyHotDrinksCost * (daysInRange / 30));
-
-      // Rooms & Courses
-      const roomsRevenue = r(bookings.reduce((sum, b) => sum + Number(b.price), 0));
-      let coursesRevenue = 0;
-      if (courses.length > 0) {
-        const trainees = await prisma.trainee.findMany({
-          where: { courseId: { in: courses.map((c) => c.id) } },
-          select: { amountPaid: true },
-        });
-        coursesRevenue = r(trainees.reduce((sum, t) => sum + Number(t.amountPaid), 0));
-      }
-
-      // Collected debt revenue (cash-basis: counts when debt is collected)
-      const debtRevenue = r(
-        collectedDebts.reduce((sum, d) => sum + Number(d.amount), 0)
-      );
-
-      // Financial summary
-      const totalRevenue = r(hoursRevenue + snacksRevenue + hotDrinksRevenue + coursesRevenue + roomsRevenue + debtRevenue);
-      const netProfit = r(totalRevenue - expensesTotal - hotDrinksCost);
-
-      // Total discounts given (already factored into hoursRevenue via reduced `amount`)
-      const totalDiscounts = r(
-        sessions.filter((s) => s.paymentStatus === "paid").reduce((sum, s) => sum + Number(s.discountAmount), 0)
-      );
-
       res.status(200).json({
         success: true,
         data: {
-          visits: { count: visitCount, hoursRevenue },
+          visits: { count: visitCount, hoursRevenue: rev.hoursRevenue },
           subscribers: { activeCount, totalPaid },
-          sales: { snacksRevenue, hotDrinksRevenue },
-          expenses: { total: expensesTotal, hotDrinksCost },
-          roomsCourses: { roomsRevenue, coursesRevenue },
-          debtRevenue,
-          financialSummary: { hoursRevenue, snacksRevenue, hotDrinksRevenue, coursesRevenue, roomsRevenue, debtRevenue, expenses: expensesTotal, hotDrinksCost, netProfit, totalDiscounts },
+          sales: { snacksRevenue: rev.snacksRevenue, hotDrinksRevenue: rev.hotDrinksRevenue },
+          expenses: { total: rev.expensesTotal, hotDrinksCost: rev.hotDrinksCost },
+          roomsCourses: { roomsRevenue: rev.bookingRevenue, coursesRevenue: rev.coursesRevenue },
+          debtRevenue: rev.debtRevenue,
+          financialSummary: {
+            hoursRevenue: rev.hoursRevenue,
+            snacksRevenue: rev.snacksRevenue,
+            hotDrinksRevenue: rev.hotDrinksRevenue,
+            coursesRevenue: rev.coursesRevenue,
+            roomsRevenue: rev.bookingRevenue,
+            debtRevenue: rev.debtRevenue,
+            expenses: rev.expensesTotal,
+            hotDrinksCost: rev.hotDrinksCost,
+            netProfit: rev.netProfit,
+            totalDiscounts: rev.totalDiscounts,
+          },
         },
       });
     } catch (error) {
@@ -130,7 +78,7 @@ export class ReportsController {
   async exportReport(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const parsed = exportQuerySchema.parse(req.query);
-      const fromDate = new Date(parsed.from);
+      const fromDate = palestineStartOfDay(new Date(parsed.from));
       const toDate = palestineEndOfDay(new Date(parsed.to));
       const exportType = parsed.type ?? "reports";
 
@@ -480,74 +428,19 @@ export class ReportsController {
         { header: "المبلغ", key: "amount", width: 16 },
       ];
 
-      // 1. Session revenue (cash-basis: only paid sessions count)
-      // Derive hourly revenue from stored data: hoursRevenue = amount - snacksTotal
-      const sessionRev = sessions
-        .filter((s) => s.checkOut !== null && s.paymentStatus === "paid")
-        .reduce((sum, s) => {
-          const snacksTotal = (s.snackOrders ?? []).reduce((snackSum: number, o: any) => snackSum + Number(o.total), 0);
-          return sum + (Number(s.amount) - snacksTotal);
-        }, 0);
+      const rev = await calculateRevenue(fromDate, toDate);
 
-      // 2. Sale revenue
-      const saleRev = sales.reduce((sum, s) => sum + Number(s.total), 0);
-
-      // 3. Course revenue
-      let courseRev = 0;
-      if (courses.length > 0) {
-        const courseIds = courses.map((c) => c.id);
-        const trainees = await prisma.trainee.findMany({
-          where: { courseId: { in: courseIds } },
-          select: { amountPaid: true },
-        });
-        courseRev = trainees.reduce((sum, t) => sum + Number(t.amountPaid), 0);
-      }
-
-      // 4. Booking revenue
-      const bookingRev = bookings
-        .filter((b) => b.status === "confirmed")
-        .reduce((sum, b) => sum + Number(b.price), 0);
-
-      // 5. Collected debt revenue (cash-basis)
-      const collectedDebts = await prisma.debt.findMany({
-        where: {
-          status: "collected",
-          collectedAt: { gte: fromDate, lte: toDate },
-        },
-        select: { amount: true },
-      });
-      const debtRev = collectedDebts.reduce((sum, d) => sum + Number(d.amount), 0);
-
-      // 6. Total discounts given
-      const totalDiscounts = sessions
-        .filter((s) => s.checkOut !== null && s.paymentStatus === "paid")
-        .reduce((sum, s) => sum + Number(s.discountAmount), 0);
-
-      // 7. Expenses
-      const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
-
-      // 8. hotDrinksMonthlyCost prorated
-      const settings = await prisma.settings.findFirst();
-      const monthlyHotDrinksCost = settings ? Number(settings.hotDrinksMonthlyCost) : 0;
-      const daysInRange = Math.max(1, Math.ceil((toDate.getTime() - fromDate.getTime()) / 86400000));
-      const hotDrinksProrated = Math.round((monthlyHotDrinksCost * (daysInRange / 30) + Number.EPSILON) * 100) / 100;
-
-      const r = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
-
-      const totalRevenue = r(sessionRev + saleRev + courseRev + bookingRev + debtRev);
-      const totalDeductions = r(totalExpenses + hotDrinksProrated);
-      const netProfit = r(totalRevenue - totalDeductions);
-
-      summarySheet.addRow({ item: "إيراد الجلسات", amount: r(sessionRev) });
-      summarySheet.addRow({ item: "إيراد المبيعات", amount: r(saleRev) });
-      summarySheet.addRow({ item: "إيراد الدورات", amount: r(courseRev) });
-      summarySheet.addRow({ item: "إيراد الحجوزات", amount: r(bookingRev) });
-      summarySheet.addRow({ item: "إيراد الديون المحصلة", amount: r(debtRev) });
-      summarySheet.addRow({ item: "الخصومات", amount: r(totalDiscounts) });
-      summarySheet.addRow({ item: "الإيرادات الإجمالية", amount: totalRevenue });
-      summarySheet.addRow({ item: "المصروفات", amount: r(totalExpenses) });
-      summarySheet.addRow({ item: "تكلفة المشروبات الساخنة (نسبة)", amount: hotDrinksProrated });
-      summarySheet.addRow({ item: "صافي الربح", amount: netProfit });
+      summarySheet.addRow({ item: "إيراد الجلسات", amount: rev.hoursRevenue });
+      summarySheet.addRow({ item: "إيراد السناكس", amount: rev.snacksRevenue });
+      summarySheet.addRow({ item: "إيراد المشروبات الساخنة", amount: rev.hotDrinksRevenue });
+      summarySheet.addRow({ item: "إيراد الدورات", amount: rev.coursesRevenue });
+      summarySheet.addRow({ item: "إيراد الحجوزات", amount: rev.bookingRevenue });
+      summarySheet.addRow({ item: "إيراد الديون المحصلة", amount: rev.debtRevenue });
+      summarySheet.addRow({ item: "الخصومات", amount: rev.totalDiscounts });
+      summarySheet.addRow({ item: "الإيرادات الإجمالية", amount: rev.totalRevenue });
+      summarySheet.addRow({ item: "المصروفات", amount: rev.expensesTotal });
+      summarySheet.addRow({ item: "تكلفة المشروبات الساخنة (نسبة)", amount: rev.hotDrinksCost });
+      summarySheet.addRow({ item: "صافي الربح", amount: rev.netProfit });
 
       // Generate buffer
       const buffer = await workbook.xlsx.writeBuffer();

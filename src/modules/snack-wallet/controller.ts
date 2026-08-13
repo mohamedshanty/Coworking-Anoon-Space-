@@ -96,6 +96,15 @@ export class SnackWalletController {
       next(error);
     }
   }
+
+  async getBalanceSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = await snackWalletService.getBalanceSummary();
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const snackWalletController = new SnackWalletController();

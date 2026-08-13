@@ -26,6 +26,7 @@ import hotDrinkDefsRouter from "./modules/hot-drink-defs/routes";
 import traineesRouter from "./modules/trainees/routes";
 import visitorsRouter from "./modules/visitors/routes";
 import snackWalletRouter from "./modules/snack-wallet/routes";
+import dailyNotesRouter from "./modules/daily-notes/routes";
 import { authenticate } from "./middleware/authenticate";
 import { authorize } from "./middleware/authorize";
 
@@ -112,6 +113,9 @@ router.use("/visitors", visitorsRouter);
 
 // Register snack wallet routes
 router.use("/snack-wallet", snackWalletRouter);
+
+// Register daily notes routes
+router.use("/daily-notes", dailyNotesRouter);
 
 // Test routes for middleware verification
 router.get("/test-protected-view", authenticate, authorize("الرئيسية", "view"), (req, res) => {

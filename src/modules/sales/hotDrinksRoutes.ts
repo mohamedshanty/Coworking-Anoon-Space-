@@ -7,6 +7,13 @@ const router = Router();
 
 router.use(authenticate);
 
+// GET revenue summary (today + month totals for hot drinks)
+router.get(
+  "/revenue-summary",
+  authorize("المشروبات", "view"),
+  (req, res, next) => salesController.getRevenueSummary(req, res, next)
+);
+
 // GET hot drinks sales logs
 router.get(
   "/",

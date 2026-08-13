@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
+import { palestineStartOfDay, palestineEndOfDay } from "../../lib/timezone";
 import {
   CreateSnackSaleInput,
   CreateOtherSaleInput,
@@ -343,6 +344,45 @@ export class SalesService {
 
     // Hot drinks have no inventory to restore
     return prisma.sale.delete({ where: { id } });
+  }
+
+  async getRevenueSummary(isHotDrink?: boolean) {
+    const now = new Date();
+    const todayStart = palestineStartOfDay(now);
+    const todayEnd = palestineEndOfDay(now);
+
+    // Palestine start of current month
+    const monthStartParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Hebron",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(now);
+    const year = parseInt(monthStartParts.find((p) => p.type === "year")!.value);
+    const month = parseInt(monthStartParts.find((p) => p.type === "month")!.value);
+    const monthStart = palestineStartOfDay(new Date(Date.UTC(year, month - 1, 1)));
+
+    const where: any = {};
+    if (isHotDrink !== undefined) {
+      where.isHotDrink = isHotDrink;
+    }
+
+    const [todaySales, monthSales] = await Promise.all([
+      prisma.sale.findMany({
+        where: { ...where, date: { gte: todayStart, lte: todayEnd } },
+        select: { total: true },
+      }),
+      prisma.sale.findMany({
+        where: { ...where, date: { gte: monthStart, lte: now } },
+        select: { total: true },
+      }),
+    ]);
+
+    const r = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
+    const todayRevenue = r(todaySales.reduce((sum, s) => sum + Number(s.total), 0));
+    const monthRevenue = r(monthSales.reduce((sum, s) => sum + Number(s.total), 0));
+
+    return { todayRevenue, monthRevenue };
   }
 }
 

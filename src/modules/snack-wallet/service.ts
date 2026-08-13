@@ -229,6 +229,17 @@ export class SnackWalletService {
 
     return { wallet, sessionTransaction: txn };
   }
+
+  async getBalanceSummary() {
+    const result = await prisma.snackWallet.aggregate({
+      _sum: { balance: true },
+      _count: true,
+    });
+    return {
+      totalBalance: Number(result._sum.balance ?? 0),
+      walletCount: result._count,
+    };
+  }
 }
 
 export const snackWalletService = new SnackWalletService();

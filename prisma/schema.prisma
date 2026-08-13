@@ -369,3 +369,11 @@ enum WalletTxnType {
   topup
   deduction
 }
+
+model DailyNote {
+  id          String   @id @default(uuid())
+  date        DateTime
+  content     String
+  authorName  String
+  createdAt   DateTime @default(now())
+}

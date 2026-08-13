@@ -3,8 +3,9 @@ import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { calculateSessionPricing } from "./pricing";
 import { CheckInInput, UpdateSessionInput, AddBatchOrdersInput } from "./schema";
-import { isSamePalestineDay, palestineStartOfDay, palestineEndOfDay } from "../../lib/timezone";
+import { isSamePalestineDay, getPalestineDateParts, palestineStartOfDay, palestineEndOfDay } from "../../lib/timezone";
 import { snackWalletService } from "../snack-wallet/service";
+
 
 async function getHotDrinkPrice(drinkId: string): Promise<{ price: number; name: string } | null> {
   const hotDrink = await prisma.hotDrink.findFirst({
@@ -1382,46 +1383,80 @@ export class SessionsService {
       }
     }
 
-    const settings = await prisma.settings.findFirst();
-    const activeSubscriptions = await prisma.subscription.findMany({
-      where: { status: "active", endDate: { gte: new Date() } },
+    // Fetch subscriptions that overlap with the date range (for subscriber hours calculation)
+    const subscriptions = await prisma.subscription.findMany({
+      where: {
+        startDate: { lte: toDate },
+        endDate: { gte: fromDate },
+      },
+      select: {
+        visitorId: true,
+        startDate: true,
+        endDate: true,
+        amountPaid: true,
+      },
     });
+
+    // Count same-day sessions per subscriber per day (to divide daily rate evenly)
+    const sameDaySessionCount = new Map<string, number>();
+    for (const s of sessions) {
+      const effectiveType = s.sessionType ?? s.visitor.type;
+      if (effectiveType === "subscriber" || effectiveType === "trainee") {
+        const { year, month, day } = getPalestineDateParts(s.checkIn);
+        const dayKey = `${s.visitorId}_${year}_${month}_${day}`;
+        sameDaySessionCount.set(dayKey, (sameDaySessionCount.get(dayKey) ?? 0) + 1);
+      }
+    }
+
+    // Helper to find the subscription covering a session's checkIn date
+    const findSubscription = (visitorId: string, checkIn: Date) =>
+      subscriptions.find(
+        (sub) =>
+          sub.visitorId === visitorId &&
+          sub.startDate <= checkIn &&
+          sub.endDate >= checkIn,
+      );
 
     const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
     const data = sessions.map((s) => {
-      const hasActiveSub = activeSubscriptions.some(
-        (sub) => sub.visitorId === s.visitorId
-      );
-
       const effectiveType = s.sessionType ?? s.visitor.type;
 
       const hours = s.checkOut
         ? Math.round(((s.checkOut.getTime() - s.checkIn.getTime()) / 3600000) * 100) / 100
         : 0;
 
+      // Determine isSub from the session's own type fields, NOT from live subscription status.
+      // This preserves subscriber classification for historical sessions even after the subscription expires.
       const isSub =
-        (effectiveType === "subscriber" && hasActiveSub) ||
-        effectiveType === "trainee";
+        effectiveType === "subscriber" || effectiveType === "trainee";
 
-      const sessionHourlyRate = s.hourlyRate != null
-        ? Number(s.hourlyRate)
-        : settings
-          ? Number(settings.hourlyRate)
-          : 0;
+      // Compute snack totals directly from the session's SnackOrder records (same data the table shows).
+      const snacksTotal = s.snackOrders.reduce((sum, o) => sum + Number(o.total), 0);
 
-      const pricing = calculateSessionPricing(
-        s.checkIn,
-        effectiveType,
-        hasActiveSub,
-        s.snackOrders,
-        {
-          hourlyRate: sessionHourlyRate,
-          fullDayPrice: settings ? Number(settings.fullDayPrice) : 0,
-          fullDayThresholdHours: settings?.fullDayThresholdHours ?? 8,
-        },
-        s.checkOut
-      );
+      // Use the STORED session.amount (set at checkout time) minus snacks to get the hours portion.
+      // This avoids recomputing pricing from scratch, ensuring the table always agrees with the summary.
+      const hoursAmount = s.hourlyPriceOverride != null
+        ? r2(Number(s.hourlyPriceOverride))
+        : r2(Number(s.amount) - snacksTotal);
+
+      // Per-session subscriber hours: divide the subscription's daily rate by the number of
+      // sessions that subscriber has on the same calendar day. Set to 0 if no subscription
+      // covers this session's checkIn date.
+      let subscriberHoursAmount = 0;
+      if (isSub) {
+        const sub = findSubscription(s.visitorId, s.checkIn);
+        if (sub) {
+          const daysInSub = Math.max(1, Math.ceil(
+            (sub.endDate.getTime() - sub.startDate.getTime()) / 86_400_000,
+          ));
+          const dailyRate = Number(sub.amountPaid) / daysInSub;
+          const { year, month, day } = getPalestineDateParts(s.checkIn);
+          const dayKey = `${s.visitorId}_${year}_${month}_${day}`;
+          const sessionsOnDay = sameDaySessionCount.get(dayKey) ?? 1;
+          subscriberHoursAmount = r2(dailyRate / sessionsOnDay);
+        }
+      }
 
       return {
         id: s.id,
@@ -1462,8 +1497,9 @@ export class SessionsService {
         })),
         hours,
         isSub,
-        ordersAmount: r2(pricing.ordersAmount),
-        hoursAmount: s.hourlyPriceOverride != null ? r2(Number(s.hourlyPriceOverride)) : r2(pricing.timeAmount),
+        ordersAmount: r2(snacksTotal),
+        hoursAmount,
+        subscriberHoursAmount,
         totalAmount: Number(s.amount),
         walletPayment: walletTxnBySession.get(s.id) ?? null,
       };
@@ -1480,81 +1516,136 @@ export class SessionsService {
       throw new ApiError(400, "Invalid date format for 'from' or 'to'");
     }
 
-    const [sessions, sales, expenses, activeSubscriptions] = await Promise.all([
+    // Fetch all completed sessions in the date range with their snack orders and visitor info.
+    // This is the SAME data source the table (getHistory) uses, ensuring summary matches the table.
+    const [sessions, expenses, subscriptions] = await Promise.all([
       prisma.session.findMany({
         where: {
           checkIn: { gte: fromDate, lte: toDate },
           checkOut: { not: null },
         },
-        select: { sessionType: true, visitorId: true, paymentStatus: true, amount: true, discountAmount: true, finalPrice: true, visitor: { select: { type: true } }, snackOrders: { select: { total: true } } },
-      }),
-      prisma.sale.findMany({
-        where: { date: { gte: fromDate, lte: toDate } },
-        select: { total: true },
+        include: { snackOrders: true, visitor: true },
       }),
       prisma.expense.findMany({
         where: { date: { gte: fromDate, lte: toDate } },
         select: { amount: true },
       }),
       prisma.subscription.findMany({
-        where: { status: "active", endDate: { gte: new Date() } },
-        select: { visitorId: true },
+        where: {
+          startDate: { lte: toDate },
+          endDate: { gte: fromDate },
+        },
+        select: {
+          visitorId: true,
+          startDate: true,
+          endDate: true,
+          amountPaid: true,
+        },
       }),
     ]);
 
-    const r = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
+    const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
-    // Determine which sessions belong to active subscribers (time covered by subscription)
-    const isSubSession = (s: { sessionType: string | null; visitorId: string; visitor: { type: string } }) => {
-      const effectiveType = s.sessionType ?? s.visitor.type;
-      return effectiveType === "subscriber" && activeSubscriptions.some((sub) => sub.visitorId === s.visitorId);
-    };
-
-    const visitCount = sessions.length;
-
-    // Cash-basis: only count sessions where payment was actually collected
-    // Exclude subscriber sessions — their time is covered by subscription, not paid per-visit
-    // Derive hourly revenue from stored data: hoursRevenue = amount - snacksTotal
-    const hoursRevenue = r(
+    // hoursRevenue: sum of each session's STORED amount minus its SnackOrder totals,
+    // for paid sessions only. Debt/partial sessions stay visible in the table but must
+    // NOT count toward hoursRevenue in the summary.
+    const hoursRevenue = r2(
       sessions
-        .filter((s) => s.paymentStatus === "paid" && !isSubSession(s))
+        .filter((s) => s.paymentStatus === "paid")
         .reduce((sum, s) => {
           const snacksTotal = s.snackOrders.reduce((snackSum, o) => snackSum + Number(o.total), 0);
           return sum + (Number(s.amount) - snacksTotal);
-        }, 0)
+        }, 0),
     );
 
-    const snacksRevenue = r(
-      sales.reduce((sum, s) => sum + Number(s.total), 0)
+    // snacksRevenue: sum of ALL SnackOrder totals (hot drinks + regular snacks) for all sessions
+    // in range. Uses the SAME SnackOrder records shown in the table, matching the "orders" column.
+    const snacksRevenue = r2(
+      sessions.reduce((sum, s) => {
+        const sessionSnacks = s.snackOrders.reduce(
+          (snackSum, o) => snackSum + Number(o.total), 0,
+        );
+        return sum + sessionSnacks;
+      }, 0),
     );
 
-    const expensesTotal = r(
-      expenses.reduce((sum, e) => sum + Number(e.amount), 0)
+    // Subscriber hours revenue: per-session daily rate from the subscription, divided by the
+    // number of sessions that subscriber has on the same calendar day.
+    const sameDaySessionCount = new Map<string, number>();
+    for (const s of sessions) {
+      const effectiveType = s.sessionType ?? s.visitor.type;
+      if (effectiveType === "subscriber" || effectiveType === "trainee") {
+        const { year, month, day } = getPalestineDateParts(s.checkIn);
+        const dayKey = `${s.visitorId}_${year}_${month}_${day}`;
+        sameDaySessionCount.set(dayKey, (sameDaySessionCount.get(dayKey) ?? 0) + 1);
+      }
+    }
+
+    const findSubscription = (visitorId: string, checkIn: Date) =>
+      subscriptions.find(
+        (sub) =>
+          sub.visitorId === visitorId &&
+          sub.startDate <= checkIn &&
+          sub.endDate >= checkIn,
+      );
+
+    const subscriberHoursRevenue = r2(
+      sessions.reduce((sum, s) => {
+        const effectiveType = s.sessionType ?? s.visitor.type;
+        if (effectiveType !== "subscriber" && effectiveType !== "trainee") return sum;
+        const sub = findSubscription(s.visitorId, s.checkIn);
+        if (!sub) return sum;
+        const daysInSub = Math.max(1, Math.ceil(
+          (sub.endDate.getTime() - sub.startDate.getTime()) / 86_400_000,
+        ));
+        const dailyRate = Number(sub.amountPaid) / daysInSub;
+        const { year, month, day } = getPalestineDateParts(s.checkIn);
+        const dayKey = `${s.visitorId}_${year}_${month}_${day}`;
+        const sessionsOnDay = sameDaySessionCount.get(dayKey) ?? 1;
+        return sum + r2(dailyRate / sessionsOnDay);
+      }, 0),
     );
 
-    const netProfit = r(hoursRevenue + snacksRevenue - expensesTotal);
+    // Expenses (independent of sessions — queried directly from the Expense model)
+    const expensesTotal = r2(
+      expenses.reduce((sum, e) => sum + Number(e.amount), 0),
+    );
 
-    const totalDiscounts = r(
+    // Total discounts for paid sessions
+    const totalDiscounts = r2(
       sessions
-        .filter((s) => s.paymentStatus === "paid" && !isSubSession(s))
-        .reduce((sum, s) => sum + Number(s.discountAmount), 0)
+        .filter((s) => s.paymentStatus === "paid")
+        .reduce((sum, s) => sum + Number(s.discountAmount), 0),
     );
 
-    // Exclude trainee AND subscriber sessions from avg revenue — they don't pay hourly,
-    // so including them skews the metric downward.
+    // Net profit scoped to this page's data
+    const netProfit = r2(hoursRevenue + snacksRevenue - expensesTotal);
+
+    const visitCount = sessions.length;
+
+    // Subscriber count: use effectiveType (sessionType or visitor.type) directly.
+    // This reflects subscriber status AT THE TIME OF THE SESSION, not current subscription status.
+    const subscriberCount = sessions.filter((s) => {
+      const effectiveType = s.sessionType ?? s.visitor.type;
+      return effectiveType === "subscriber";
+    }).length;
+
+    const subscriberRatio = visitCount > 0 ? r2((subscriberCount / visitCount) * 100) : 0;
+
+    // Average revenue per paid non-subscriber/non-trainee visit
     const paidNonSubVisits = sessions.filter(
-      (s) => s.paymentStatus === "paid" && !isSubSession(s) && (s.sessionType ?? s.visitor.type) !== "trainee"
+      (s) =>
+        s.paymentStatus === "paid" &&
+        (s.sessionType ?? s.visitor.type) !== "subscriber" &&
+        (s.sessionType ?? s.visitor.type) !== "trainee",
     ).length;
-    const avgRevenuePerVisit = paidNonSubVisits > 0 ? r(hoursRevenue / paidNonSubVisits) : 0;
-
-    const subscriberCount = sessions.filter((s) => isSubSession(s)).length;
-
-    const subscriberRatio = visitCount > 0 ? r((subscriberCount / visitCount) * 100) : 0;
+    const avgRevenuePerVisit = paidNonSubVisits > 0 ? r2(hoursRevenue / paidNonSubVisits) : 0;
 
     return {
       visitCount,
       hoursRevenue,
       snacksRevenue,
+      subscriberHoursRevenue,
       expenses: expensesTotal,
       netProfit,
       totalDiscounts,

@@ -7,6 +7,13 @@ const router = Router();
 
 router.use(authenticate);
 
+// GET balance summary (total across all wallets)
+router.get(
+  "/balance-summary",
+  authorize("محفظة السناكس", "view"),
+  (req, res, next) => snackWalletController.getBalanceSummary(req, res, next)
+);
+
 // GET all wallets (paginated)
 router.get(
   "/",

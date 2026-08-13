@@ -143,6 +143,20 @@ export class SalesController {
       next(error);
     }
   }
+
+  async getRevenueSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const isHotDrinkParam = req.query.isHotDrink as string | undefined;
+      const isHotDrink = isHotDrinkParam === "true" ? true : isHotDrinkParam === "false" ? false : undefined;
+      const data = await salesService.getRevenueSummary(isHotDrink);
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const salesController = new SalesController();

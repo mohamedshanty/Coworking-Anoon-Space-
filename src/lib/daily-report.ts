@@ -4,6 +4,7 @@ import { calculateSessionPricing } from "../modules/sessions/pricing";
 import { palestineStartOfDay, palestineEndOfDay, formatPalestineDate, formatPalestineDateTime } from "./timezone";
 import { sendMail } from "./email";
 import ExcelJS from "exceljs";
+import { calculateRevenue } from "./revenue";
 
 const r = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
@@ -226,57 +227,48 @@ export async function generateReportBuffer(fromDate: Date, toDate: Date): Promis
     });
   }
 
-  // --- Sheet 6: Financial Summary ---
+  // --- Sheet 6: Daily Notes (only if notes exist) ---
+  const dailyNotes = await prisma.dailyNote.findMany({
+    where: { date: { gte: fromDate, lte: toDate } },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (dailyNotes.length > 0) {
+    const notesSheet = workbook.addWorksheet("ملاحظات اليوم");
+    notesSheet.columns = [
+      { header: "المحتوى", key: "content", width: 50 },
+      { header: "الكاتب", key: "authorName", width: 20 },
+      { header: "الوقت", key: "createdAt", width: 20 },
+    ];
+    for (const note of dailyNotes) {
+      notesSheet.addRow({
+        content: note.content,
+        authorName: note.authorName,
+        createdAt: formatPalestineDateTime(note.createdAt),
+      });
+    }
+  }
+
+  // --- Sheet 7: Financial Summary ---
   const summarySheet = workbook.addWorksheet("الملخص المالي");
   summarySheet.columns = [
     { header: "البند", key: "item", width: 32 },
     { header: "المبلغ", key: "amount", width: 16 },
   ];
 
-  const sessionRev = r(
-    sessions
-      .filter((s) => s.checkOut !== null && s.paymentStatus === "paid")
-      .reduce((sum, s) => {
-        const snacksTotal = (s.snackOrders ?? []).reduce((snackSum: number, o: any) => snackSum + Number(o.total), 0);
-        return sum + (Number(s.amount) - snacksTotal);
-      }, 0),
-  );
-  const saleRev = r(sales.reduce((sum, s) => sum + Number(s.total), 0));
-  let courseRev = 0;
-  if (courses.length > 0) {
-    const trainees = await prisma.trainee.findMany({
-      where: { courseId: { in: courses.map((c) => c.id) } },
-      select: { amountPaid: true },
-    });
-    courseRev = r(trainees.reduce((sum, t) => sum + Number(t.amountPaid), 0));
-  }
-  const bookingRev = r(
-    bookings.filter((b) => b.status === "confirmed").reduce((sum, b) => sum + Number(b.price), 0),
-  );
-  const debtRev = r(collectedDebts.reduce((sum, d) => sum + Number(d.amount), 0));
-  const totalDiscounts = r(
-    sessions
-      .filter((s) => s.checkOut !== null && s.paymentStatus === "paid")
-      .reduce((sum, s) => sum + Number(s.discountAmount), 0),
-  );
-  const totalExpenses = r(expenses.reduce((sum, e) => sum + Number(e.amount), 0));
-  const monthlyHotDrinksCost = pricingSettings ? Number(pricingSettings.hotDrinksMonthlyCost) : 0;
-  const daysInRange = Math.max(1, Math.ceil((toDate.getTime() - fromDate.getTime()) / 86400000));
-  const hotDrinksProrated = r(monthlyHotDrinksCost * (daysInRange / 30));
-  const totalRevenue = r(sessionRev + saleRev + courseRev + bookingRev + debtRev);
-  const totalDeductions = r(totalExpenses + hotDrinksProrated);
-  const netProfit = r(totalRevenue - totalDeductions);
+  const rev = await calculateRevenue(fromDate, toDate);
 
-  summarySheet.addRow({ item: "إيراد الجلسات", amount: sessionRev });
-  summarySheet.addRow({ item: "إيراد المبيعات", amount: saleRev });
-  summarySheet.addRow({ item: "إيراد الدورات", amount: courseRev });
-  summarySheet.addRow({ item: "إيراد الحجوزات", amount: bookingRev });
-  summarySheet.addRow({ item: "إيراد الديون المحصلة", amount: debtRev });
-  summarySheet.addRow({ item: "الخصومات", amount: totalDiscounts });
-  summarySheet.addRow({ item: "الإيرادات الإجمالية", amount: totalRevenue });
-  summarySheet.addRow({ item: "المصروفات", amount: totalExpenses });
-  summarySheet.addRow({ item: "تكلفة المشروبات الساخنة (نسبة)", amount: hotDrinksProrated });
-  summarySheet.addRow({ item: "صافي الربح", amount: netProfit });
+  summarySheet.addRow({ item: "إيراد الجلسات", amount: rev.hoursRevenue });
+  summarySheet.addRow({ item: "إيراد السناكس", amount: rev.snacksRevenue });
+  summarySheet.addRow({ item: "إيراد المشروبات الساخنة", amount: rev.hotDrinksRevenue });
+  summarySheet.addRow({ item: "إيراد الدورات", amount: rev.coursesRevenue });
+  summarySheet.addRow({ item: "إيراد الحجوزات", amount: rev.bookingRevenue });
+  summarySheet.addRow({ item: "إيراد الديون المحصلة", amount: rev.debtRevenue });
+  summarySheet.addRow({ item: "الخصومات", amount: rev.totalDiscounts });
+  summarySheet.addRow({ item: "الإيرادات الإجمالية", amount: rev.totalRevenue });
+  summarySheet.addRow({ item: "المصروفات", amount: rev.expensesTotal });
+  summarySheet.addRow({ item: "تكلفة المشروبات الساخنة (نسبة)", amount: rev.hotDrinksCost });
+  summarySheet.addRow({ item: "صافي الربح", amount: rev.netProfit });
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
@@ -286,7 +278,8 @@ export async function generateReportBuffer(fromDate: Date, toDate: Date): Promis
 export function generateReportHtml(fromDate: Date, toDate: Date, summary: {
   totalRevenue: number;
   sessionRev: number;
-  saleRev: number;
+  snacksRevenue: number;
+  hotDrinksRevenue: number;
   courseRev: number;
   bookingRev: number;
   debtRev: number;
@@ -295,7 +288,7 @@ export function generateReportHtml(fromDate: Date, toDate: Date, summary: {
   netProfit: number;
   totalVisits: number;
   activeSubscribers: number;
-}): string {
+}, notes?: Array<{ content: string; authorName: string; createdAt: Date }>): string {
   const dateStr = formatPalestineDate(fromDate);
   const fmt = (v: number) => v.toLocaleString("ar-EG", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
@@ -324,18 +317,22 @@ export function generateReportHtml(fromDate: Date, toDate: Date, summary: {
         <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${fmt(summary.sessionRev)}</td>
       </tr>
       <tr>
-        <td style="padding: 10px; font-weight: bold; border-bottom: 1px solid #ddd;">إيراد المبيعات</td>
-        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${fmt(summary.saleRev)}</td>
+        <td style="padding: 10px; font-weight: bold; border-bottom: 1px solid #ddd;">إيراد السناكس</td>
+        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${fmt(summary.snacksRevenue)}</td>
       </tr>
       <tr style="background: #f0f0f0;">
+        <td style="padding: 10px; font-weight: bold; border-bottom: 1px solid #ddd;">إيراد المشروبات الساخنة</td>
+        <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${fmt(summary.hotDrinksRevenue)}</td>
+      </tr>
+      <tr>
         <td style="padding: 10px; font-weight: bold; border-bottom: 1px solid #ddd;">إيراد الدورات</td>
         <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${fmt(summary.courseRev)}</td>
       </tr>
-      <tr>
+      <tr style="background: #f0f0f0;">
         <td style="padding: 10px; font-weight: bold; border-bottom: 1px solid #ddd;">إيراد الحجوزات</td>
         <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${fmt(summary.bookingRev)}</td>
       </tr>
-      <tr style="background: #f0f0f0;">
+      <tr>
         <td style="padding: 10px; font-weight: bold; border-bottom: 1px solid #ddd;">إيراد الديون المحصلة</td>
         <td style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">${fmt(summary.debtRev)}</td>
       </tr>
@@ -353,6 +350,15 @@ export function generateReportHtml(fromDate: Date, toDate: Date, summary: {
       </tr>
     </table>
   </div>
+  ${notes && notes.length > 0 ? `
+  <div style="padding: 20px; border-top: 2px solid #1a1a2e;">
+    <h2 style="margin: 0 0 12px; font-size: 16px; color: #1a1a2e;">ملاحظات اليوم</h2>
+    ${notes.map((n) => `
+    <div style="background: #f8f9fa; border-radius: 6px; padding: 12px; margin-bottom: 8px; border-right: 3px solid #1a1a2e;">
+      <div style="font-size: 14px; color: #333; margin-bottom: 4px;">${n.content}</div>
+      <div style="font-size: 11px; color: #888;">${n.authorName} — ${formatPalestineDateTime(n.createdAt)}</div>
+    </div>`).join("")}
+  </div>` : ""}
   <div style="background: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #666;">
     مرفق ملف Excel بالتفاصيل الكاملة
   </div>
@@ -383,76 +389,42 @@ export async function generateAndSendDailyReport(targetDate?: Date): Promise<Dai
     return { success: false, message: "No recipients configured (DAILY_REPORT_RECIPIENTS)", date: dateStr };
   }
 
-  // Fetch summary data for the HTML body
-  const [sessions, sales, expenses, bookings, courses, activeSubscriptions, pricingSettings] = await Promise.all([
-    prisma.session.findMany({
+  // Calculate revenue using the shared function
+  const rev = await calculateRevenue(fromDate, toDate);
+
+  // Fetch additional data for the email body
+  const [sessionCount, activeSubscriptions, dailyNotes] = await Promise.all([
+    prisma.session.count({
       where: { checkIn: { gte: fromDate, lte: toDate }, checkOut: { not: null } },
-      select: { sessionType: true, amount: true, paymentStatus: true, visitor: { select: { type: true } }, snackOrders: { select: { total: true } } },
-    }),
-    prisma.sale.findMany({
-      where: { date: { gte: fromDate, lte: toDate } },
-      select: { total: true },
-    }),
-    prisma.expense.findMany({
-      where: { date: { gte: fromDate, lte: toDate } },
-      select: { amount: true },
-    }),
-    prisma.booking.findMany({
-      where: { startTime: { gte: fromDate, lte: toDate }, status: "confirmed" },
-      select: { price: true },
-    }),
-    prisma.course.findMany({
-      where: { startDate: { lte: toDate }, endDate: { gte: fromDate } },
-      select: { id: true },
     }),
     prisma.subscription.findMany({
       where: { status: "active", endDate: { gte: new Date() } },
       select: { visitorId: true },
     }),
-    prisma.settings.findFirst(),
+    prisma.dailyNote.findMany({
+      where: { date: { gte: fromDate, lte: toDate } },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
-  const collectedDebts = await prisma.debt.findMany({
-    where: { status: "collected", collectedAt: { gte: fromDate, lte: toDate } },
-    select: { amount: true },
-  });
-
-  const sessionRev = r(
-    sessions
-      .filter((s) => s.paymentStatus === "paid")
-      .reduce((sum, s) => {
-        const snacksTotal = s.snackOrders.reduce((snackSum, o) => snackSum + Number(o.total), 0);
-        return sum + (Number(s.amount) - snacksTotal);
-      }, 0),
-  );
-  const saleRev = r(sales.reduce((sum, s) => sum + Number(s.total), 0));
-  let courseRev = 0;
-  if (courses.length > 0) {
-    const trainees = await prisma.trainee.findMany({
-      where: { courseId: { in: courses.map((c) => c.id) } },
-      select: { amountPaid: true },
-    });
-    courseRev = r(trainees.reduce((sum, t) => sum + Number(t.amountPaid), 0));
-  }
-  const bookingRev = r(bookings.reduce((sum, b) => sum + Number(b.price), 0));
-  const debtRev = r(collectedDebts.reduce((sum, d) => sum + Number(d.amount), 0));
-  const totalExpenses = r(expenses.reduce((sum, e) => sum + Number(e.amount), 0));
-  const monthlyHotDrinksCost = pricingSettings ? Number(pricingSettings.hotDrinksMonthlyCost) : 0;
-  const daysInRange = Math.max(1, Math.ceil((toDate.getTime() - fromDate.getTime()) / 86400000));
-  const hotDrinksProrated = r(monthlyHotDrinksCost * (daysInRange / 30));
-  const totalRevenue = r(sessionRev + saleRev + courseRev + bookingRev + debtRev);
-  const netProfit = r(totalRevenue - totalExpenses - hotDrinksProrated);
-
   const summary = {
-    totalRevenue, sessionRev, saleRev, courseRev, bookingRev, debtRev,
-    totalExpenses, hotDrinksProrated, netProfit,
-    totalVisits: sessions.length,
+    totalRevenue: rev.totalRevenue,
+    sessionRev: rev.hoursRevenue,
+    snacksRevenue: rev.snacksRevenue,
+    hotDrinksRevenue: rev.hotDrinksRevenue,
+    courseRev: rev.coursesRevenue,
+    bookingRev: rev.bookingRevenue,
+    debtRev: rev.debtRevenue,
+    totalExpenses: rev.expensesTotal,
+    hotDrinksProrated: rev.hotDrinksCost,
+    netProfit: rev.netProfit,
+    totalVisits: sessionCount,
     activeSubscribers: activeSubscriptions.length,
   };
 
   // Generate Excel buffer
   const xlsxBuffer = await generateReportBuffer(fromDate, toDate);
-  const html = generateReportHtml(fromDate, toDate, summary);
+  const html = generateReportHtml(fromDate, toDate, summary, dailyNotes);
 
   const subject = `التقرير المالي اليومي - ${dateStr}`;
 
