@@ -43,6 +43,13 @@ router.get(
   (req, res, next) => sessionsController.getNewVisitors(req, res, next)
 );
 
+// POST batch dismiss new visitors
+router.post(
+  "/new-visitors/dismiss-batch",
+  authorize("داخل المساحة", "edit"),
+  (req, res, next) => sessionsController.dismissNewVisitorsBatch(req, res, next)
+);
+
 // POST check-in
 router.post(
   "/",

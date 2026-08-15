@@ -67,3 +67,9 @@ export type UpdateSessionInput = z.infer<typeof updateSessionSchema>;
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 export type AddOrderInput = z.infer<typeof addOrderSchema>;
 export type AddBatchOrdersInput = z.infer<typeof addBatchOrdersSchema>;
+
+export const dismissNewVisitorsBatchSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1, "At least one session ID is required"),
+});
+
+export type DismissNewVisitorsBatchInput = z.infer<typeof dismissNewVisitorsBatchSchema>;

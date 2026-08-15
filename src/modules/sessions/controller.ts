@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { sessionsService } from "./service";
-import { checkInSchema, updateSessionSchema, checkoutSchema, addOrderSchema, addBatchOrdersSchema } from "./schema";
+import { checkInSchema, updateSessionSchema, checkoutSchema, addOrderSchema, addBatchOrdersSchema, dismissNewVisitorsBatchSchema } from "./schema";
 
 export class SessionsController {
   async visitorLookup(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -192,6 +192,19 @@ export class SessionsController {
     try {
       const id = req.params.id as string;
       const data = await sessionsService.dismissNewVisitor(id);
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async dismissNewVisitorsBatch(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { ids } = dismissNewVisitorsBatchSchema.parse(req.body);
+      const data = await sessionsService.dismissNewVisitorsBatch(ids);
       res.status(200).json({
         success: true,
         data,

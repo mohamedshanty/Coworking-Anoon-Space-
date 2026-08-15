@@ -1214,6 +1214,17 @@ export class SessionsService {
     });
   }
 
+  async dismissNewVisitorsBatch(ids: string[]) {
+    const result = await prisma.session.updateMany({
+      where: {
+        id: { in: ids },
+        newVisitorDismissed: false,
+      },
+      data: { newVisitorDismissed: true },
+    });
+    return { hidden: result.count };
+  }
+
   async deleteSession(id: string) {
     const session = await prisma.session.findUnique({
       where: { id },
