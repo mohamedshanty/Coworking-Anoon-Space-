@@ -92,11 +92,12 @@ export class DebtsService {
     const paidNow = Number(debt.amount);
 
     const result = await prisma.$transaction(async (tx) => {
+      // Preserve the original amount so calculateRevenue() can count it as debtRevenue
+      // on the collection day. The status field indicates collection, not amount=0.
       const updatedDebt = await tx.debt.update({
         where: { id },
         data: {
           status: "collected",
-          amount: 0,
           collectedAt: new Date(),
         },
       });
@@ -140,11 +141,11 @@ export class DebtsService {
     const newBalance = Math.round((currentAmount - paidAmount + Number.EPSILON) * 100) / 100;
 
     const result = await prisma.$transaction(async (tx) => {
-      // If fully paid, mark as collected
+      // If fully paid, mark as collected. Preserve original amount for revenue calculation.
       const updatedDebt = newBalance <= 0
         ? await tx.debt.update({
             where: { id },
-            data: { amount: 0, status: "collected", collectedAt: new Date() },
+            data: { status: "collected", collectedAt: new Date() },
           })
         : await tx.debt.update({
             where: { id },

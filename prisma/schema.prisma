@@ -168,6 +168,8 @@ model Debt {
   id             String        @id @default(uuid())
   visitorId      String?
   subscriptionId String?
+  sessionId      String?
+  sessionAmount  Decimal?      @db.Decimal(10, 2)
   name           String
   phone          String
   amount         Decimal       @db.Decimal(10, 2)

@@ -4,7 +4,6 @@ import ExcelJS from "exceljs";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { getEffectiveStatus } from "../../lib/subscription";
-import { calculateSessionPricing } from "../sessions/pricing";
 import { palestineStartOfDay, palestineEndOfDay, formatPalestineDateTime, formatPalestineDate } from "../../lib/timezone";
 import { calculateRevenue } from "../../lib/revenue";
 
@@ -132,16 +131,9 @@ export class ReportsController {
         orderBy: { checkIn: "asc" },
       });
 
-      // Fetch settings and active subscriptions for pricing calculation
-      const pricingSettings = await prisma.settings.findFirst();
-      const activeSubscriptions = await prisma.subscription.findMany({
-        where: { status: "active", endDate: { gte: new Date() } },
-        select: { visitorId: true },
-      });
-
       // Sheet 1: الزيارات (Visits) — history type ONLY
       if (exportType === "history") {
-        const rn = (v: number) => Math.round(v);
+        const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
         const visitsSheet = workbook.addWorksheet("الزيارات");
         visitsSheet.columns = [
@@ -167,29 +159,24 @@ export class ReportsController {
             : null;
 
           const effectiveType = s.sessionType ?? s.visitor.type;
-          const hasActiveSub = activeSubscriptions.some(
-            (sub) => sub.visitorId === s.visitorId
-          );
-          const sessionHourlyRate = s.hourlyRate != null
-            ? Number(s.hourlyRate)
-            : pricingSettings
-              ? Number(pricingSettings.hourlyRate)
-              : 0;
+          const isSub = effectiveType === "subscriber" || effectiveType === "trainee";
 
-          const pricing = calculateSessionPricing(
-            s.checkIn,
-            effectiveType,
-            hasActiveSub,
-            s.snackOrders,
-            {
-              hourlyRate: sessionHourlyRate,
-              fullDayPrice: pricingSettings ? Number(pricingSettings.fullDayPrice) : 0,
-              fullDayThresholdHours: pricingSettings?.fullDayThresholdHours ?? 8,
-            },
-            s.checkOut
+          // Use STORED data (matching the in-app History table exactly):
+          // - ordersAmount: sum of SnackOrder totals (stored, not recomputed)
+          // - hoursAmount: hourlyPriceOverride ?? (amount - snacksTotal)
+          // - totalAmount: session.amount (stored at checkout time)
+          const snacksTotal = s.snackOrders.reduce(
+            (snackSum: number, o: any) => snackSum + Number(o.total), 0,
           );
-
-          const isSub = effectiveType === "subscriber" && hasActiveSub;
+          const ordersAmount = r2(snacksTotal);
+          const hoursAmount = isSub
+            ? "مشترك"
+            : (s.hourlyPriceOverride != null
+              ? r2(Number(s.hourlyPriceOverride))
+              : r2(Number(s.amount) - snacksTotal));
+          const totalAmount = isSub
+            ? r2(ordersAmount)
+            : r2(Number(s.amount));
 
           visitsSheet.addRow({
             visitorName: s.visitor.name,
@@ -197,10 +184,10 @@ export class ReportsController {
             checkIn: formatPalestineDateTime(s.checkIn),
             checkOut: s.checkOut ? formatPalestineDateTime(s.checkOut) : "لم يخرج",
             duration: duration !== null ? duration : "—",
-            ordersAmount: rn(pricing.ordersAmount),
-            hoursAmount: isSub ? "مشترك" : (s.hourlyPriceOverride != null ? rn(Number(s.hourlyPriceOverride)) : rn(pricing.timeAmount)),
-            totalAmount: isSub ? rn(pricing.ordersAmount) : rn(Number(s.amount)),
-            discount: Number(s.discountAmount) > 0 ? rn(Number(s.discountAmount)) : "—",
+            ordersAmount,
+            hoursAmount,
+            totalAmount,
+            discount: Number(s.discountAmount) > 0 ? r2(Number(s.discountAmount)) : "—",
             discountNote: s.discountNote || "—",
             adjustmentNote: s.adjustmentNote || "—",
             paymentMethod: s.paymentMethod ? paymentMethodMap[s.paymentMethod] : "—",

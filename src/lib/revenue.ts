@@ -65,21 +65,40 @@ export async function calculateRevenue(fromDate: Date, toDate: Date): Promise<Re
     prisma.settings.findFirst(),
     prisma.debt.findMany({
       where: { status: "collected", collectedAt: { gte: fromDate, lte: toDate } },
-      select: { amount: true },
+      select: { amount: true, sessionId: true, sessionAmount: true, type: true },
     }),
   ]);
 
-  // Hours revenue: only paid sessions, subtract snack portion
+  // Split collected debts: session debts → hoursRevenue/snacksRevenue, manual debts → debtRevenue
+  let debtHoursRevenue = 0;
+  let debtSnacksRevenue = 0;
+  let debtManualRevenue = 0;
+  for (const d of collectedDebts) {
+    const totalAmount = Number(d.amount);
+    if (d.sessionId && d.sessionAmount != null) {
+      const hoursPortion = Number(d.sessionAmount);
+      const snacksPortion = totalAmount - hoursPortion;
+      debtHoursRevenue += hoursPortion;
+      debtSnacksRevenue += snacksPortion;
+    } else {
+      debtManualRevenue += totalAmount;
+    }
+  }
+
+  // Hours revenue: only paid sessions, subtract snack portion + collected session debt hours portion.
+  // IMPORTANT: This formula is intentionally identical to getHistorySummary().hoursRevenue
+  // in sessions/service.ts. Both use: Σ(session.amount - snackOrders.total) for paid sessions.
+  // Any change here must be mirrored in getHistorySummary() to keep daily/weekly reports consistent.
   const hoursRevenue = r(
     sessions.filter((s) => s.paymentStatus === "paid").reduce((sum, s) => {
       const snacksTotal = s.snackOrders.reduce((snackSum, o) => snackSum + Number(o.total), 0);
       return sum + (Number(s.amount) - snacksTotal);
-    }, 0)
+    }, 0) + debtHoursRevenue
   );
 
-  // Sales split: snacks vs hot drinks
+  // Sales split: snacks vs hot drinks + collected session debt snacks portion
   const snacksRevenue = r(
-    sales.filter((s) => !s.isHotDrink).reduce((sum, s) => sum + Number(s.total), 0)
+    sales.filter((s) => !s.isHotDrink).reduce((sum, s) => sum + Number(s.total), 0) + debtSnacksRevenue
   );
   const hotDrinksRevenue = r(
     sales.filter((s) => s.isHotDrink).reduce((sum, s) => sum + Number(s.total), 0)
@@ -100,10 +119,8 @@ export async function calculateRevenue(fromDate: Date, toDate: Date): Promise<Re
     bookings.reduce((sum, b) => sum + Number(b.price), 0)
   );
 
-  // Debts: collected only
-  const debtRevenue = r(
-    collectedDebts.reduce((sum, d) => sum + Number(d.amount), 0)
-  );
+  // Debts: only manual/subscription debts (session debts already split above)
+  const debtRevenue = r(debtManualRevenue);
 
   // Expenses
   const expensesTotal = r(

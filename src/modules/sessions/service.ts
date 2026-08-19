@@ -415,31 +415,78 @@ export class SessionsService {
       return result;
     }
 
-    const updated = await prisma.session.update({
-      where: { id },
-      data: {
-        ...(data.checkIn ? { checkIn: newCheckIn as Date } : {}),
-        ...(data.checkOut !== undefined
-          ? { checkOut: data.checkOut ? new Date(data.checkOut) : null }
-          : {}),
-        ...(derivedAmount !== undefined ? { amount: derivedAmount } : {}),
-        ...(derivedHourlyPriceOverride !== undefined ? { hourlyPriceOverride: derivedHourlyPriceOverride } : {}),
-        ...(data.notes !== undefined ? { notes: data.notes } : {}),
-        ...(data.sessionType !== undefined ? { sessionType: data.sessionType } : {}),
-        ...(data.paymentStatus ? { paymentStatus: data.paymentStatus } : {}),
-        ...(data.paymentMethod !== undefined ? { paymentMethod: data.paymentMethod } : {}),
-        ...(data.hourlyRate !== undefined ? { hourlyRate: data.hourlyRate } : {}),
-        ...(data.discountAmount !== undefined ? { discountAmount: data.discountAmount } : {}),
-        ...(data.discountNote !== undefined ? { discountNote: data.discountNote || null } : {}),
-        ...(data.paymentAccount !== undefined ? { paymentAccount: data.paymentAccount?.trim() || null } : {}),
-        ...(data.calculatedPrice !== undefined ? { calculatedPrice: data.calculatedPrice } : {}),
-        ...(data.finalPrice !== undefined ? { finalPrice: data.finalPrice } : {}),
-        ...(data.adjustmentNote !== undefined ? { adjustmentNote: data.adjustmentNote || null } : {}),
-      },
-      include: {
-        visitor: true,
-        snackOrders: true,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.session.update({
+        where: { id },
+        data: {
+          ...(data.checkIn ? { checkIn: newCheckIn as Date } : {}),
+          ...(data.checkOut !== undefined
+            ? { checkOut: data.checkOut ? new Date(data.checkOut) : null }
+            : {}),
+          ...(derivedAmount !== undefined ? { amount: derivedAmount } : {}),
+          ...(derivedHourlyPriceOverride !== undefined ? { hourlyPriceOverride: derivedHourlyPriceOverride } : {}),
+          ...(data.notes !== undefined ? { notes: data.notes } : {}),
+          ...(data.sessionType !== undefined ? { sessionType: data.sessionType } : {}),
+          ...(data.paymentStatus ? { paymentStatus: data.paymentStatus } : {}),
+          ...(data.paymentMethod !== undefined ? { paymentMethod: data.paymentMethod } : {}),
+          ...(data.hourlyRate !== undefined ? { hourlyRate: data.hourlyRate } : {}),
+          ...(data.discountAmount !== undefined ? { discountAmount: data.discountAmount } : {}),
+          ...(data.discountNote !== undefined ? { discountNote: data.discountNote || null } : {}),
+          ...(data.paymentAccount !== undefined ? { paymentAccount: data.paymentAccount?.trim() || null } : {}),
+          ...(data.calculatedPrice !== undefined ? { calculatedPrice: data.calculatedPrice } : {}),
+          ...(data.finalPrice !== undefined ? { finalPrice: data.finalPrice } : {}),
+          ...(data.adjustmentNote !== undefined ? { adjustmentNote: data.adjustmentNote || null } : {}),
+        },
+        include: {
+          visitor: true,
+          snackOrders: true,
+        },
+      });
+
+      // If paymentStatus changed to a debt status, ensure an UNPAID Debt record exists.
+      // Skip if there's already an unpaid debt for this session (e.g. checkoutUnpaid already created one).
+      if (data.paymentStatus === "full_debt" || data.paymentStatus === "partial_debt") {
+        const existingUnpaidDebt = await tx.debt.findFirst({
+          where: { sessionId: id, type: "session", status: "unpaid" },
+        });
+        if (!existingUnpaidDebt) {
+          const totalAmount = Number(result.amount);
+          const snacksTotal = (result.snackOrders ?? []).reduce(
+            (sum: number, o: any) => sum + Number(o.total), 0,
+          );
+          const hoursPortion = Math.round((totalAmount - snacksTotal + Number.EPSILON) * 100) / 100;
+          if (totalAmount > 0) {
+            await tx.debt.create({
+              data: {
+                visitorId: result.visitorId,
+                sessionId: id,
+                sessionAmount: hoursPortion,
+                name: result.visitor.name,
+                phone: result.visitor.phone,
+                amount: totalAmount,
+                type: "session",
+                status: "unpaid",
+                createdAt: new Date(),
+              },
+            });
+          }
+        }
+      }
+
+      // If paymentStatus changed away from a debt status to paid, collect any existing unpaid debt
+      if (data.paymentStatus === "paid" && (session.paymentStatus === "full_debt" || session.paymentStatus === "partial_debt")) {
+        const existingDebt = await tx.debt.findFirst({
+          where: { sessionId: id, type: "session", status: "unpaid" },
+        });
+        if (existingDebt) {
+          await tx.debt.update({
+            where: { id: existingDebt.id },
+            data: { status: "collected", collectedAt: new Date() },
+          });
+        }
+      }
+
+      return result;
     });
 
     return updated;
@@ -585,13 +632,18 @@ export class SessionsService {
       },
     });
 
-    // Create Debt Record
+    // Create Debt Record (with session link for revenue splitting on collection)
+    const debtAmount = Math.round(pricing.totalAmount);
+    const snacksTotal = pricing.ordersAmount;
+    const hoursPortion = Math.round((debtAmount - snacksTotal + Number.EPSILON) * 100) / 100;
     await prisma.debt.create({
       data: {
         visitorId: session.visitorId,
+        sessionId: session.id,
+        sessionAmount: hoursPortion,
         name: session.visitor.name,
         phone: session.visitor.phone,
-        amount: Math.round(pricing.totalAmount),
+        amount: debtAmount,
         type: "session",
         status: "unpaid",
         createdAt: new Date(),
@@ -1557,15 +1609,19 @@ export class SessionsService {
 
     const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
-    // hoursRevenue: sum of each session's STORED amount minus its SnackOrder totals,
-    // for paid sessions only. Debt/partial sessions stay visible in the table but must
-    // NOT count toward hoursRevenue in the summary.
+    // hoursRevenue: sum of each session's hours portion for paid sessions only.
+    // Uses the SAME per-session formula as the history table (getHistory):
+    //   hourlyPriceOverride != null ? hourlyPriceOverride : (amount - snacksTotal)
+    // This ensures the summary exactly matches the sum of the table's "مبلغ الساعات" column.
     const hoursRevenue = r2(
       sessions
         .filter((s) => s.paymentStatus === "paid")
         .reduce((sum, s) => {
           const snacksTotal = s.snackOrders.reduce((snackSum, o) => snackSum + Number(o.total), 0);
-          return sum + (Number(s.amount) - snacksTotal);
+          const hoursAmt = s.hourlyPriceOverride != null
+            ? Number(s.hourlyPriceOverride)
+            : Number(s.amount) - snacksTotal;
+          return sum + hoursAmt;
         }, 0),
     );
 
@@ -1600,6 +1656,9 @@ export class SessionsService {
           sub.endDate >= checkIn,
       );
 
+    // Subscriber hours revenue: per-session daily rate from the subscription, divided by the
+    // number of sessions that subscriber has on the same calendar day.
+    // Uses r2() per-session to match the table's "إيراد ساعات المشتركين" column exactly.
     const subscriberHoursRevenue = r2(
       sessions.reduce((sum, s) => {
         const effectiveType = s.sessionType ?? s.visitor.type;
