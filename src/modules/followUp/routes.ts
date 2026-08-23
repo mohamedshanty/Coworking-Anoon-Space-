@@ -14,6 +14,13 @@ router.get(
   (req, res, next) => followUpController.getFollowUpList(req, res, next)
 );
 
+// POST batch opt-out visitors from follow-up
+router.post(
+  "/opt-out-batch",
+  authorize("المتابعة", "edit"),
+  (req, res, next) => followUpController.optOutBatch(req, res, next)
+);
+
 // POST mark visitor as contacted
 router.post(
   "/:visitorId/contacted",

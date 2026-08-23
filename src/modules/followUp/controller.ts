@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { followUpService } from "./service";
+import { dismissFollowUpBatchSchema } from "./schema";
 import { getParam } from "../../lib/getParam";
 
 const followUpQuerySchema = z.object({
@@ -43,6 +44,16 @@ export class FollowUpController {
         success: true,
         data,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async optOutBatch(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { ids } = dismissFollowUpBatchSchema.parse(req.body);
+      const data = await followUpService.optOutBatch(ids);
+      res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
     }

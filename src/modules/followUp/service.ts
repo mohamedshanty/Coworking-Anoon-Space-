@@ -73,6 +73,17 @@ export class FollowUpService {
       },
     });
   }
+
+  async optOutBatch(ids: string[]) {
+    const result = await prisma.visitor.updateMany({
+      where: {
+        id: { in: ids },
+        followUpStatus: { not: "opt_out" },
+      },
+      data: { followUpStatus: "opt_out" },
+    });
+    return { hidden: result.count };
+  }
 }
 
 export const followUpService = new FollowUpService();
