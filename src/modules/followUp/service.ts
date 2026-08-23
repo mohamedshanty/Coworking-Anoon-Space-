@@ -78,7 +78,6 @@ export class FollowUpService {
     const result = await prisma.visitor.updateMany({
       where: {
         id: { in: ids },
-        followUpStatus: { not: "opt_out" },
       },
       data: { followUpStatus: "opt_out" },
     });
