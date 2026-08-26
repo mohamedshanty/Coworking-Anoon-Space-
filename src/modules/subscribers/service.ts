@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { CreateSubscriberInput, RenewSubscriptionInput, UpdateSubscriberInput } from "./schema";
+import { syncMemberToAnoonQr } from "../../lib/anoon-sync";
 
 export class SubscribersService {
   async getSubscribers(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc"; status?: string }) {
@@ -164,6 +165,13 @@ export class SubscribersService {
       return { subscription, debt };
     });
 
+    void syncMemberToAnoonQr({
+      name: visitor.name,
+      phone: data.phone,
+      packageType: data.packageType,
+      startDate: result.subscription.startDate,
+    });
+
     return { visitor, subscription: result.subscription };
   }
 
@@ -225,6 +233,13 @@ export class SubscribersService {
       }
 
       return { subscription: newSub, debt };
+    });
+
+    void syncMemberToAnoonQr({
+      name: visitor.name,
+      phone: visitor.phone,
+      packageType: data.packageType,
+      startDate: result.subscription.startDate,
     });
 
     return result.subscription;
