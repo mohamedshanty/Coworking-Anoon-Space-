@@ -10,4 +10,10 @@ router.post(
   (req, res, next) => integrationsController.anoonCheckIn(req, res, next)
 );
 
+router.post(
+  "/anoon-visitor-checkin",
+  verifyInternalSecret,
+  (req, res, next) => integrationsController.anoonVisitorCheckIn(req, res, next)
+);
+
 export default router;
