@@ -28,6 +28,7 @@ import visitorsRouter from "./modules/visitors/routes";
 import snackWalletRouter from "./modules/snack-wallet/routes";
 import dailyNotesRouter from "./modules/daily-notes/routes";
 import integrationsRouter from "./modules/integrations/routes";
+import publicMenuRouter from "./modules/public-menu/routes";
 import { authenticate } from "./middleware/authenticate";
 import { authorize } from "./middleware/authorize";
 
@@ -120,6 +121,9 @@ router.use("/daily-notes", dailyNotesRouter);
 
 // Register integration routes (machine-to-machine, secret-header auth)
 router.use("/integrations", integrationsRouter);
+
+// Register public menu routes (no auth — public ordering page)
+router.use("/public", publicMenuRouter);
 
 // Test routes for middleware verification
 router.get("/test-protected-view", authenticate, authorize("الرئيسية", "view"), (req, res) => {
