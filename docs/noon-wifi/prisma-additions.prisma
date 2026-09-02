@@ -1,0 +1,90 @@
+// ============================================================================
+//  أضف هذا إلى prisma/schema.prisma في مستودع noonCowork
+//  ثم:  npx prisma migrate dev --name add_hotspot
+//  ملاحظة: أنت على Prisma 7 — الصيغة أدناه متوافقة.
+// ============================================================================
+
+enum NetUserKind {
+  SUBSCRIBER
+  TRAINEE
+  EMPLOYEE
+  VISITOR
+}
+
+enum NetTier {
+  T10
+  T20
+  T30
+}
+
+enum NetEndReason {
+  CHECKOUT       // زر إنهاء الجلسة في صفحة «داخل المساحة»
+  END_OF_DAY     // كرون نهاية الدوام
+  IDLE           // الراوتر أسقط الجلسة
+  ADMIN
+  SUPERSEDED     // دخول جديد بنفس الرقم قبل إغلاق القديم
+}
+
+/// جهاز معروف: MAC مربوط برقم جوال بشكل دائم.
+/// رقم واحد يمكن أن يملك عدة أجهزة (جوال + لابتوب + تابلت).
+/// عند مسح الـ QR من الجوال، تُفوَّض كل الأجهزة المرتبطة تلقائياً.
+model KnownDevice {
+  id         String   @id @default(cuid())
+  mac        String   @unique              // دائماً uppercase بصيغة AA:BB:CC:DD:EE:FF
+  phone      String
+  label      String?                       // "لابتوب محمد" — اختياري، يملؤه الأدمن
+  hostname   String?                       // من DHCP lease، مفيد للتمييز
+  isBlocked  Boolean  @default(false)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @updatedAt
+
+  @@index([phone])
+  @@index([lastSeenAt])
+}
+
+/// جلسة إنترنت واحدة. منفصلة عن جلسة الحضور (Session) لأن:
+///  - الزائر قد يقطع الإنترنت ويبقى في المساحة (والعكس)
+///  - الفوترة هنا مبنية على وقت الشبكة لا وقت المقعد
+model NetSession {
+  id          String       @id @default(cuid())
+  phone       String
+  name        String
+  kind        NetUserKind
+  tier        NetTier
+  hourlyRate  Decimal      @db.Decimal(10, 2)   // 0 لغير الزوار
+  mac         String
+  ip          String?
+  routerUser  String                             // اسم المستخدم على الراوتر = الجوال
+  startedAt   DateTime     @default(now())
+  endedAt     DateTime?
+  minutes     Int?
+  amount      Decimal?     @db.Decimal(10, 2)
+  billed      Boolean      @default(false)
+  endedReason NetEndReason?
+
+  /// ربط بجلسة الحضور الحالية في noonCowork (إن وُجدت)
+  sessionId   String?
+  visitorId   String?
+
+  @@index([phone])
+  @@index([endedAt])
+  @@index([mac])
+  @@index([sessionId])
+}
+
+// ----------------------------------------------------------------------------
+// اختياري لكنه مفيد: سجل تدقيق لكل نداء ذهب للراوتر.
+// عند أي خلاف مع عميل ("الإنترنت انقطع عني") يصبح لديك دليل.
+// ----------------------------------------------------------------------------
+model HotspotAudit {
+  id        String   @id @default(cuid())
+  action    String   // LOGIN | LOGOUT | ENSURE_USER | REAUTH_DEVICE | EOD_SWEEP
+  phone     String?
+  mac       String?
+  ok        Boolean
+  detail    String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([phone])
+}
