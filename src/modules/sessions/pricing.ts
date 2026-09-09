@@ -4,13 +4,22 @@ export interface PricingSettings {
   fullDayThresholdHours: number;
 }
 
+export interface InternetCharge {
+  amount: number;
+  minutes: number;
+  tier: string;
+  /** In "replaces" mode the seat price is zeroed — the internet charge IS the time cost. */
+  replacesSeat?: boolean;
+}
+
 export function calculateSessionPricing(
   checkIn: Date,
   visitorType: string,
   hasActiveSubscription: boolean,
   snackOrders: { total: number | string | any }[],
   settings: PricingSettings,
-  checkOut?: Date | null
+  checkOut?: Date | null,
+  internetCharge?: InternetCharge | null,
 ) {
   const checkInTime = new Date(checkIn).getTime();
   const endTime = checkOut ? new Date(checkOut).getTime() : Date.now();
@@ -25,9 +34,14 @@ export function calculateSessionPricing(
     visitorType === "trainee";
 
   // Time cost calculation
-  const timeAmountRaw = isSub
+  // In "replaces" mode for non-subscribers: time portion is zeroed —
+  // the internet charge becomes the sole time cost.
+  const replacesSeat = !isSub && internetCharge?.replacesSeat;
+  const timeAmountRaw = replacesSeat
     ? 0
-    : Math.min(hours * Number(settings.hourlyRate), Number(settings.fullDayPrice));
+    : isSub
+      ? 0
+      : Math.min(hours * Number(settings.hourlyRate), Number(settings.fullDayPrice));
   const timeAmount = Math.round((timeAmountRaw + Number.EPSILON) * 100) / 100;
 
   // Orders cost calculation
@@ -36,13 +50,19 @@ export function calculateSessionPricing(
   }, 0);
   const ordersAmount = Math.round((ordersAmountRaw + Number.EPSILON) * 100) / 100;
 
-  const totalAmount = Math.round((timeAmount + ordersAmount + Number.EPSILON) * 100) / 100;
+  // Internet charge (surcharge on top, or replaces seat in "replaces" mode)
+  const internetAmount = internetCharge?.amount ?? 0;
+
+  const totalAmount = Math.round(
+    (timeAmount + ordersAmount + internetAmount + Number.EPSILON) * 100,
+  ) / 100;
 
   return {
     hours,
     isSub,
     timeAmount,
     ordersAmount,
+    internetAmount,
     totalAmount,
   };
 }

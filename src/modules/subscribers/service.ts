@@ -57,6 +57,7 @@ export class SubscribersService {
       name: { name: params.sortDir ?? "asc" },
       phone: { phone: params.sortDir ?? "asc" },
       source: { source: params.sortDir ?? "asc" },
+      visitCount: { visitCount: params.sortDir ?? "desc" },
       createdAt: { createdAt: params.sortDir ?? "desc" },
     };
     const orderBy = subSortFields[params.sortField ?? "createdAt"] ?? { createdAt: "desc" };

@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, NetTier } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { calculateSessionPricing } from "./pricing";
@@ -35,6 +35,7 @@ export class SessionsService {
       type: v.type,
       source: v.source,
       sessionCount: v._count.sessions,
+      visitCount: (v as any).visitCount ?? v._count.sessions,
     }));
   }
 
@@ -44,6 +45,11 @@ export class SessionsService {
       include: {
         visitor: true,
         snackOrders: true,
+        netSessions: {
+          where: { endedAt: null },
+          select: { id: true, tier: true, minutes: true, startedAt: true },
+          take: 1,
+        },
       },
     });
 
@@ -88,6 +94,7 @@ export class SessionsService {
         hours: pricing.hours,
         isSub: pricing.isSub,
         amount: pricing.totalAmount, // Dynamically computed active total amount (time + snacks)
+        netSession: s.netSessions[0] ?? null,
       };
     });
   }
@@ -263,7 +270,7 @@ export class SessionsService {
 
       await tx.visitor.update({
         where: { id: visitorId },
-        data: { lastVisit: checkInTime },
+        data: { lastVisit: checkInTime, visitCount: { increment: 1 } },
       });
 
       let subscriptionOverQuota = false;
@@ -500,6 +507,7 @@ export class SessionsService {
     paymentAccount?: string,
     hourlyPriceOverride?: number | null,
     adjustmentNote?: string | null,
+    walletOpts?: { walletId?: string; walletAmount?: number; walletTarget?: "snack" | "hours" | "mixed" },
   ) {
     const session = await prisma.session.findUnique({
       where: { id },
@@ -523,6 +531,28 @@ export class SessionsService {
 
     const effectiveType = session.sessionType ?? session.visitor.type;
 
+    // -- noonWiFi: compute internet charge BEFORE pricing -------------------
+    const phone = session.visitor?.phone;
+    let internetCharge: { amount: number; minutes: number; tier: NetTier } | null = null;
+    let netChargeParam: import("./pricing").InternetCharge | null = null;
+    try {
+      if (phone) {
+        const [{ computePendingInternetCharge }, { BILLING }] = await Promise.all([
+          import("../hotspot/hotspot.service"),
+          import("../hotspot/hotspot.config"),
+        ]);
+        const net = await computePendingInternetCharge(phone);
+        if (net) {
+          internetCharge = { amount: net.amount, minutes: net.minutes, tier: net.tier };
+          const isVisitor = effectiveType === "visitor";
+          const replacesSeat = isVisitor && BILLING.mode === "replaces";
+          netChargeParam = { ...net, replacesSeat };
+        }
+      }
+    } catch (err) {
+      console.error("[hotspot] computePendingInternetCharge failed", err);
+    }
+
     const sessionHourlyRate = session.hourlyRate != null
       ? Number(session.hourlyRate)
       : Number(settings.hourlyRate);
@@ -536,19 +566,49 @@ export class SessionsService {
         hourlyRate: sessionHourlyRate,
         fullDayPrice: Number(settings.fullDayPrice),
         fullDayThresholdHours: settings.fullDayThresholdHours,
-      }
+      },
+      null,
+      netChargeParam,
     );
 
     const calculatedPrice = pricing.totalAmount;
     const snacksTotal = pricing.ordersAmount;
 
+    // In "replaces" mode for visitors: seat price is zeroed, so the
+    // effective hourly price used for discount/override math is 0.
+    const replacesSeat = netChargeParam?.replacesSeat;
+    const baseHourly = replacesSeat ? 0 : pricing.timeAmount;
     const effectiveHourlyPrice = hourlyPriceOverride != null
       ? hourlyPriceOverride
-      : pricing.timeAmount;
+      : baseHourly;
 
     const safeDiscount = Math.max(0, Math.min(discountAmount, effectiveHourlyPrice));
     const hourlyPortion = Math.max(0, effectiveHourlyPrice - safeDiscount);
-    const finalAmount = Math.round((hourlyPortion + snacksTotal + Number.EPSILON) * 100) / 100;
+    const finalAmount = Math.round((hourlyPortion + snacksTotal + pricing.internetAmount + Number.EPSILON) * 100) / 100;
+
+    // -- Wallet deduction for hours/snacks/mixed (same balance pool) --
+    // Wallet can cover part or all of the invoice. The session amount stays the
+    // full invoice total; the wallet transaction records how much was wallet-paid
+    // and which target (snack vs hours vs mixed) it was applied to.
+    let walletTransaction: any = null;
+    if (walletOpts?.walletId && (walletOpts.walletAmount ?? 0) > 0) {
+      const wAmount = Math.round(((walletOpts.walletAmount ?? 0) + Number.EPSILON) * 100) / 100;
+      if (wAmount > finalAmount) {
+        throw new ApiError(400, "مبلغ المحفظة يتجاوز إجمالي الفاتورة");
+      }
+      const target = walletOpts.walletTarget ?? "mixed";
+      const targetLabel =
+        target === "snack" ? "سناكس" : target === "hours" ? "ساعات" : "سناكس وساعات";
+      const result = await snackWalletService.deduct(
+        walletOpts.walletId,
+        wAmount,
+        id,
+        `خصم المحفظة — ${targetLabel} (تسجيل خروج)`,
+        undefined,
+        target,
+      );
+      walletTransaction = result.transaction;
+    }
 
     const updated = await prisma.session.update({
       where: { id },
@@ -557,7 +617,7 @@ export class SessionsService {
         amount: finalAmount,
         calculatedPrice,
         finalPrice: finalAmount,
-        hourlyPriceOverride: hourlyPriceOverride ?? null,
+        hourlyPriceOverride: replacesSeat ? 0 : (hourlyPriceOverride ?? null),
         paymentStatus: "paid",
         paymentMethod,
         discountAmount: safeDiscount,
@@ -571,7 +631,22 @@ export class SessionsService {
       },
     });
 
-    return updated;
+    // -- noonWiFi: cut internet and close NetSession ------------------------
+    // The charge is already included in finalAmount above.
+    // endByPhone cuts the router, closes the NetSession, marks it billed,
+    // and writes the adjustmentNote label — but does NOT modify session.amount.
+    // We pass the just-computed `internetCharge` through verbatim so the
+    // NetSession row matches the session invoice to the last rounding tick.
+    try {
+      if (phone) {
+        const { endByPhone } = await import("../hotspot/hotspot.service");
+        await endByPhone(phone, "checkout", { charge: internetCharge ?? undefined });
+      }
+    } catch (err) {
+      console.error("[hotspot] cutoff on checkout failed", err);
+    }
+
+    return { ...updated, internetCharge, walletTransaction };
   }
 
   async checkoutUnpaid(id: string) {
@@ -597,6 +672,28 @@ export class SessionsService {
 
     const effectiveType = session.sessionType ?? session.visitor.type;
 
+    // -- noonWiFi: compute internet charge BEFORE pricing -------------------
+    const phone = session.visitor?.phone;
+    let internetCharge: { amount: number; minutes: number; tier: NetTier } | null = null;
+    let netChargeParam: import("./pricing").InternetCharge | null = null;
+    try {
+      if (phone) {
+        const [{ computePendingInternetCharge }, { BILLING }] = await Promise.all([
+          import("../hotspot/hotspot.service"),
+          import("../hotspot/hotspot.config"),
+        ]);
+        const net = await computePendingInternetCharge(phone);
+        if (net) {
+          internetCharge = { amount: net.amount, minutes: net.minutes, tier: net.tier };
+          const isVisitor = effectiveType === "visitor";
+          const replacesSeat = isVisitor && BILLING.mode === "replaces";
+          netChargeParam = { ...net, replacesSeat };
+        }
+      }
+    } catch (err) {
+      console.error("[hotspot] computePendingInternetCharge failed", err);
+    }
+
     // Use the session's own hourly rate; fall back to global default for
     // sessions created before the per-session rate feature was introduced.
     const sessionHourlyRate = session.hourlyRate != null
@@ -612,8 +709,12 @@ export class SessionsService {
         hourlyRate: sessionHourlyRate,
         fullDayPrice: Number(settings.fullDayPrice),
         fullDayThresholdHours: settings.fullDayThresholdHours,
-      }
+      },
+      null,
+      netChargeParam,
     );
+
+    const replacesSeat = netChargeParam?.replacesSeat;
 
     // Update Session
     const updated = await prisma.session.update({
@@ -623,6 +724,7 @@ export class SessionsService {
         amount: Math.round(pricing.totalAmount),
         calculatedPrice: pricing.totalAmount,
         finalPrice: Math.round(pricing.totalAmount),
+        hourlyPriceOverride: replacesSeat ? 0 : null,
         paymentStatus: "full_debt",
         paymentMethod: null,
       },
@@ -635,7 +737,7 @@ export class SessionsService {
     // Create Debt Record (with session link for revenue splitting on collection)
     const debtAmount = Math.round(pricing.totalAmount);
     const snacksTotal = pricing.ordersAmount;
-    const hoursPortion = Math.round((debtAmount - snacksTotal + Number.EPSILON) * 100) / 100;
+    const hoursPortion = Math.round((debtAmount - snacksTotal - pricing.internetAmount + Number.EPSILON) * 100) / 100;
     await prisma.debt.create({
       data: {
         visitorId: session.visitorId,
@@ -650,10 +752,21 @@ export class SessionsService {
       },
     });
 
-    return updated;
+    // -- noonWiFi: cut internet and close NetSession ------------------------
+    // The charge is already included in the debt amount above.
+    try {
+      if (phone) {
+        const { endByPhone } = await import("../hotspot/hotspot.service");
+        await endByPhone(phone, "checkout", { charge: internetCharge ?? undefined });
+      }
+    } catch (err) {
+      console.error("[hotspot] cutoff on unpaid checkout failed", err);
+    }
+
+    return { ...updated, internetCharge };
   }
 
-  async addOrder(sessionId: string, itemId: string, qty: number, skipWallet?: boolean) {
+  async addOrder(sessionId: string, itemId: string, qty: number, skipWallet?: boolean, unitPrice?: number) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: { visitor: true },
@@ -671,6 +784,8 @@ export class SessionsService {
     let dbItemId: string | null = null;
     let hotDrinkName: string | null = null;
     let dbDrinkId: string | null = null;
+    const hasOverride = unitPrice != null && unitPrice >= 0;
+    const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
     if (itemId.startsWith("hot-")) {
       isHotDrink = true;
@@ -680,7 +795,7 @@ export class SessionsService {
         throw new ApiError(404, `Hot drink not found or inactive`);
       }
       itemName = hotDrink.name;
-      total = qty * hotDrink.price;
+      total = hasOverride ? r2(qty * (unitPrice as number)) : r2(qty * hotDrink.price);
       hotDrinkName = hotDrink.name;
       // dbItemId stays null — hot drinks are not inventory items
     } else if (itemId.startsWith("drink-")) {
@@ -697,7 +812,7 @@ export class SessionsService {
         data: { quantity: drink.quantity - qty },
       });
       itemName = drink.name;
-      total = qty * Number(drink.sellPrice);
+      total = hasOverride ? r2(qty * (unitPrice as number)) : r2(qty * Number(drink.sellPrice));
       dbDrinkId = drinkId;
     } else {
       const item = await prisma.inventoryItem.findUnique({
@@ -717,7 +832,7 @@ export class SessionsService {
       });
 
       itemName = item.name;
-      total = qty * Number(item.sellPrice);
+      total = hasOverride ? r2(qty * (unitPrice as number)) : r2(qty * Number(item.sellPrice));
       dbItemId = itemId;
     }
 
@@ -746,13 +861,14 @@ export class SessionsService {
       if (wallet) {
         const balance = Number(wallet.balance);
         if (balance >= total) {
-          // Sufficient balance — auto-deduct
+          // Sufficient balance — auto-deduct (snack target)
           const result = await snackWalletService.deduct(
             wallet.id,
             total,
             sessionId,
             itemName,
             order.id,
+            "snack",
           );
           walletTransaction = result.transaction;
           paymentMethod = "wallet";
@@ -807,6 +923,9 @@ export class SessionsService {
 
     for (const item of input.items) {
       const { itemId, qty } = item;
+      const unitPrice = (item as { unitPrice?: number }).unitPrice;
+      const hasOverride = unitPrice != null && unitPrice >= 0;
+      const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
       let isHotDrink = false;
       let itemName = "";
       let total = 0;
@@ -824,7 +943,7 @@ export class SessionsService {
           throw new ApiError(404, `Hot drink "${hotDrinkId}" not found or inactive`);
         }
         itemName = hotDrink.name;
-        total = qty * Number(hotDrink.price);
+        total = hasOverride ? r2(qty * (unitPrice as number)) : r2(qty * Number(hotDrink.price));
         hotDrinkName = hotDrink.name;
       } else if (itemId.startsWith("drink-")) {
         const drinkId = itemId.replace("drink-", "");
@@ -836,7 +955,7 @@ export class SessionsService {
           throw new ApiError(400, `Insufficient stock for ${drink.name} (requested ${qty}, available ${drink.quantity})`);
         }
         itemName = drink.name;
-        total = qty * Number(drink.sellPrice);
+        total = hasOverride ? r2(qty * (unitPrice as number)) : r2(qty * Number(drink.sellPrice));
         dbDrinkId = drinkId;
       } else {
         const invItem = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
@@ -847,11 +966,11 @@ export class SessionsService {
           throw new ApiError(400, `Insufficient stock for ${invItem.name} (requested ${qty}, available ${invItem.quantity})`);
         }
         itemName = invItem.name;
-        total = qty * Number(invItem.sellPrice);
+        total = hasOverride ? r2(qty * (unitPrice as number)) : r2(qty * Number(invItem.sellPrice));
         dbItemId = itemId;
       }
 
-      batchTotal += total;
+      batchTotal = Math.round((batchTotal + total + Number.EPSILON) * 100) / 100;
       itemDetails.push({ itemId, qty, total, itemName, isHotDrink, dbItemId, dbDrinkId, hotDrinkName });
     }
 
@@ -872,6 +991,8 @@ export class SessionsService {
             batchTotal,
             sessionId,
             `طلب جماعي (${input.items.length} صنف)`,
+            undefined,
+            "snack",
           );
           walletTransaction = result.transaction;
           paymentMethod = "wallet";
@@ -948,7 +1069,7 @@ export class SessionsService {
     return { results, walletTransaction };
   }
 
-  async editOrderItem(orderId: string, data: { itemId?: string; qty?: number }) {
+  async editOrderItem(orderId: string, data: { itemId?: string; qty?: number; unitPrice?: number }) {
     const order = await prisma.snackOrder.findUnique({
       where: { id: orderId },
       include: { session: { include: { visitor: true } }, item: true, drink: true },
@@ -963,6 +1084,7 @@ export class SessionsService {
     const oldTotal = Number(order.total);
     const oldQty = order.qty;
     const newQty = data.qty ?? oldQty;
+    const hasPriceOverride = data.unitPrice != null && data.unitPrice >= 0;
     let newTotal = oldTotal;
     let newItemId = order.itemId;
     let newHotDrinkName = order.hotDrinkName;
@@ -995,7 +1117,7 @@ export class SessionsService {
         if (!hotDrink) {
           throw new ApiError(404, `Hot drink "${hotDrinkId}" not found or inactive`);
         }
-        newTotal = newQty * hotDrink.price;
+        newTotal = hasPriceOverride ? newQty * (data.unitPrice as number) : newQty * hotDrink.price;
         newItemId = null;
         newHotDrinkName = hotDrink.name;
         newIsHotDrink = true;
@@ -1009,7 +1131,7 @@ export class SessionsService {
           where: { id: drinkId },
           data: { quantity: drink.quantity - newQty },
         });
-        newTotal = newQty * Number(drink.sellPrice);
+        newTotal = hasPriceOverride ? newQty * (data.unitPrice as number) : newQty * Number(drink.sellPrice);
         newItemId = null;
         newHotDrinkName = null;
         newIsHotDrink = false;
@@ -1022,15 +1144,15 @@ export class SessionsService {
           where: { id: data.itemId },
           data: { quantity: item.quantity - newQty },
         });
-        newTotal = newQty * Number(item.sellPrice);
+        newTotal = hasPriceOverride ? newQty * (data.unitPrice as number) : newQty * Number(item.sellPrice);
         newItemId = data.itemId;
         newHotDrinkName = null;
         newIsHotDrink = false;
         newDrinkId = null;
       }
     } else if (data.qty !== undefined && data.qty !== oldQty) {
-      // Same item, just quantity change
-      newTotal = newQty * (oldTotal / oldQty);
+      // Same item, just quantity change (or price override on same item)
+      newTotal = hasPriceOverride ? newQty * (data.unitPrice as number) : newQty * (oldTotal / oldQty);
       // Adjust inventory/drink stock for the difference
       if (order.itemId && order.item) {
         const diff = newQty - oldQty;
@@ -1065,6 +1187,9 @@ export class SessionsService {
           }
         }
       }
+    } else if (hasPriceOverride) {
+      // Same item, price override only (qty unchanged or not provided)
+      newTotal = newQty * (data.unitPrice as number);
     }
 
     const roundedNewTotal = Math.round((newTotal + Number.EPSILON) * 100) / 100;
@@ -1141,6 +1266,7 @@ export class SessionsService {
               sessionId: order.sessionId,
               orderId,
               type: "deduction",
+              target: "snack",
               amount: roundedNewTotal,
               balanceBefore: deductBalBefore,
               balanceAfter: deductBalAfter,
@@ -1429,20 +1555,31 @@ export class SessionsService {
       prisma.session.count({ where }),
     ]);
 
-    // Fetch wallet transactions for all sessions in this batch (for wallet-paid orders)
+    // Fetch wallet transactions for all sessions in this batch (for wallet-paid orders).
+    // A session can now have multiple deductions (snack orders + hours at checkout),
+    // so aggregate per session: sum amounts, keep first balanceBefore / last balanceAfter.
     const sessionIds = sessions.map((s) => s.id);
     const walletTxns = await prisma.snackWalletTransaction.findMany({
       where: { sessionId: { in: sessionIds }, type: "deduction" },
-      select: { sessionId: true, balanceBefore: true, balanceAfter: true, amount: true },
+      select: { sessionId: true, balanceBefore: true, balanceAfter: true, amount: true, target: true, createdAt: true },
+      orderBy: { createdAt: "asc" },
     });
-    const walletTxnBySession = new Map<string, { balanceBefore: number; balanceAfter: number; amount: number }>();
+    const walletTxnBySession = new Map<string, { balanceBefore: number; balanceAfter: number; amount: number; targets: string[] }>();
     for (const txn of walletTxns) {
       if (txn.sessionId) {
-        walletTxnBySession.set(txn.sessionId, {
-          balanceBefore: Number(txn.balanceBefore),
-          balanceAfter: Number(txn.balanceAfter),
-          amount: Number(txn.amount),
-        });
+        const existing = walletTxnBySession.get(txn.sessionId);
+        if (existing) {
+          existing.amount = Math.round((existing.amount + Number(txn.amount) + Number.EPSILON) * 100) / 100;
+          existing.balanceAfter = Number(txn.balanceAfter);
+          if (txn.target && !existing.targets.includes(txn.target)) existing.targets.push(txn.target);
+        } else {
+          walletTxnBySession.set(txn.sessionId, {
+            balanceBefore: Number(txn.balanceBefore),
+            balanceAfter: Number(txn.balanceAfter),
+            amount: Number(txn.amount),
+            targets: txn.target ? [txn.target] : [],
+          });
+        }
       }
     }
 

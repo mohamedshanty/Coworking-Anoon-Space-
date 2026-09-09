@@ -14,6 +14,13 @@ router.get(
   (req, res, next) => debtsController.getDebts(req, res, next)
 );
 
+// GET outstanding debt total for a person (MUST be before /:id routes)
+router.get(
+  "/outstanding",
+  authorize("المديونيات", "view"),
+  (req, res, next) => debtsController.getOutstanding(req, res, next)
+);
+
 // POST create manual debt
 router.post(
   "/",
