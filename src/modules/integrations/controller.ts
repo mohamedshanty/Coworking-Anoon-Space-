@@ -6,18 +6,7 @@ export class IntegrationsController {
   async anoonCheckIn(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const input = anoonCheckInSchema.parse(req.body);
-      const result = await integrationsService.anoonCheckIn(input.phone);
-
-      if (!result) {
-        console.warn(
-          `[AnoonCheckIn] No visitor found for phone=${input.phone} (name=${input.name}) at ${new Date().toISOString()} — not auto-creating; review Anoon QR subscriber sync/backfill`
-        );
-        res.status(404).json({
-          success: false,
-          message: "Visitor not found",
-        });
-        return;
-      }
+      const result = await integrationsService.anoonCheckIn(input);
 
       if (!result.alreadyActive) {
         const io = req.app.get("io");
@@ -26,9 +15,15 @@ export class IntegrationsController {
         }
       }
 
+      // `data` keeps the legacy shape (the session itself) so existing
+      // clients keep working; person/plan/type are additive.
       res.status(200).json({
         success: true,
         data: result.session,
+        person: result.person,
+        plan: result.plan,
+        type: result.type,
+        alreadyActive: result.alreadyActive,
       });
     } catch (error) {
       next(error);
