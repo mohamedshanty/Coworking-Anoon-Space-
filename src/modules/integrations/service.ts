@@ -257,7 +257,13 @@ export class IntegrationsService {
         type === "visitor"
           ? Math.round((baseHourlyRate + plan.hourlyRate + Number.EPSILON) * 100) / 100
           : baseHourlyRate;
-      session = await sessionsService.checkIn({ visitorId: visitor.id, hourlyRate: finalHourlyRate });
+      session = await sessionsService.checkIn({
+        visitorId: visitor.id,
+        hourlyRate: finalHourlyRate,
+        // Employees are anchored to a visitor row because sessions do not
+        // support an employee type.
+        type: type === "employee" ? "visitor" : type,
+      });
     } catch (err: any) {
       // Lost race with a concurrent check-in → return the now-open session.
       if (err?.statusCode === 400) {
