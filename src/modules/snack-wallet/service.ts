@@ -126,7 +126,14 @@ export class SnackWalletService {
     });
   }
 
-  async deduct(walletId: string, amount: number, sessionId: string, description?: string, orderId?: string) {
+  async deduct(
+    walletId: string,
+    amount: number,
+    sessionId: string,
+    description?: string,
+    orderId?: string,
+    target?: "snack" | "hours" | "mixed",
+  ) {
     const wallet = await prisma.snackWallet.findUnique({ where: { id: walletId } });
     if (!wallet) {
       throw new ApiError(404, "المحفظة غير موجودة");
@@ -136,8 +143,9 @@ export class SnackWalletService {
       throw new ApiError(400, "رصيد غير كافٍ");
     }
 
+    const rounded = Math.round((amount + Number.EPSILON) * 100) / 100;
     const balanceBefore = Number(wallet.balance);
-    const balanceAfter = balanceBefore - amount;
+    const balanceAfter = Math.round((balanceBefore - rounded + Number.EPSILON) * 100) / 100;
 
     return prisma.$transaction(async (tx) => {
       const updated = await tx.snackWallet.update({
@@ -151,7 +159,8 @@ export class SnackWalletService {
           sessionId,
           orderId: orderId ?? null,
           type: "deduction",
-          amount,
+          target: target ?? "snack",
+          amount: rounded,
           balanceBefore,
           balanceAfter,
           description: description ?? null,

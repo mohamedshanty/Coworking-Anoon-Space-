@@ -42,12 +42,16 @@ export const checkoutSchema = z.object({
   paymentAccount: z.string().optional(),
   hourlyPriceOverride: z.number().min(0).nullable().optional(),
   adjustmentNote: z.string().nullable().optional(),
+  walletId: z.string().min(1).optional(),
+  walletAmount: z.number().min(0).optional(),
+  walletTarget: z.enum(["snack", "hours", "mixed"]).optional(),
 });
 
 export const addOrderSchema = z.object({
   itemId: z.string().min(1),
   qty: z.number().int().min(1),
   skipWallet: z.boolean().optional(),
+  unitPrice: z.number().min(0).optional(),
 });
 
 export const addBatchOrdersSchema = z.object({
@@ -56,6 +60,7 @@ export const addBatchOrdersSchema = z.object({
       z.object({
         itemId: z.string().min(1),
         qty: z.number().int().min(1),
+        unitPrice: z.number().min(0).optional(),
       }),
     )
     .min(1, "At least one item is required"),

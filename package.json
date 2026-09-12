@@ -7,7 +7,10 @@
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && prisma migrate deploy && tsc",
     "start": "node dist/server.js",
-    "seed": "prisma db seed"
+    "seed": "prisma db seed",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "mikrotik:check": "tsx scripts/mikrotik-check.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -28,6 +31,7 @@
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^4.6.0",
+    "node-routeros": "^1.6.8",
     "nodemailer": "^9.0.5",
     "pg": "^8.22.0",
     "socket.io": "^4.8.3",
@@ -47,6 +51,7 @@
     "socket.io-client": "^4.8.3",
     "ts-node": "^10.9.2",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
   }
 }

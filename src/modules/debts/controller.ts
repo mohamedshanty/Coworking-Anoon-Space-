@@ -8,7 +8,25 @@ export class DebtsController {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
-      const data = await debtsService.getDebts({ page, limit });
+      const status = (req.query.status as string) || undefined;
+      const search = (req.query.search as string) || undefined;
+      const from = (req.query.from as string) || undefined;
+      const to = (req.query.to as string) || undefined;
+      const data = await debtsService.getDebts({ page, limit, status, search, from, to });
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getOutstanding(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const visitorId = (req.query.visitorId as string) || undefined;
+      const phone = (req.query.phone as string) || undefined;
+      const data = await debtsService.getOutstanding({ visitorId, phone });
       res.status(200).json({
         success: true,
         data,

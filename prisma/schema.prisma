@@ -12,6 +12,7 @@ model Visitor {
   phone          String
   type           PersonType
   lastVisit      DateTime?
+  visitCount     Int             @default(0)
   followUpStatus FollowUpStatus?
   followUpAt     DateTime?
   source         String?
@@ -21,6 +22,7 @@ model Visitor {
   sessions       Session[]
   subscriptions  Subscription[]
   visitorNotes   VisitorNote[]
+  netSessions    NetSession[]
 }
 
 model VisitorNote {
@@ -53,6 +55,7 @@ model Session {
   sales               Sale[]
   visitor             Visitor              @relation(fields: [visitorId], references: [id], onDelete: Cascade)
   snackOrders         SnackOrder[]
+  netSessions         NetSession[]
 }
 
 model SnackOrder {
@@ -147,6 +150,7 @@ model SnackWalletTransaction {
   sessionId     String?
   orderId       String?
   type          WalletTxnType
+  target        WalletTxnTarget?
   amount        Decimal       @db.Decimal(10, 2)
   balanceBefore Decimal       @db.Decimal(10, 2)
   balanceAfter  Decimal       @db.Decimal(10, 2)
@@ -231,6 +235,7 @@ model Staff {
   id             String       @id @default(uuid())
   name           String
   username       String       @unique
+  phone          String?      @unique
   role           StaffRole
   passwordHash   String
   failedAttempts Int          @default(0)
@@ -248,6 +253,17 @@ model LoginLog {
   ip        String
   userAgent String?
   staff     Staff?      @relation(fields: [userId], references: [id])
+}
+
+// Attendance roster for space employees (QR member check-in).
+// Separate from Staff (admin login accounts) by design.
+model EmployeeRoster {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Settings {
@@ -372,10 +388,96 @@ enum WalletTxnType {
   deduction
 }
 
+enum WalletTxnTarget {
+  snack
+  hours
+  mixed
+}
+
 model DailyNote {
   id          String   @id @default(uuid())
   date        DateTime
   content     String
   authorName  String
   createdAt   DateTime @default(now())
+}
+
+// ============================================================================
+//  noonWiFi — Hotspot / MikroTik integration
+// ============================================================================
+
+enum NetUserKind {
+  subscriber
+  trainee
+  employee
+  visitor
+}
+
+enum NetTier {
+  t10
+  t20
+  t30
+}
+
+enum NetEndReason {
+  checkout
+  end_of_day
+  idle
+  admin
+  superseded
+}
+
+model KnownDevice {
+  id          String   @id @default(uuid())
+  mac         String   @unique
+  phone       String
+  label       String?
+  hostname    String?
+  isBlocked   Boolean  @default(false)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @updatedAt
+
+  @@index([phone])
+  @@index([lastSeenAt])
+}
+
+model NetSession {
+  id          String        @id @default(uuid())
+  phone       String
+  name        String
+  kind        NetUserKind
+  tier        NetTier
+  hourlyRate  Decimal       @db.Decimal(10, 2)
+  mac         String
+  ip          String?
+  routerUser  String
+  startedAt   DateTime      @default(now())
+  endedAt     DateTime?
+  minutes     Int?
+  amount      Decimal?      @db.Decimal(10, 2)
+  billed      Boolean       @default(false)
+  endedReason NetEndReason?
+  sessionId   String?
+  visitorId   String?
+  session     Session?      @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  visitor     Visitor?      @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+
+  @@index([phone])
+  @@index([endedAt])
+  @@index([mac])
+  @@index([sessionId])
+  @@index([visitorId])
+}
+
+model HotspotAudit {
+  id        String   @id @default(uuid())
+  action    String
+  phone     String?
+  mac       String?
+  ok        Boolean
+  detail    String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([phone])
 }

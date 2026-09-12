@@ -9,6 +9,7 @@ import { ALLOWED_ORIGINS } from "./lib/env";
 import { prisma } from "./lib/prisma";
 import { expireStaleSubscriptions } from "./lib/subscription";
 import { generateAndSendDailyReport } from "./lib/daily-report";
+import { registerHotspotCrons } from "./modules/hotspot/hotspot.cron";
 
 const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
@@ -74,6 +75,9 @@ if (cron.validate(dailyReportCron)) {
 } else {
   console.warn(`[DailyReport] Invalid cron expression: ${dailyReportCron}. Daily report email disabled.`);
 }
+
+// noonWiFi hotspot crons (EOD sweep + idle reconciliation)
+registerHotspotCrons();
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

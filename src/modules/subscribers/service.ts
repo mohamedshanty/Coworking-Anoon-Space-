@@ -1,7 +1,9 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { CreateSubscriberInput, RenewSubscriptionInput, UpdateSubscriberInput } from "./schema";
-import { syncMemberToAnoonQr } from "../../lib/anoon-sync";
+import { syncMemberToAnoonQr, deactivateMemberOnAnoonQr } from "../../lib/anoon-sync";
+import { normalizePhone } from "../hotspot/hotspot.config";
+import { assertPhoneNotTaken } from "../../lib/personUniqueness";
 
 export class SubscribersService {
   async getSubscribers(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc"; status?: string }) {
@@ -57,6 +59,7 @@ export class SubscribersService {
       name: { name: params.sortDir ?? "asc" },
       phone: { phone: params.sortDir ?? "asc" },
       source: { source: params.sortDir ?? "asc" },
+      visitCount: { visitCount: params.sortDir ?? "desc" },
       createdAt: { createdAt: params.sortDir ?? "desc" },
     };
     const orderBy = subSortFields[params.sortField ?? "createdAt"] ?? { createdAt: "desc" };
@@ -86,8 +89,14 @@ export class SubscribersService {
       ? Math.round((data.totalFee + Number.EPSILON) * 100) / 100
       : roundedAmount;
 
+    const normalizedPhone = normalizePhone(data.phone);
+    if (!normalizedPhone) {
+      throw new ApiError(400, "Invalid phone number — expected format 05XXXXXXXX");
+    }
+
+    // Match legacy rows stored pre-normalization as well as canonical ones.
     let visitor = await prisma.visitor.findFirst({
-      where: { phone: data.phone },
+      where: { phone: { in: [data.phone, normalizedPhone] } },
     });
 
     if (visitor) {
@@ -108,20 +117,27 @@ export class SubscribersService {
           `يوجد مشترك مسجل مسبقاً بنفس رقم الهاتف: ${visitor.name}`
         );
       }
+      // Reactivation: exclude our own Visitor table from the uniqueness
+      // check (the expired-subscriber row is us) but still guard against
+      // trainee/employee collisions.
+      await assertPhoneNotTaken(normalizedPhone, { table: "visitor" });
       // Reactivation: visitor exists but has no live subscription — allow creating a new one.
       visitor = await prisma.visitor.update({
         where: { id: visitor.id },
         data: {
           type: "subscriber",
           name: data.name,
+          phone: normalizedPhone,
           ...(data.notes !== undefined ? { notes: data.notes } : {}),
         },
       });
     } else {
+      // Brand-new subscriber: full cross-table uniqueness check.
+      await assertPhoneNotTaken(normalizedPhone);
       visitor = await prisma.visitor.create({
         data: {
           name: data.name,
-          phone: data.phone,
+          phone: normalizedPhone,
           type: "subscriber",
           ...(data.notes !== undefined ? { notes: data.notes } : {}),
         },
@@ -152,7 +168,7 @@ export class SubscribersService {
             visitorId: visitor.id,
             subscriptionId: subscription.id,
             name: data.name,
-            phone: data.phone,
+            phone: normalizedPhone,
             amount: remainingBalance,
             type: "subscription",
             status: "unpaid",
@@ -167,7 +183,7 @@ export class SubscribersService {
 
     void syncMemberToAnoonQr({
       name: visitor.name,
-      phone: data.phone,
+      phone: normalizedPhone,
       packageType: data.packageType,
       startDate: result.subscription.startDate,
     });
@@ -278,7 +294,20 @@ export class SubscribersService {
     }
 
     const newName = data.name ?? undefined;
-    const newPhone = data.phone ?? undefined;
+    let newPhone: string | undefined;
+
+    // Phone changes go through the same cross-table uniqueness guard as
+    // creation (otherwise the creation check is trivially bypassable).
+    // Compare in normalized form so a mere reformat isn't a "change".
+    if (data.phone) {
+      const normalized = normalizePhone(data.phone);
+      if (!normalized) {
+        throw new ApiError(400, "Invalid phone number — expected format 05XXXXXXXX");
+      }
+      if (normalized !== visitor.phone) {
+        newPhone = await assertPhoneNotTaken(normalized);
+      }
+    }
 
     // Wrap in transaction so visitor, subscription, and debt name are consistent
     const updated = await prisma.$transaction(async (tx) => {
@@ -357,9 +386,16 @@ export class SubscribersService {
     // Cascade: Sessions (onDelete: Cascade), Subscriptions (onDelete: Cascade).
     // Debts: onDelete: SetNull — debts survive with visitorId nulled out.
     // This is acceptable: debts are financial records that should persist even after subscriber removal.
-    return prisma.visitor.delete({
+    const deleted = await prisma.visitor.delete({
       where: { id: visitorId },
     });
+
+    // Tell Anoon QR to DEACTIVATE (not delete) its copy, fire-and-forget,
+    // so a later renewal reactivates the same record. Only notified after
+    // the local delete succeeded.
+    void deactivateMemberOnAnoonQr(deleted.phone);
+
+    return deleted;
   }
 }
 

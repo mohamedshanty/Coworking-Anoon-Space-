@@ -1,8 +1,10 @@
+import path from "node:path";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { errorHandler } from "./middleware/errorHandler";
 import { ALLOWED_ORIGINS } from "./lib/env";
+import { hotspotRouter } from "./modules/hotspot/hotspot.routes";
 import authRouter from "./modules/auth/routes";
 import sessionsRouter from "./modules/sessions/routes";
 import subscribersRouter from "./modules/subscribers/routes";
@@ -24,6 +26,7 @@ import contactsRouter from "./modules/contacts/routes";
 import drinksRouter from "./modules/drinks/routes";
 import hotDrinkDefsRouter from "./modules/hot-drink-defs/routes";
 import traineesRouter from "./modules/trainees/routes";
+import employeesRouter from "./modules/employees/routes";
 import visitorsRouter from "./modules/visitors/routes";
 import snackWalletRouter from "./modules/snack-wallet/routes";
 import dailyNotesRouter from "./modules/daily-notes/routes";
@@ -110,6 +113,9 @@ router.use("/hot-drink-defs", hotDrinkDefsRouter);
 // Register trainees routes
 router.use("/trainees", traineesRouter);
 
+// Register employees roster routes (name + phone, no login)
+router.use("/employees", employeesRouter);
+
 // Register visitors profile routes
 router.use("/visitors", visitorsRouter);
 
@@ -125,6 +131,9 @@ router.use("/integrations", integrationsRouter);
 // Register public menu routes (no auth — public ordering page)
 router.use("/public", publicMenuRouter);
 
+// Register noonWiFi hotspot routes
+router.use("/hotspot", hotspotRouter);
+
 // Test routes for middleware verification
 router.get("/test-protected-view", authenticate, authorize("الرئيسية", "view"), (req, res) => {
   res.json({ success: true, message: "Authorized view!", user: req.user });
@@ -139,6 +148,23 @@ router.delete("/test-protected-delete", authenticate, authorize("الرئيسي�
 });
 
 app.use("/api/v1", router);
+
+// ---------------------------------------------------------------------------
+// noonWiFi portal — static HTML served from /portal
+//
+// The portal is a single file with inline scripts. It MUST work on a device
+// that has no internet yet (connected to WiFi but not authorized), so it
+// cannot load external resources. Helmet's CSP would block inline scripts,
+// so we strip the CSP header for this path only — NOT for the whole app.
+// The portal is served from the same origin, so no CORS changes needed.
+// ---------------------------------------------------------------------------
+app.use("/portal", (_req, res, next) => {
+  res.removeHeader("Content-Security-Policy");
+  res.removeHeader("X-Content-Security-Policy");
+  res.removeHeader("X-WebKit-CSP");
+  next();
+});
+app.use("/portal", express.static(path.join(__dirname, "../public/portal")));
 
 // Error Handler Middleware
 app.use(errorHandler);

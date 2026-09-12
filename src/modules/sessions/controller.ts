@@ -78,8 +78,8 @@ export class SessionsController {
   async checkout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const { paymentMethod, discountAmount, discountNote, paymentAccount, hourlyPriceOverride, adjustmentNote } = checkoutSchema.parse(req.body);
-      const session = await sessionsService.checkout(id, paymentMethod, discountAmount, discountNote, paymentAccount, hourlyPriceOverride, adjustmentNote);
+      const { paymentMethod, discountAmount, discountNote, paymentAccount, hourlyPriceOverride, adjustmentNote, walletId, walletAmount, walletTarget } = checkoutSchema.parse(req.body);
+      const session = await sessionsService.checkout(id, paymentMethod, discountAmount, discountNote, paymentAccount, hourlyPriceOverride, adjustmentNote, { walletId, walletAmount, walletTarget });
 
       // Socket broadcast
       const io = req.app.get("io");
@@ -119,8 +119,8 @@ export class SessionsController {
   async addOrder(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const { itemId, qty, skipWallet } = addOrderSchema.parse(req.body);
-      const { order, sale, walletTransaction } = await sessionsService.addOrder(id, itemId, qty, skipWallet);
+      const { itemId, qty, skipWallet, unitPrice } = addOrderSchema.parse(req.body);
+      const { order, sale, walletTransaction } = await sessionsService.addOrder(id, itemId, qty, skipWallet, unitPrice);
 
       // Socket broadcast
       const io = req.app.get("io");
@@ -164,8 +164,8 @@ export class SessionsController {
   async editOrderItem(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const orderId = req.params.orderId as string;
-      const { itemId, qty } = req.body;
-      const order = await sessionsService.editOrderItem(orderId, { itemId, qty });
+      const { itemId, qty, unitPrice } = req.body;
+      const order = await sessionsService.editOrderItem(orderId, { itemId, qty, unitPrice });
 
       const io = req.app.get("io");
       if (io) {

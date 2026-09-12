@@ -37,6 +37,7 @@ export class VisitorsService {
       source: visitor.source,
       notes: visitor.notes,
       lastVisit: visitor.lastVisit?.toISOString() ?? null,
+      visitCount: (visitor as any).visitCount ?? visitor._count.sessions,
       followUpStatus: visitor.followUpStatus,
       followUpAt: visitor.followUpAt?.toISOString() ?? null,
       createdAt: visitor.createdAt.toISOString(),

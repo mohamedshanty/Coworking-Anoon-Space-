@@ -53,14 +53,19 @@
 #   rx = رفع العميل (upload)  |  tx = تنزيل العميل (download)
 # نستخدم قيماً متماثلة لتجنّب أي التباس.
 # shared-users=4 يسمح للشخص الواحد بربط جواله + لابتوب + تابلت برقم واحد.
+#
+# idle-timeout=60m (وليس 15m) — مع إلغاء الفوترة عند الخمول لم تعد المهلة قراراً
+# مالياً، لكنها تقلّل مرات إعادة المسح المُحبطة للزائر. keepalive-timeout=2m
+# يكفي لإبقاء الجلسة حيّة أثناء الاجتماع/النوم القصير.
+# الفوترة على مستوى الزيارة كاملة (وليس الجلسة)، والمصالحة على الخمول لا تفوتر.
 /ip hotspot user profile
-add name=noon-10m      rate-limit=10M/10M shared-users=4 idle-timeout=15m keepalive-timeout=2m \
+add name=noon-10m      rate-limit=10M/10M shared-users=4 idle-timeout=60m keepalive-timeout=2m \
     comment="مشترك/متدرب/موظف — مجاني"
-add name=visitor-10m   rate-limit=10M/10M shared-users=4 idle-timeout=15m keepalive-timeout=2m \
+add name=visitor-10m   rate-limit=10M/10M shared-users=4 idle-timeout=60m keepalive-timeout=2m \
     comment="زائر — 3 شيكل/ساعة"
-add name=visitor-20m   rate-limit=20M/20M shared-users=4 idle-timeout=15m keepalive-timeout=2m \
+add name=visitor-20m   rate-limit=20M/20M shared-users=4 idle-timeout=60m keepalive-timeout=2m \
     comment="زائر — 4 شيكل/ساعة"
-add name=visitor-30m   rate-limit=30M/30M shared-users=4 idle-timeout=15m keepalive-timeout=2m \
+add name=visitor-30m   rate-limit=30M/30M shared-users=4 idle-timeout=60m keepalive-timeout=2m \
     comment="زائر — 5 شيكل/ساعة"
 
 # تأكيد إغلاق أي دخول تلقائي متبقٍ على البروفايل الافتراضي
