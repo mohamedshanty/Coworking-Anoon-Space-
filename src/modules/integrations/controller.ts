@@ -16,13 +16,17 @@ export class IntegrationsController {
       }
 
       // `data` keeps the legacy shape (the session itself) so existing
-      // clients keep working; person/plan/type are additive.
+      // clients keep working; person/plan/type are additive. `type` is the
+      // resolved person type; requestedType/resolvedType tell the QR side
+      // what was asked and what it resolved to.
       res.status(200).json({
         success: true,
         data: result.session,
         person: result.person,
         plan: result.plan,
         type: result.type,
+        requestedType: result.requestedType,
+        resolvedType: result.resolvedType,
         alreadyActive: result.alreadyActive,
       });
     } catch (error) {

@@ -13,10 +13,18 @@ import type { AnoonCheckInInput } from "./schema";
 
 export type AnoonPersonType = "visitor" | "subscriber" | "trainee" | "employee";
 
+/** What the kiosk asked for: unified member tab or walk-in visitor tab. */
+export type AnoonRequestedType = "member" | "visitor";
+
 export type AnoonCheckInResult = {
   session: any;
   alreadyActive: boolean;
+  /** Resolved person type (legacy `type` field — kept for old clients). */
   type: AnoonPersonType;
+  /** What the kiosk sent ("member" covers legacy subscriber/trainee/employee). */
+  requestedType: AnoonRequestedType;
+  /** Which underlying type `member` resolved to (== type; for QR logging). */
+  resolvedType: AnoonPersonType;
   person: { id?: string; name: string; phone: string };
   plan: {
     tier: NetTier;
@@ -94,16 +102,73 @@ export function resolveEffectivePlan(
   return resolvePlan("visitor", tier);
 }
 
+export type ResolvedMember =
+  | { type: "employee"; person: { id: string; name: string; phone: string } }
+  | { type: "trainee"; person: any }
+  | { type: "subscriber"; person: any };
+
+/**
+ * Unified member lookup for the Anoon QR "member" tab: given only a phone
+ * number, figure out whether it belongs to an employee, a trainee, or a
+ * subscriber. Members are NEVER auto-created — unknown phones get a 404
+ * (only the "visitor" tab auto-creates).
+ *
+ * NOTE on "trainee": Visitor rows with type "trainee", NOT the
+ * course-enrollment Trainee model. NOTE on "employee": the EmployeeRoster
+ * only — Staff login accounts are deliberately not consulted here.
+ *
+ * Task 2's creation-time uniqueness guarantee means at most one branch can
+ * ever match, so the order below is only a cheap-tables-first perf choice.
+ */
+export async function resolveMember(phone: string): Promise<ResolvedMember> {
+  const roster = await prisma.employeeRoster.findUnique({ where: { phone } });
+  if (roster?.active) {
+    return { type: "employee", person: roster };
+  }
+
+  const trainee = await prisma.visitor.findFirst({
+    where: { phone, type: "trainee" },
+    orderBy: { createdAt: "asc" },
+  });
+  if (trainee) {
+    return { type: "trainee", person: trainee };
+  }
+
+  const subscriber = await prisma.visitor.findFirst({
+    where: {
+      phone,
+      type: "subscriber",
+      subscriptions: { some: {} },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  if (subscriber) {
+    return { type: "subscriber", person: subscriber };
+  }
+
+  console.warn(
+    `[AnoonCheckIn] Unregistered member phone=${phone} at ${new Date().toISOString()} — not auto-creating`,
+  );
+  throw new ApiError(404, "This phone number is not registered. Please contact the front desk.");
+}
+
 export class IntegrationsService {
   /**
-   * Unified Anoon QR check-in for all four person types.
+   * Unified Anoon QR check-in.
    *
-   * Order: validate (controller) → normalize phone → resolve plan →
-   * resolve person → reuse open session or check in → ensure router user
-   * (best-effort) → return local result.
+   * Two incoming tabs: "member" (backend resolves subscriber / trainee /
+   * employee from the phone number) and "visitor" (auto-created).
+   * Legacy "subscriber" / "trainee" / "employee" values take the member path.
+   *
+   * Order: validate (controller) → normalize phone → resolve member →
+   * resolve plan (before any write, so a bad visitor speed never creates a
+   * row) → anchor attendance person → reuse open session or check in →
+   * ensure router user (best-effort) → return local result.
    */
   async anoonCheckIn(input: AnoonCheckInInput): Promise<AnoonCheckInResult> {
-    const type = (input.type ?? "subscriber") as AnoonPersonType;
+    const requested = (input.type ?? "subscriber") as string;
+    const requestedType: AnoonRequestedType =
+      requested === "visitor" ? "visitor" : "member";
 
     const normalized = normalizePhone(input.phone);
     if (!normalized) {
@@ -114,20 +179,46 @@ export class IntegrationsService {
     const source = input.source;
     const clientCheckinId = input.clientCheckinId;
 
+    // Resolve the real person type first (find-only — members never auto-create).
+    let type: AnoonPersonType;
+    let memberPerson: any = null;
+    if (requestedType === "member") {
+      const resolved = await resolveMember(phone);
+      type = resolved.type;
+      memberPerson = resolved.person;
+    } else {
+      type = "visitor";
+    }
+
+    // Plan resolves before any write, so a bad visitor speed (400) never
+    // leaves an orphan auto-created row behind.
     const plan = resolveEffectivePlan(type, input.internetSpeed, input.routerProfile);
 
     if (clientCheckinId || source) {
       console.log(
-        `[AnoonCheckIn] type=${type} phone=${phone} source=${source ?? "-"} clientCheckinId=${clientCheckinId ?? "-"}`,
+        `[AnoonCheckIn] requested=${requestedType} resolved=${type} phone=${phone} source=${source ?? "-"} clientCheckinId=${clientCheckinId ?? "-"}`,
       );
     }
 
-    const visitor = await this.resolvePersonByType(type, phone, name, source);
+    let visitor: any;
+    if (type === "employee") {
+      // Session.visitorId is required and PersonType has no "employee"
+      // value, so employees anchor their attendance session on a Visitor
+      // row (mirrors how reception checks an employee in as a walk-in today).
+      visitor = await this.findOrCreateVisitor(phone, memberPerson?.name ?? name, "visitor", source);
+    } else if (type === "visitor") {
+      visitor = await this.findOrCreateVisitor(phone, name, "visitor", source);
+    } else {
+      // Trainee / subscriber: the Visitor row resolveMember already found.
+      visitor = memberPerson;
+    }
 
     const buildResult = (session: any, alreadyActive: boolean): AnoonCheckInResult => ({
       session,
       alreadyActive,
       type,
+      requestedType,
+      resolvedType: type,
       person: { id: visitor.id, name: visitor.name ?? name, phone },
       plan: {
         tier: plan.tier,
@@ -188,51 +279,9 @@ export class IntegrationsService {
   }
 
   /**
-   * Find-only for subscribers (legacy behavior: 404 "Visitor not found",
-   * never auto-create) and Staff (404, never auto-create).
-   * Find-or-create for visitors/trainees via the existing Visitor model.
-   * Employees anchor their attendance session on a Visitor row because
-   * Session.visitorId is required and PersonType has no "employee" value
-   * (mirrors how reception checks an employee in as a walk-in today).
+   * Small resolvers used by resolveMember() below. Members are NEVER
+   * auto-created here — only the visitor tab creates rows.
    */
-  private async resolvePersonByType(
-    type: AnoonPersonType,
-    phone: string,
-    name: string,
-    source?: string,
-  ): Promise<any> {
-    if (type === "subscriber") {
-      const visitor = await prisma.visitor.findFirst({
-        where: { phone },
-        orderBy: { createdAt: "asc" },
-      });
-      if (!visitor) {
-        console.warn(
-          `[AnoonCheckIn] No visitor found for phone=${phone} (name=${name}) at ${new Date().toISOString()} — not auto-creating; review Anoon QR subscriber sync/backfill`,
-        );
-        throw new ApiError(404, "Visitor not found");
-      }
-      return visitor;
-    }
-
-    if (type === "employee") {
-      const staff = await prisma.staff.findUnique({
-        where: { phone },
-        select: { id: true, name: true, phone: true },
-      });
-      if (!staff) {
-        throw new ApiError(404, "Staff member not found");
-      }
-      return this.findOrCreateVisitor(phone, staff.name ?? name, "visitor", source);
-    }
-
-    if (type === "trainee") {
-      return this.findOrCreateVisitor(phone, name, "trainee", source);
-    }
-
-    return this.findOrCreateVisitor(phone, name, "visitor", source);
-  }
-
   private async findOrCreateVisitor(
     phone: string,
     name: string,

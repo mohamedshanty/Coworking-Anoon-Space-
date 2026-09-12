@@ -19,15 +19,13 @@ vi.mock("../../lib/mikrotik", () => ({
 const {
   mockVisitorFindFirst,
   mockVisitorCreate,
-  mockStaffFindUnique,
-  mockStaffCreate,
+  mockEmployeeFindUnique,
   mockSessionFindFirst,
   mockSettingsFindFirst,
 } = vi.hoisted(() => ({
   mockVisitorFindFirst: vi.fn(),
   mockVisitorCreate: vi.fn(),
-  mockStaffFindUnique: vi.fn(),
-  mockStaffCreate: vi.fn(),
+  mockEmployeeFindUnique: vi.fn(),
   mockSessionFindFirst: vi.fn(),
   mockSettingsFindFirst: vi.fn(),
 }));
@@ -35,7 +33,7 @@ const {
 vi.mock("../../lib/prisma", () => ({
   prisma: {
     visitor: { findFirst: mockVisitorFindFirst, create: mockVisitorCreate },
-    staff: { findUnique: mockStaffFindUnique, create: mockStaffCreate },
+    employeeRoster: { findUnique: mockEmployeeFindUnique },
     session: { findFirst: mockSessionFindFirst },
     settings: { findFirst: mockSettingsFindFirst },
   },
@@ -53,7 +51,7 @@ vi.mock("../sessions/service", () => ({
 // Import after mocks
 // ---------------------------------------------------------------------------
 
-import { integrationsService, resolveEffectivePlan } from "./service";
+import { integrationsService, resolveEffectivePlan, resolveMember } from "./service";
 import { anoonCheckInSchema } from "./schema";
 import { ApiError } from "../../lib/ApiError";
 
@@ -81,7 +79,7 @@ beforeEach(() => {
   mockVisitorCreate.mockImplementation((args: any) =>
     Promise.resolve({ id: "v-new", ...args.data }),
   );
-  mockStaffFindUnique.mockResolvedValue(null);
+  mockEmployeeFindUnique.mockResolvedValue(null);
   mockSessionFindFirst.mockResolvedValue(null);
   // Base seat price for surcharge tests (Settings.hourlyRate).
   mockSettingsFindFirst.mockResolvedValue({ hourlyRate: 10 });
@@ -108,12 +106,23 @@ async function expect404(promise: Promise<any>, message: string) {
 // ---------------------------------------------------------------------------
 
 describe("anoonCheckInSchema", () => {
-  it("defaults missing type to subscriber (legacy payload)", () => {
+  it("defaults missing type to subscriber (legacy payload → member path)", () => {
     const parsed = anoonCheckInSchema.parse({
       phone: "0590000003",
       name: "Legacy Subscriber",
     });
     expect(parsed.type).toBe("subscriber");
+  });
+
+  it("accepts the two new tabs plus the three legacy values", () => {
+    for (const type of ["member", "visitor", "subscriber", "trainee", "employee"]) {
+      const parsed = anoonCheckInSchema.parse({
+        type,
+        phone: "0590000000",
+        name: "Someone",
+      });
+      expect(parsed.type).toBe(type);
+    }
   });
 
   it("rejects an invalid visitor speed (40M)", () => {
@@ -129,7 +138,76 @@ describe("anoonCheckInSchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Visitors
+// resolveMember unit checks
+// ---------------------------------------------------------------------------
+
+describe("resolveMember", () => {
+  it("active roster row → employee (visitor table never queried)", async () => {
+    mockEmployeeFindUnique.mockResolvedValue({
+      id: "e-1",
+      name: "Test Employee",
+      phone: "0590000002",
+      active: true,
+    });
+
+    const resolved = await resolveMember("0590000002");
+
+    expect(resolved.type).toBe("employee");
+    expect(mockVisitorFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("inactive roster row falls through to the trainee check", async () => {
+    mockEmployeeFindUnique.mockResolvedValue({
+      id: "e-1",
+      name: "Ex Employee",
+      phone: "0590000002",
+      active: false,
+    });
+    mockVisitorFindFirst.mockResolvedValueOnce(
+      mockVisitor({ id: "v-t", type: "trainee", phone: "0590000002" }),
+    );
+
+    const resolved = await resolveMember("0590000002");
+
+    expect(resolved.type).toBe("trainee");
+  });
+
+  it("trainee Visitor row → trainee", async () => {
+    mockVisitorFindFirst.mockResolvedValueOnce(
+      mockVisitor({ id: "v-t", type: "trainee", phone: "0590000001" }),
+    );
+
+    const resolved = await resolveMember("0590000001");
+
+    expect(resolved.type).toBe("trainee");
+    expect(mockVisitorFindFirst).toHaveBeenCalledTimes(1);
+  });
+
+  it("subscription-backed Visitor row → subscriber", async () => {
+    mockVisitorFindFirst
+      .mockResolvedValueOnce(null) // trainee check: no match
+      .mockResolvedValueOnce(
+        mockVisitor({ id: "v-sub", type: "subscriber", phone: "0590000003" }),
+      );
+
+    const resolved = await resolveMember("0590000003");
+
+    expect(resolved.type).toBe("subscriber");
+    expect(mockVisitorFindFirst).toHaveBeenCalledTimes(2);
+  });
+
+  it("unknown phone → 404 with the front-desk message", async () => {
+    mockVisitorFindFirst.mockResolvedValue(null);
+
+    await expect404(
+      resolveMember("0590000009"),
+      "This phone number is not registered. Please contact the front desk.",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Visitors (unchanged tab)
 // ---------------------------------------------------------------------------
 
 describe("visitor check-in", () => {
@@ -143,6 +221,8 @@ describe("visitor check-in", () => {
     } as any);
 
     expect(result.type).toBe("visitor");
+    expect(result.requestedType).toBe("visitor");
+    expect(result.resolvedType).toBe("visitor");
     expect(result.alreadyActive).toBe(false);
     expect(result.session.id).toBe("s-001");
     expect(result.plan.internetSpeed).toBe("10M");
@@ -203,7 +283,7 @@ describe("visitor check-in", () => {
     );
   });
 
-  it("rejects an unknown visitor router profile", async () => {
+  it("rejects an unknown visitor router profile before creating anything", async () => {
     await expect(
       integrationsService.anoonCheckIn({
         type: "visitor",
@@ -213,85 +293,6 @@ describe("visitor check-in", () => {
         routerProfile: "gold-100m",
       } as any),
     ).rejects.toMatchObject({ statusCode: 400 });
-    expect(mockCheckIn).not.toHaveBeenCalled();
-    expect(mockEnsureUser).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Trainee
-// ---------------------------------------------------------------------------
-
-describe("trainee check-in", () => {
-  it("ignores requested 30M/visitor-30m → noon-10m", async () => {
-    const result = await integrationsService.anoonCheckIn({
-      type: "trainee",
-      name: "Test Trainee",
-      phone: "0590000001",
-      internetSpeed: "30M",
-      routerProfile: "visitor-30m",
-    } as any);
-
-    expect(result.type).toBe("trainee");
-    expect(result.plan.internetSpeed).toBe("10M");
-    expect(result.plan.routerProfile).toBe("noon-10m");
-    expect(mockVisitorCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ type: "trainee" }),
-      }),
-    );
-    expect(mockEnsureUser).toHaveBeenCalledWith(
-      expect.objectContaining({ profile: "noon-10m" }),
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Employee (Staff find-only)
-// ---------------------------------------------------------------------------
-
-describe("employee check-in", () => {
-  it("existing Staff → session created, noon-10m, no Staff creation", async () => {
-    mockStaffFindUnique.mockResolvedValue({
-      id: "st-1",
-      name: "Test Employee",
-      phone: "0590000002",
-    });
-
-    const result = await integrationsService.anoonCheckIn({
-      type: "employee",
-      name: "Test Employee",
-      phone: "0590000002",
-      internetSpeed: "30M",
-      routerProfile: "visitor-30m",
-    } as any);
-
-    expect(result.type).toBe("employee");
-    expect(result.plan.internetSpeed).toBe("10M");
-    expect(result.plan.routerProfile).toBe("noon-10m");
-    expect(mockStaffFindUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { phone: "0590000002" } }),
-    );
-    expect(mockStaffCreate).not.toHaveBeenCalled();
-    expect(mockCheckIn).toHaveBeenCalledTimes(1);
-    expect(mockEnsureUser).toHaveBeenCalledWith(
-      expect.objectContaining({ profile: "noon-10m" }),
-    );
-  });
-
-  it("missing Staff → 404, no session, no router user, no records created", async () => {
-    mockStaffFindUnique.mockResolvedValue(null);
-
-    await expect404(
-      integrationsService.anoonCheckIn({
-        type: "employee",
-        name: "Ghost",
-        phone: "0590000009",
-      } as any),
-      "Staff member not found",
-    );
-
-    expect(mockStaffCreate).not.toHaveBeenCalled();
     expect(mockVisitorCreate).not.toHaveBeenCalled();
     expect(mockCheckIn).not.toHaveBeenCalled();
     expect(mockEnsureUser).not.toHaveBeenCalled();
@@ -299,44 +300,111 @@ describe("employee check-in", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Subscriber (legacy behavior preserved)
+// Member tab (unified resolution)
 // ---------------------------------------------------------------------------
 
-describe("subscriber check-in", () => {
-  it("existing subscriber → session, noon-10m, never auto-created", async () => {
-    mockVisitorFindFirst.mockResolvedValue(
-      mockVisitor({ id: "v-sub", type: "subscriber", phone: "0590000003" }),
-    );
+describe("member check-in", () => {
+  it("subscriber phone → noon-10m, base rate, never auto-created", async () => {
+    mockVisitorFindFirst
+      .mockResolvedValueOnce(null) // trainee check
+      .mockResolvedValueOnce(
+        mockVisitor({ id: "v-sub", type: "subscriber", phone: "0590000003" }),
+      );
 
     const result = await integrationsService.anoonCheckIn({
-      type: "subscriber",
-      name: "Legacy Subscriber",
+      type: "member",
+      name: "Member Subscriber",
       phone: "0590000003",
       internetSpeed: "30M",
       routerProfile: "visitor-30m",
     } as any);
 
+    expect(result.requestedType).toBe("member");
+    expect(result.resolvedType).toBe("subscriber");
+    expect(result.type).toBe("subscriber");
     expect(result.plan.internetSpeed).toBe("10M");
     expect(result.plan.routerProfile).toBe("noon-10m");
     expect(mockVisitorCreate).not.toHaveBeenCalled();
     expect(mockCheckIn).toHaveBeenCalledWith(
-      expect.objectContaining({ visitorId: "v-sub" }),
+      expect.objectContaining({ visitorId: "v-sub", hourlyRate: 10 }),
     );
     expect(mockEnsureUser).toHaveBeenCalledWith(
       expect.objectContaining({ profile: "noon-10m" }),
     );
   });
 
-  it("missing subscriber → 404 'Visitor not found', nothing created", async () => {
+  it("trainee phone → noon-10m, requested speed ignored, never auto-created", async () => {
+    mockVisitorFindFirst.mockResolvedValueOnce(
+      mockVisitor({ id: "v-t", type: "trainee", phone: "0590000001" }),
+    );
+
+    const result = await integrationsService.anoonCheckIn({
+      type: "member",
+      name: "Member Trainee",
+      phone: "0590000001",
+      internetSpeed: "30M",
+      routerProfile: "visitor-30m",
+    } as any);
+
+    expect(result.resolvedType).toBe("trainee");
+    expect(result.type).toBe("trainee");
+    expect(result.plan.internetSpeed).toBe("10M");
+    expect(result.plan.routerProfile).toBe("noon-10m");
+    expect(mockVisitorCreate).not.toHaveBeenCalled();
+    expect(mockCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({ visitorId: "v-t", hourlyRate: 10 }),
+    );
+  });
+
+  it("employee roster phone → noon-10m, anchored on a Visitor row", async () => {
+    mockEmployeeFindUnique.mockResolvedValue({
+      id: "e-1",
+      name: "Test Employee",
+      phone: "0590000002",
+      active: true,
+    });
+    // No attendance anchor yet → findOrCreateVisitor creates one.
+    mockVisitorFindFirst.mockResolvedValue(null);
+
+    const result = await integrationsService.anoonCheckIn({
+      type: "member",
+      name: "Test Employee",
+      phone: "0590000002",
+      internetSpeed: "30M",
+      routerProfile: "visitor-30m",
+    } as any);
+
+    expect(result.resolvedType).toBe("employee");
+    expect(result.type).toBe("employee");
+    expect(result.plan.internetSpeed).toBe("10M");
+    expect(result.plan.routerProfile).toBe("noon-10m");
+    expect(mockVisitorCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: "visitor",
+          phone: "0590000002",
+          name: "Test Employee",
+        }),
+      }),
+    );
+    expect(mockCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({ visitorId: "v-new", hourlyRate: 10 }),
+    );
+    expect(mockEnsureUser).toHaveBeenCalledWith(
+      expect.objectContaining({ profile: "noon-10m" }),
+    );
+  });
+
+  it("unregistered phone → 404, nothing created", async () => {
     mockVisitorFindFirst.mockResolvedValue(null);
 
     await expect404(
       integrationsService.anoonCheckIn({
-        type: "subscriber",
+        type: "member",
         name: "Nobody",
-        phone: "0590000004",
+        phone: "0590000009",
       } as any),
-      "Visitor not found",
+      "This phone number is not registered. Please contact the front desk.",
     );
 
     expect(mockVisitorCreate).not.toHaveBeenCalled();
@@ -344,10 +412,33 @@ describe("subscriber check-in", () => {
     expect(mockEnsureUser).not.toHaveBeenCalled();
   });
 
-  it("legacy request without type follows the subscriber flow", async () => {
-    mockVisitorFindFirst.mockResolvedValue(
-      mockVisitor({ id: "v-sub", type: "subscriber", phone: "0590000003" }),
-    );
+  it("legacy type=subscriber follows the member path", async () => {
+    mockVisitorFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        mockVisitor({ id: "v-sub", type: "subscriber", phone: "0590000003" }),
+      );
+
+    const parsed = anoonCheckInSchema.parse({
+      type: "subscriber",
+      phone: "0590000003",
+      name: "Legacy Subscriber",
+    });
+    const result = await integrationsService.anoonCheckIn(parsed);
+
+    expect(result.requestedType).toBe("member");
+    expect(result.resolvedType).toBe("subscriber");
+    expect(result.plan.routerProfile).toBe("noon-10m");
+    expect(mockVisitorCreate).not.toHaveBeenCalled();
+    expect(mockCheckIn).toHaveBeenCalledTimes(1);
+  });
+
+  it("legacy request without type follows the member path", async () => {
+    mockVisitorFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        mockVisitor({ id: "v-sub", type: "subscriber", phone: "0590000003" }),
+      );
 
     const parsed = anoonCheckInSchema.parse({
       phone: "0590000003",
@@ -355,10 +446,76 @@ describe("subscriber check-in", () => {
     });
     const result = await integrationsService.anoonCheckIn(parsed);
 
-    expect(result.type).toBe("subscriber");
+    expect(result.requestedType).toBe("member");
+    expect(result.resolvedType).toBe("subscriber");
     expect(result.plan.routerProfile).toBe("noon-10m");
     expect(mockVisitorCreate).not.toHaveBeenCalled();
     expect(mockCheckIn).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hourly rate: base seat price + visitor internet surcharge (Task 1)
+// ---------------------------------------------------------------------------
+
+describe("hourly rate surcharge", () => {
+  it("visitor 20M → Session hourlyRate = base (10) + surcharge (4)", async () => {
+    await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "20M",
+    } as any);
+
+    expect(mockCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({ hourlyRate: 14 }),
+    );
+  });
+
+  it("visitor 10M → Session hourlyRate = base (10) + surcharge (3)", async () => {
+    await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+    } as any);
+
+    expect(mockCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({ hourlyRate: 13 }),
+    );
+  });
+
+  it("member subscriber → Session hourlyRate = base (10), no surcharge", async () => {
+    mockVisitorFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        mockVisitor({ id: "v-sub", type: "subscriber", phone: "0590000003" }),
+      );
+
+    await integrationsService.anoonCheckIn({
+      type: "member",
+      name: "Member Subscriber",
+      phone: "0590000003",
+    } as any);
+
+    expect(mockCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({ visitorId: "v-sub", hourlyRate: 10 }),
+    );
+  });
+
+  it("idempotent replay does not re-fetch settings or re-check-in", async () => {
+    mockVisitorFindFirst.mockResolvedValue(mockVisitor());
+    mockSessionFindFirst.mockResolvedValue(mockSession());
+
+    await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "20M",
+    } as any);
+
+    expect(mockCheckIn).not.toHaveBeenCalled();
+    expect(mockSettingsFindFirst).not.toHaveBeenCalled();
   });
 });
 
@@ -427,69 +584,6 @@ describe("idempotency and router failure", () => {
     expect(result.alreadyActive).toBe(true);
     expect(mockCheckIn).not.toHaveBeenCalled();
     expect(mockEnsureUser).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Hourly rate: base seat price + visitor internet surcharge (Task 1)
-// ---------------------------------------------------------------------------
-
-describe("hourly rate surcharge", () => {
-  it("visitor 20M → Session hourlyRate = base (10) + surcharge (4)", async () => {
-    await integrationsService.anoonCheckIn({
-      type: "visitor",
-      name: "Test Visitor",
-      phone: "0590000000",
-      internetSpeed: "20M",
-    } as any);
-
-    expect(mockCheckIn).toHaveBeenCalledWith(
-      expect.objectContaining({ hourlyRate: 14 }),
-    );
-  });
-
-  it("visitor 10M → Session hourlyRate = base (10) + surcharge (3)", async () => {
-    await integrationsService.anoonCheckIn({
-      type: "visitor",
-      name: "Test Visitor",
-      phone: "0590000000",
-      internetSpeed: "10M",
-    } as any);
-
-    expect(mockCheckIn).toHaveBeenCalledWith(
-      expect.objectContaining({ hourlyRate: 13 }),
-    );
-  });
-
-  it("subscriber → Session hourlyRate = base (10), no surcharge", async () => {
-    mockVisitorFindFirst.mockResolvedValue(
-      mockVisitor({ id: "v-sub", type: "subscriber", phone: "0590000003" }),
-    );
-
-    await integrationsService.anoonCheckIn({
-      type: "subscriber",
-      name: "Legacy Subscriber",
-      phone: "0590000003",
-    } as any);
-
-    expect(mockCheckIn).toHaveBeenCalledWith(
-      expect.objectContaining({ visitorId: "v-sub", hourlyRate: 10 }),
-    );
-  });
-
-  it("idempotent replay does not re-fetch settings or re-check-in", async () => {
-    mockVisitorFindFirst.mockResolvedValue(mockVisitor());
-    mockSessionFindFirst.mockResolvedValue(mockSession());
-
-    await integrationsService.anoonCheckIn({
-      type: "visitor",
-      name: "Test Visitor",
-      phone: "0590000000",
-      internetSpeed: "20M",
-    } as any);
-
-    expect(mockCheckIn).not.toHaveBeenCalled();
-    expect(mockSettingsFindFirst).not.toHaveBeenCalled();
   });
 });
 
