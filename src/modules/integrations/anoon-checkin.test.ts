@@ -22,12 +22,14 @@ const {
   mockStaffFindUnique,
   mockStaffCreate,
   mockSessionFindFirst,
+  mockSettingsFindFirst,
 } = vi.hoisted(() => ({
   mockVisitorFindFirst: vi.fn(),
   mockVisitorCreate: vi.fn(),
   mockStaffFindUnique: vi.fn(),
   mockStaffCreate: vi.fn(),
   mockSessionFindFirst: vi.fn(),
+  mockSettingsFindFirst: vi.fn(),
 }));
 
 vi.mock("../../lib/prisma", () => ({
@@ -35,6 +37,7 @@ vi.mock("../../lib/prisma", () => ({
     visitor: { findFirst: mockVisitorFindFirst, create: mockVisitorCreate },
     staff: { findUnique: mockStaffFindUnique, create: mockStaffCreate },
     session: { findFirst: mockSessionFindFirst },
+    settings: { findFirst: mockSettingsFindFirst },
   },
 }));
 
@@ -80,6 +83,8 @@ beforeEach(() => {
   );
   mockStaffFindUnique.mockResolvedValue(null);
   mockSessionFindFirst.mockResolvedValue(null);
+  // Base seat price for surcharge tests (Settings.hourlyRate).
+  mockSettingsFindFirst.mockResolvedValue({ hourlyRate: 10 });
   mockCheckIn.mockImplementation((args: any) =>
     Promise.resolve({ id: "s-001", visitorId: args.visitorId }),
   );
@@ -314,7 +319,9 @@ describe("subscriber check-in", () => {
     expect(result.plan.internetSpeed).toBe("10M");
     expect(result.plan.routerProfile).toBe("noon-10m");
     expect(mockVisitorCreate).not.toHaveBeenCalled();
-    expect(mockCheckIn).toHaveBeenCalledWith({ visitorId: "v-sub" });
+    expect(mockCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({ visitorId: "v-sub" }),
+    );
     expect(mockEnsureUser).toHaveBeenCalledWith(
       expect.objectContaining({ profile: "noon-10m" }),
     );
@@ -420,6 +427,69 @@ describe("idempotency and router failure", () => {
     expect(result.alreadyActive).toBe(true);
     expect(mockCheckIn).not.toHaveBeenCalled();
     expect(mockEnsureUser).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hourly rate: base seat price + visitor internet surcharge (Task 1)
+// ---------------------------------------------------------------------------
+
+describe("hourly rate surcharge", () => {
+  it("visitor 20M → Session hourlyRate = base (10) + surcharge (4)", async () => {
+    await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "20M",
+    } as any);
+
+    expect(mockCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({ hourlyRate: 14 }),
+    );
+  });
+
+  it("visitor 10M → Session hourlyRate = base (10) + surcharge (3)", async () => {
+    await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+    } as any);
+
+    expect(mockCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({ hourlyRate: 13 }),
+    );
+  });
+
+  it("subscriber → Session hourlyRate = base (10), no surcharge", async () => {
+    mockVisitorFindFirst.mockResolvedValue(
+      mockVisitor({ id: "v-sub", type: "subscriber", phone: "0590000003" }),
+    );
+
+    await integrationsService.anoonCheckIn({
+      type: "subscriber",
+      name: "Legacy Subscriber",
+      phone: "0590000003",
+    } as any);
+
+    expect(mockCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({ visitorId: "v-sub", hourlyRate: 10 }),
+    );
+  });
+
+  it("idempotent replay does not re-fetch settings or re-check-in", async () => {
+    mockVisitorFindFirst.mockResolvedValue(mockVisitor());
+    mockSessionFindFirst.mockResolvedValue(mockSession());
+
+    await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "20M",
+    } as any);
+
+    expect(mockCheckIn).not.toHaveBeenCalled();
+    expect(mockSettingsFindFirst).not.toHaveBeenCalled();
   });
 });
 

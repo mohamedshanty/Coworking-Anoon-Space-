@@ -152,7 +152,21 @@ export class IntegrationsService {
 
     let session: any;
     try {
-      session = await sessionsService.checkIn({ visitorId: visitor.id });
+      // Seat price + visitor internet surcharge, baked into the session rate
+      // so the Live ("داخل المساحة") page shows the real hourly price.
+      // Members (subscriber/trainee/employee) use the free noon-10m profile
+      // and pay no surcharge. sessionsService.checkIn already accepts an
+      // hourlyRate override — no signature change needed there.
+      const settings = await prisma.settings.findFirst();
+      if (!settings) {
+        throw new ApiError(500, "Settings not initialized in database");
+      }
+      const baseHourlyRate = Number(settings.hourlyRate);
+      const finalHourlyRate =
+        type === "visitor"
+          ? Math.round((baseHourlyRate + plan.hourlyRate + Number.EPSILON) * 100) / 100
+          : baseHourlyRate;
+      session = await sessionsService.checkIn({ visitorId: visitor.id, hourlyRate: finalHourlyRate });
     } catch (err: any) {
       // Lost race with a concurrent check-in → return the now-open session.
       if (err?.statusCode === 400) {
