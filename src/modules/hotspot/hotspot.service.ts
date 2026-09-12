@@ -7,7 +7,7 @@
  */
 
 import crypto from "node:crypto";
-import { NetTier, NetUserKind, NetEndReason } from "@prisma/client";
+import { NetTier, NetUserKind, NetEndReason, Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { HOTSPOT_USER_SECRET } from "../../lib/env";
 import { getMikrotik, normalizeMac } from "../../lib/mikrotik";
@@ -480,7 +480,7 @@ async function computeVisitCharge(phone: string, asOf: Date): Promise<VisitCharg
     id: string;
     kind: NetUserKind;
     tier: NetTier;
-    hourlyRate: number;
+    hourlyRate: Prisma.Decimal;
     sessionId: string | null;
     visitorId: string | null;
     startedAt: Date;
