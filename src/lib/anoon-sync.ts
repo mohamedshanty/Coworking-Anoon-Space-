@@ -72,3 +72,54 @@ export async function syncMemberToAnoonQr(payload: {
     return { ok: false, reason: isTimeout ? "timeout" : "network-error" };
   }
 }
+
+/**
+ * Deactivate (not delete) a member on Anoon QR so a later renewal can
+ * reactivate the same record. Same fire-and-forget pattern as
+ * syncMemberToAnoonQr: 5s timeout, failures only logged.
+ *
+ * NOTE: requires the Anoon QR side to implement POST /sync/member/deactivate
+ * first — until then this logs an http-* failure and nothing breaks.
+ */
+export async function deactivateMemberOnAnoonQr(phone: string): Promise<AnoonSyncOutcome> {
+  try {
+    const baseUrl = process.env.ANOON_QR_BASE_URL;
+    const secret = process.env.INTERNAL_SYNC_SECRET;
+
+    if (!baseUrl || !secret) {
+      console.warn(
+        `[AnoonSync] Skipped member deactivate (phone=${phone}): ANOON_QR_BASE_URL or INTERNAL_SYNC_SECRET is not configured`
+      );
+      return { ok: false, reason: "not-configured" };
+    }
+
+    const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/sync/member/deactivate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Secret": secret,
+      },
+      body: JSON.stringify({ phone }),
+      signal: AbortSignal.timeout(ANOON_SYNC_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      console.error(
+        `[AnoonSync] Member deactivate failed (phone=${phone}, at=${new Date().toISOString()}): HTTP ${response.status} ${responseText}`.trim()
+      );
+      return { ok: false, reason: `http-${response.status}` };
+    }
+
+    console.log(`[AnoonSync] Deactivated member (phone=${phone})`);
+    return { ok: true };
+  } catch (error) {
+    const isTimeout =
+      error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+    console.error(
+      `[AnoonSync] Member deactivate failed (phone=${phone}, at=${new Date().toISOString()}):`,
+      error
+    );
+    return { ok: false, reason: isTimeout ? "timeout" : "network-error" };
+  }
+}

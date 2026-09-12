@@ -1,7 +1,7 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { CreateSubscriberInput, RenewSubscriptionInput, UpdateSubscriberInput } from "./schema";
-import { syncMemberToAnoonQr } from "../../lib/anoon-sync";
+import { syncMemberToAnoonQr, deactivateMemberOnAnoonQr } from "../../lib/anoon-sync";
 import { normalizePhone } from "../hotspot/hotspot.config";
 import { assertPhoneNotTaken } from "../../lib/personUniqueness";
 
@@ -386,9 +386,16 @@ export class SubscribersService {
     // Cascade: Sessions (onDelete: Cascade), Subscriptions (onDelete: Cascade).
     // Debts: onDelete: SetNull — debts survive with visitorId nulled out.
     // This is acceptable: debts are financial records that should persist even after subscriber removal.
-    return prisma.visitor.delete({
+    const deleted = await prisma.visitor.delete({
       where: { id: visitorId },
     });
+
+    // Tell Anoon QR to DEACTIVATE (not delete) its copy, fire-and-forget,
+    // so a later renewal reactivates the same record. Only notified after
+    // the local delete succeeded.
+    void deactivateMemberOnAnoonQr(deleted.phone);
+
+    return deleted;
   }
 }
 
