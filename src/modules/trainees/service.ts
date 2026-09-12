@@ -1,6 +1,8 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { CreateTraineeInput, UpdateTraineeInput } from "./schema";
+import { normalizePhone } from "../hotspot/hotspot.config";
+import { assertPhoneNotTaken } from "../../lib/personUniqueness";
 
 export class TraineesService {
   async getTrainees(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc" }) {
@@ -46,22 +48,15 @@ export class TraineesService {
   }
 
   async createTrainee(data: CreateTraineeInput) {
-    // Check if a visitor with this phone already exists
-    const existing = await prisma.visitor.findFirst({
-      where: { phone: data.phone },
-    });
-
-    if (existing) {
-      throw new ApiError(
-        409,
-        `يوجد شخص مسجل مسبقاً بنفس رقم الهاتف: ${existing.name}`
-      );
-    }
+    // Cross-table uniqueness: a phone belongs to exactly one of
+    // subscriber / trainee / employee. Plain walk-in visitor rows
+    // (auto-created, no subscription) intentionally do NOT conflict.
+    const phone = await assertPhoneNotTaken(data.phone);
 
     const visitor = await prisma.visitor.create({
       data: {
         name: data.name,
-        phone: data.phone,
+        phone,
         type: "trainee",
         source: data.source ?? null,
         notes: data.notes ?? null,
@@ -80,13 +75,16 @@ export class TraineesService {
       throw new ApiError(400, "Visitor is not a trainee");
     }
 
-    // If changing phone, check for duplicates
-    if (data.phone && data.phone !== visitor.phone) {
-      const duplicate = await prisma.visitor.findFirst({
-        where: { phone: data.phone, id: { not: id } },
-      });
-      if (duplicate) {
-        throw new ApiError(409, `رقم الهاتف مستخدم بالفعل: ${duplicate.name}`);
+    // If changing phone, run the cross-table uniqueness guard (covers
+    // subscribers, other trainees, and the employee roster).
+    let newPhone: string | undefined;
+    if (data.phone) {
+      const normalized = normalizePhone(data.phone);
+      if (!normalized) {
+        throw new ApiError(400, "Invalid phone number — expected format 05XXXXXXXX");
+      }
+      if (normalized !== visitor.phone) {
+        newPhone = await assertPhoneNotTaken(normalized);
       }
     }
 
@@ -94,7 +92,7 @@ export class TraineesService {
       where: { id },
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.phone !== undefined ? { phone: data.phone } : {}),
+        ...(newPhone !== undefined ? { phone: newPhone } : {}),
         ...(data.source !== undefined ? { source: data.source } : {}),
         ...(data.notes !== undefined ? { notes: data.notes } : {}),
       },
