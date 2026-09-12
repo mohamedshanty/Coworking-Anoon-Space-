@@ -255,6 +255,17 @@ model LoginLog {
   staff     Staff?      @relation(fields: [userId], references: [id])
 }
 
+// Attendance roster for space employees (QR member check-in).
+// Separate from Staff (admin login accounts) by design.
+model EmployeeRoster {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Settings {
   id                    String  @id @default("default")
   hourlyRate            Decimal @db.Decimal(10, 2)
