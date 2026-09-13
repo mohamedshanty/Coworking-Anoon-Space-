@@ -300,6 +300,7 @@ enum PersonType {
   visitor
   subscriber
   trainee
+  employee
 }
 
 enum SessionPaymentStatus {

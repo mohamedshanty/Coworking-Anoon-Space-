@@ -172,10 +172,13 @@ export class IntegrationsService {
 
     const normalized = normalizePhone(input.phone);
     if (!normalized) {
-      throw new ApiError(400, "Invalid phone number — expected format 05XXXXXXXX");
+      throw new ApiError(
+        400,
+        "Invalid phone number — expected format 05XXXXXXXX",
+      );
     }
     const phone = normalized;
-    const name = input.name.trim();
+    const name = input.name?.trim() || "";
     const source = input.source;
     const clientCheckinId = input.clientCheckinId;
 
@@ -192,7 +195,11 @@ export class IntegrationsService {
 
     // Plan resolves before any write, so a bad visitor speed (400) never
     // leaves an orphan auto-created row behind.
-    const plan = resolveEffectivePlan(type, input.internetSpeed, input.routerProfile);
+    const plan = resolveEffectivePlan(
+      type,
+      input.internetSpeed,
+      input.routerProfile,
+    );
 
     if (clientCheckinId || source) {
       console.log(
@@ -205,7 +212,12 @@ export class IntegrationsService {
       // Session.visitorId is required and PersonType has no "employee"
       // value, so employees anchor their attendance session on a Visitor
       // row (mirrors how reception checks an employee in as a walk-in today).
-      visitor = await this.findOrCreateVisitor(phone, memberPerson?.name ?? name, "visitor", source);
+      visitor = await this.findOrCreateVisitor(
+        phone,
+        memberPerson?.name ?? name,
+        "visitor",
+        source,
+      );
     } else if (type === "visitor") {
       visitor = await this.findOrCreateVisitor(phone, name, "visitor", source);
     } else {
@@ -213,7 +225,10 @@ export class IntegrationsService {
       visitor = memberPerson;
     }
 
-    const buildResult = (session: any, alreadyActive: boolean): AnoonCheckInResult => ({
+    const buildResult = (
+      session: any,
+      alreadyActive: boolean,
+    ): AnoonCheckInResult => ({
       session,
       alreadyActive,
       type,
@@ -255,14 +270,16 @@ export class IntegrationsService {
       const baseHourlyRate = Number(settings.hourlyRate);
       const finalHourlyRate =
         type === "visitor"
-          ? Math.round((baseHourlyRate + plan.hourlyRate + Number.EPSILON) * 100) / 100
+          ? Math.round(
+              (baseHourlyRate + plan.hourlyRate + Number.EPSILON) * 100,
+            ) / 100
           : baseHourlyRate;
       session = await sessionsService.checkIn({
         visitorId: visitor.id,
         hourlyRate: finalHourlyRate,
         // Employees are anchored to a visitor row because sessions do not
         // support an employee type.
-        type: type === "employee" ? "visitor" : type,
+        type,
       });
     } catch (err: any) {
       // Lost race with a concurrent check-in → return the now-open session.
@@ -291,7 +308,7 @@ export class IntegrationsService {
   private async findOrCreateVisitor(
     phone: string,
     name: string,
-    personType: "visitor" | "trainee",
+    personType: "visitor" | "trainee" | "employee",
     source?: string,
   ): Promise<any> {
     const existing = await prisma.visitor.findFirst({
@@ -318,10 +335,16 @@ export class IntegrationsService {
     try {
       const secret = process.env.HOTSPOT_USER_SECRET ?? "";
       if (!secret) {
-        console.warn("[AnoonCheckIn] HOTSPOT_USER_SECRET is not set — skipping router provisioning");
+        console.warn(
+          "[AnoonCheckIn] HOTSPOT_USER_SECRET is not set — skipping router provisioning",
+        );
         return;
       }
-      const password = crypto.createHmac("sha256", secret).update(phone).digest("hex").slice(0, 16);
+      const password = crypto
+        .createHmac("sha256", secret)
+        .update(phone)
+        .digest("hex")
+        .slice(0, 16);
       await getMikrotik().ensureUser({
         name: phone,
         password,
@@ -329,11 +352,17 @@ export class IntegrationsService {
         comment: `anoon-checkin | ${type} | ${name}`,
       });
     } catch (err) {
-      console.error("[AnoonCheckIn] ensureUser failed — local session kept:", err);
+      console.error(
+        "[AnoonCheckIn] ensureUser failed — local session kept:",
+        err,
+      );
     }
   }
 
-  async anoonVisitorCheckIn(phone: string, name: string): Promise<{ session: any; alreadyActive: boolean }> {
+  async anoonVisitorCheckIn(
+    phone: string,
+    name: string,
+  ): Promise<{ session: any; alreadyActive: boolean }> {
     const { palestineStartOfDay } = await import("../../lib/timezone");
     let visitor = await prisma.visitor.findFirst({ where: { phone } });
     if (!visitor) {

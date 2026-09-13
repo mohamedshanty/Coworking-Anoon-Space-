@@ -9,7 +9,7 @@ export const checkInSchema = z.union([
   z.object({
     name: z.string().min(1),
     phone: z.string().min(1),
-    type: z.enum(["visitor", "subscriber", "trainee"]),
+    type: z.enum(["visitor", "subscriber", "trainee", "employee"]),
     source: z.string().optional(),
     notes: z.string().optional(),
     hourlyRate: z.number().min(0).optional(),

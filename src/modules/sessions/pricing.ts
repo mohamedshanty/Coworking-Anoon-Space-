@@ -31,7 +31,8 @@ export function calculateSessionPricing(
   // training package/course already covers the space usage.
   const isSub =
     (visitorType === "subscriber" && hasActiveSubscription) ||
-    visitorType === "trainee";
+    visitorType === "trainee" ||
+    visitorType === "employee";
 
   // Time cost calculation
   // In "replaces" mode for non-subscribers: time portion is zeroed —
