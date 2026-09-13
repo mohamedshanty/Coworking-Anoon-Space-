@@ -215,7 +215,7 @@ export class IntegrationsService {
       visitor = await this.findOrCreateVisitor(
         phone,
         memberPerson?.name ?? name,
-        "visitor",
+        "employee",
         source,
       );
     } else if (type === "visitor") {

@@ -3,6 +3,7 @@ import { ApiError } from "../../lib/ApiError";
 import { CreateTraineeInput, UpdateTraineeInput } from "./schema";
 import { normalizePhone } from "../hotspot/hotspot.config";
 import { assertPhoneNotTaken } from "../../lib/personUniqueness";
+import { syncMemberToAnoonQr, deactivateMemberOnAnoonQr } from "../../lib/anoon-sync";
 
 export class TraineesService {
   async getTrainees(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc" }) {
@@ -63,6 +64,15 @@ export class TraineesService {
       },
     });
 
+    // Fire-and-forget: sync to Anoon QR
+    void syncMemberToAnoonQr({
+      name: data.name,
+      phone,
+      packageType: "monthly",
+      startDate: new Date(),
+      type: "trainee",
+    });
+
     return visitor;
   }
 
@@ -96,6 +106,18 @@ export class TraineesService {
         ...(data.source !== undefined ? { source: data.source } : {}),
         ...(data.notes !== undefined ? { notes: data.notes } : {}),
       },
+    }).then((updated) => {
+      // Fire-and-forget: sync name/phone changes to Anoon QR
+      if (data.name || newPhone) {
+        void syncMemberToAnoonQr({
+          name: updated.name,
+          phone: updated.phone,
+          packageType: "monthly",
+          startDate: new Date(),
+          type: "trainee",
+        });
+      }
+      return updated;
     });
   }
 
@@ -117,6 +139,9 @@ export class TraineesService {
     }
 
     await prisma.visitor.delete({ where: { id } });
+
+    // Fire-and-forget: deactivate on Anoon QR
+    void deactivateMemberOnAnoonQr(visitor.phone);
   }
 }
 

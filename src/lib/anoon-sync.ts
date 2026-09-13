@@ -21,6 +21,7 @@ export async function syncMemberToAnoonQr(payload: {
   phone: string;
   packageType: string;
   startDate: Date | string;
+  type?: "subscriber" | "trainee" | "employee";
 }): Promise<AnoonSyncOutcome> {
   try {
     const baseUrl = process.env.ANOON_QR_BASE_URL;
@@ -38,6 +39,7 @@ export async function syncMemberToAnoonQr(payload: {
       phone: payload.phone,
       planType: mapPackageTypeToAnoon(payload.packageType),
       startDate: new Date(payload.startDate).toISOString(),
+      ...(payload.type ? { type: payload.type } : {}),
     };
 
     const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/sync/member`, {

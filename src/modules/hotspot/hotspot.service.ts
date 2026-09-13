@@ -227,7 +227,7 @@ export async function portalLogin(input: LoginInput): Promise<LoginResult> {
       const session = await sessionsService.checkIn({
         name: identity.name,
         phone,
-        type: identity.kind as "visitor" | "subscriber" | "trainee",
+        type: identity.kind as "visitor" | "subscriber" | "trainee" | "employee",
         source: "WIFI_PORTAL",
       });
       sessionId = session.id;

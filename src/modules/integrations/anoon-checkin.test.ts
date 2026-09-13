@@ -381,7 +381,7 @@ describe("member check-in", () => {
     expect(mockVisitorCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          type: "visitor",
+          type: "employee",
           phone: "0590000002",
           name: "Test Employee",
         }),

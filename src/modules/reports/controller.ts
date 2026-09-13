@@ -103,6 +103,7 @@ export class ReportsController {
         visitor: "زائر",
         subscriber: "مشترك",
         trainee: "متدرب",
+        employee: "موظف",
       };
 
       // Fetch sessions (needed for both types: history shows them, reports needs revenue calc)
@@ -159,7 +160,7 @@ export class ReportsController {
             : null;
 
           const effectiveType = s.sessionType ?? s.visitor.type;
-          const isSub = effectiveType === "subscriber" || effectiveType === "trainee";
+          const isSub = effectiveType === "subscriber" || effectiveType === "trainee" || effectiveType === "employee";
 
           // Use STORED data (matching the in-app History table exactly):
           // - ordersAmount: sum of SnackOrder totals (stored, not recomputed)
@@ -198,6 +199,7 @@ export class ReportsController {
           const typeFillColors: Record<string, string> = {
             subscriber: "FFE6F0FF",
             trainee: "FFFFF3E0",
+            employee: "FFE8F5E9",
             visitor: "FFFFFFFF",
           };
           const rowFill = typeFillColors[effectiveType] ?? "FFFFFFFF";

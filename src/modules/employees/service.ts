@@ -2,6 +2,7 @@ import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { assertPhoneNotTaken } from "../../lib/personUniqueness";
 import { CreateEmployeeInput, UpdateEmployeeInput } from "./schema";
+import { syncMemberToAnoonQr, deactivateMemberOnAnoonQr } from "../../lib/anoon-sync";
 
 /**
  * Space-employee roster (name + phone only, no login).
@@ -19,9 +20,20 @@ export class EmployeesService {
     // Full cross-table check: a phone belongs to exactly one of
     // subscriber / trainee / employee.
     const phone = await assertPhoneNotTaken(data.phone);
-    return prisma.employeeRoster.create({
+    const employee = await prisma.employeeRoster.create({
       data: { name: data.name.trim(), phone },
     });
+
+    // Fire-and-forget: sync to Anoon QR
+    void syncMemberToAnoonQr({
+      name: data.name.trim(),
+      phone,
+      packageType: "monthly",
+      startDate: new Date(),
+      type: "employee",
+    });
+
+    return employee;
   }
 
   async updateEmployee(id: string, data: UpdateEmployeeInput) {
@@ -29,13 +41,26 @@ export class EmployeesService {
     if (!existing) {
       throw new ApiError(404, "Employee not found");
     }
-    return prisma.employeeRoster.update({
+    const updated = await prisma.employeeRoster.update({
       where: { id },
       data: {
         ...(data.name !== undefined ? { name: data.name.trim() } : {}),
         ...(data.active !== undefined ? { active: data.active } : {}),
       },
     });
+
+    // Fire-and-forget: sync name changes to Anoon QR
+    if (data.name) {
+      void syncMemberToAnoonQr({
+        name: data.name.trim(),
+        phone: updated.phone,
+        packageType: "monthly",
+        startDate: new Date(),
+        type: "employee",
+      });
+    }
+
+    return updated;
   }
 
   async deleteEmployee(id: string) {
@@ -43,10 +68,12 @@ export class EmployeesService {
     if (!existing) {
       throw new ApiError(404, "Employee not found");
     }
-    // Hard delete: a roster entry has no FK dependents (sessions anchor on
-    // Visitor rows, employees never sync to Anoon QR), so there is no
-    // history to preserve — unlike subscribers (Task 5).
-    return prisma.employeeRoster.delete({ where: { id } });
+    const deleted = await prisma.employeeRoster.delete({ where: { id } });
+
+    // Fire-and-forget: deactivate on Anoon QR
+    void deactivateMemberOnAnoonQr(deleted.phone);
+
+    return deleted;
   }
 }
 
