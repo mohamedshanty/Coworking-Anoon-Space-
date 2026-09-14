@@ -455,11 +455,14 @@ describe("member check-in", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Hourly rate: base seat price + visitor internet surcharge (Task 1)
+// Hourly rate: visitor internet-tier rate ALONE (no base double-count).
+// Regression test for the +3 ₪ bug where Session.hourlyRate was stored as
+// base + surcharge (e.g. 10+4=14 for 20M) instead of surcharge-only (4),
+// causing Live to show 6/7/8 instead of 3/4/5 and checkout to double-bill.
 // ---------------------------------------------------------------------------
 
 describe("hourly rate surcharge", () => {
-  it("visitor 20M → Session hourlyRate = base (10) + surcharge (4)", async () => {
+  it("visitor 20M → Session hourlyRate = surcharge only (4), no base added", async () => {
     await integrationsService.anoonCheckIn({
       type: "visitor",
       name: "Test Visitor",
@@ -468,11 +471,11 @@ describe("hourly rate surcharge", () => {
     } as any);
 
     expect(mockCheckIn).toHaveBeenCalledWith(
-      expect.objectContaining({ hourlyRate: 14 }),
+      expect.objectContaining({ hourlyRate: 4 }),
     );
   });
 
-  it("visitor 10M → Session hourlyRate = base (10) + surcharge (3)", async () => {
+  it("visitor 10M → Session hourlyRate = surcharge only (3)", async () => {
     await integrationsService.anoonCheckIn({
       type: "visitor",
       name: "Test Visitor",
@@ -481,7 +484,20 @@ describe("hourly rate surcharge", () => {
     } as any);
 
     expect(mockCheckIn).toHaveBeenCalledWith(
-      expect.objectContaining({ hourlyRate: 13 }),
+      expect.objectContaining({ hourlyRate: 3 }),
+    );
+  });
+
+  it("visitor 30M → Session hourlyRate = surcharge only (5)", async () => {
+    await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "30M",
+    } as any);
+
+    expect(mockCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({ hourlyRate: 5 }),
     );
   });
 

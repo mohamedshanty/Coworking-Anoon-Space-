@@ -258,22 +258,24 @@ export class IntegrationsService {
 
     let session: any;
     try {
-      // Seat price + visitor internet surcharge, baked into the session rate
-      // so the Live ("داخل المساحة") page shows the real hourly price.
+      // Visitor internet-tier rate ALONE represents the visitor's hourly
+      // rate (3/4/5 for 10M/20M/30M). Do NOT add the global seat/base price
+      // (Settings.hourlyRate) on top — that was the +3 ₪ double-count bug:
+      // Session.hourlyRate = base + surcharge showed 6/7/8 on the Live page
+      // and checkout then added the internet visit charge AGAIN on top.
       // Members (subscriber/trainee/employee) use the free noon-10m profile
-      // and pay no surcharge. sessionsService.checkIn already accepts an
-      // hourlyRate override — no signature change needed there.
-      const settings = await prisma.settings.findFirst();
-      if (!settings) {
-        throw new ApiError(500, "Settings not initialized in database");
+      // and keep the base seat rate (their time is zeroed in pricing anyway).
+      // sessionsService.checkIn already accepts an hourlyRate override.
+      let finalHourlyRate: number;
+      if (type === "visitor") {
+        finalHourlyRate = plan.hourlyRate;
+      } else {
+        const settings = await prisma.settings.findFirst();
+        if (!settings) {
+          throw new ApiError(500, "Settings not initialized in database");
+        }
+        finalHourlyRate = Number(settings.hourlyRate);
       }
-      const baseHourlyRate = Number(settings.hourlyRate);
-      const finalHourlyRate =
-        type === "visitor"
-          ? Math.round(
-              (baseHourlyRate + plan.hourlyRate + Number.EPSILON) * 100,
-            ) / 100
-          : baseHourlyRate;
       session = await sessionsService.checkIn({
         visitorId: visitor.id,
         hourlyRate: finalHourlyRate,

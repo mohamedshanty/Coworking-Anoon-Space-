@@ -5,6 +5,7 @@ import { calculateSessionPricing } from "./pricing";
 import { CheckInInput, UpdateSessionInput, AddBatchOrdersInput } from "./schema";
 import { isSamePalestineDay, getPalestineDateParts, palestineStartOfDay, palestineEndOfDay } from "../../lib/timezone";
 import { snackWalletService } from "../snack-wallet/service";
+import { VISITOR_PLANS } from "../hotspot/hotspot.config";
 
 
 async function getHotDrinkPrice(drinkId: string): Promise<{ price: number; name: string } | null> {
@@ -535,6 +536,11 @@ export class SessionsService {
     const phone = session.visitor?.phone;
     let internetCharge: { amount: number; minutes: number; tier: NetTier } | null = null;
     let netChargeParam: import("./pricing").InternetCharge | null = null;
+    // True when Session.hourlyRate already IS the visitor internet-tier rate
+    // (Anoon QR check-in stores surcharge-only). In that case the seat-time
+    // portion (hours × Session.hourlyRate) already covers the internet cost,
+    // so adding the NetSession visit charge again would double-bill.
+    let internetAlreadyInSeat = false;
     try {
       if (phone) {
         const [{ computePendingInternetCharge }, { BILLING }] = await Promise.all([
@@ -556,6 +562,25 @@ export class SessionsService {
     const sessionHourlyRate = session.hourlyRate != null
       ? Number(session.hourlyRate)
       : Number(settings.hourlyRate);
+
+    // Guard against the +3 ₪ double-count: Anoon visitor sessions store the
+    // internet-tier rate alone (3/4/5). If a NetSession visit charge exists
+    // for the same tier/rate, the time portion already represents the
+    // internet cost — drop the extra internet amount so Live and checkout
+    // both equal exactly the tier rate per hour. Walk-in visitors whose
+    // Session rate is the generic seat/base price keep the classic
+    // surcharge behaviour (seat + internet) and are unaffected.
+    // (VISITOR_PLANS is statically imported — no dynamic import here so the
+    // existing unit-test mock of hotspot.config, which only stubs BILLING,
+    // keeps working.)
+    if (netChargeParam && effectiveType === "visitor") {
+      const tierPlan = VISITOR_PLANS.find((p) => p.tier === netChargeParam!.tier);
+      if (tierPlan && Math.abs(sessionHourlyRate - tierPlan.hourlyRate) < 0.001) {
+        internetAlreadyInSeat = true;
+        netChargeParam = null;
+        internetCharge = null;
+      }
+    }
 
     const pricing = calculateSessionPricing(
       session.checkIn,
@@ -637,10 +662,18 @@ export class SessionsService {
     // and writes the adjustmentNote label — but does NOT modify session.amount.
     // We pass the just-computed `internetCharge` through verbatim so the
     // NetSession row matches the session invoice to the last rounding tick.
+    // Exception: when Session.hourlyRate already IS the internet-tier rate
+    // (Anoon visitor, internetAlreadyInSeat), the Session time portion
+    // already covers the internet cost — close the NetSession WITHOUT a
+    // separate bill so the visit is not charged twice.
     try {
       if (phone) {
         const { endByPhone } = await import("../hotspot/hotspot.service");
-        await endByPhone(phone, "checkout", { charge: internetCharge ?? undefined });
+        if (internetAlreadyInSeat) {
+          await endByPhone(phone, "checkout", { bill: false });
+        } else {
+          await endByPhone(phone, "checkout", { charge: internetCharge ?? undefined });
+        }
       }
     } catch (err) {
       console.error("[hotspot] cutoff on checkout failed", err);
@@ -676,6 +709,7 @@ export class SessionsService {
     const phone = session.visitor?.phone;
     let internetCharge: { amount: number; minutes: number; tier: NetTier } | null = null;
     let netChargeParam: import("./pricing").InternetCharge | null = null;
+    let internetAlreadyInSeat = false;
     try {
       if (phone) {
         const [{ computePendingInternetCharge }, { BILLING }] = await Promise.all([
@@ -699,6 +733,19 @@ export class SessionsService {
     const sessionHourlyRate = session.hourlyRate != null
       ? Number(session.hourlyRate)
       : Number(settings.hourlyRate);
+
+    // Same +3 ₪ double-count guard as checkout(): Anoon visitor sessions
+    // store the internet-tier rate alone. If a NetSession visit charge
+    // exists for the same tier/rate, the time portion already covers it.
+    // (VISITOR_PLANS is statically imported — see note in checkout().)
+    if (netChargeParam && effectiveType === "visitor") {
+      const tierPlan = VISITOR_PLANS.find((p) => p.tier === netChargeParam!.tier);
+      if (tierPlan && Math.abs(sessionHourlyRate - tierPlan.hourlyRate) < 0.001) {
+        internetAlreadyInSeat = true;
+        netChargeParam = null;
+        internetCharge = null;
+      }
+    }
 
     const pricing = calculateSessionPricing(
       session.checkIn,
@@ -753,11 +800,17 @@ export class SessionsService {
     });
 
     // -- noonWiFi: cut internet and close NetSession ------------------------
-    // The charge is already included in the debt amount above.
+    // The charge is already included in the debt amount above — except when
+    // Session.hourlyRate already IS the tier rate (internetAlreadyInSeat),
+    // in which case close without a separate bill to avoid double-charging.
     try {
       if (phone) {
         const { endByPhone } = await import("../hotspot/hotspot.service");
-        await endByPhone(phone, "checkout", { charge: internetCharge ?? undefined });
+        if (internetAlreadyInSeat) {
+          await endByPhone(phone, "checkout", { bill: false });
+        } else {
+          await endByPhone(phone, "checkout", { charge: internetCharge ?? undefined });
+        }
       }
     } catch (err) {
       console.error("[hotspot] cutoff on unpaid checkout failed", err);

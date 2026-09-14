@@ -47,6 +47,14 @@ vi.mock("../hotspot/hotspot.service", () => ({
 
 vi.mock("../hotspot/hotspot.config", () => ({
   BILLING: mockBILLING,
+  // Real tier rates (3/4/5) so the Anoon double-count guard can be tested.
+  // Sessions with hourlyRate 5 + t20 internet (rate 4) must NOT trigger the
+  // guard (rates differ) and keep classic surcharge behaviour (seat+internet).
+  VISITOR_PLANS: [
+    { tier: "t10", hourlyRate: 3 },
+    { tier: "t20", hourlyRate: 4 },
+    { tier: "t30", hourlyRate: 5 },
+  ],
 }));
 
 // ---------------------------------------------------------------------------
@@ -408,6 +416,81 @@ describe("checkout — no active NetSession", () => {
       "0599111111",
       "checkout",
       expect.objectContaining({}),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7) Anoon visitor — Session.hourlyRate already IS the tier rate.
+// Regression test for the +3 ₪ bug: Session stored base+surcharge (6/7/8)
+// and checkout added the NetSession visit charge AGAIN. After the fix,
+// Session stores surcharge-only (3/4/5) and checkout must NOT add the
+// internet amount a second time — Live and checkout both equal the tier
+// rate per hour. Covers all 3 tiers end-to-end (check-in rate → checkout).
+// ---------------------------------------------------------------------------
+
+describe.each([
+  { speed: "10M", tier: "t10", rate: 3 },
+  { speed: "20M", tier: "t20", rate: 4 },
+  { speed: "30M", tier: "t30", rate: 5 },
+] as const)("checkout — Anoon visitor $speed (tier $tier, rate $rate)", ({ tier, rate }) => {
+  it(`3h session at ${rate}₪/hr with ${tier} NetSession → total is time-only, no double internet`, async () => {
+    // Anoon check-in stores surcharge-only in Session.hourlyRate.
+    mockSessionFindUnique.mockResolvedValue(makeSession({ hourlyRate: rate }));
+    // Visitor connected to WiFi on the same tier — visit charge exists,
+    // but must be SKIPPED because the seat-time already covers it.
+    mockHotspotComputePendingInternetCharge.mockResolvedValue({
+      amount: rate, // 60min × rate (min billing) — exact value irrelevant, must be ignored
+      minutes: 60,
+      tier,
+    });
+
+    const result = await sessionsService.checkout(
+      "s-1",
+      "cash",
+      0,
+      undefined,
+      undefined,
+      null,
+      null,
+    );
+
+    // 3h × rate, NO extra internet on top.
+    expect(result.amount).toBe(3 * rate);
+    expect(result.finalPrice).toBe(3 * rate);
+    expect(result.calculatedPrice).toBe(3 * rate);
+    expect(result.internetCharge).toBeNull();
+
+    const updateCall = mockSessionUpdate.mock.calls[0][0];
+    expect(updateCall.data.amount).toBe(3 * rate);
+
+    // NetSession closed WITHOUT a separate bill (avoids double-charge).
+    expect(mockHotspotEndByPhone).toHaveBeenCalledWith(
+      "0599111111",
+      "checkout",
+      expect.objectContaining({ bill: false }),
+    );
+  });
+
+  it(`checkoutUnpaid at ${rate}₪/hr → debt is time-only, no double internet`, async () => {
+    mockSessionFindUnique.mockResolvedValue(makeSession({ hourlyRate: rate }));
+    mockHotspotComputePendingInternetCharge.mockResolvedValue({
+      amount: rate,
+      minutes: 60,
+      tier,
+    });
+
+    const result = await sessionsService.checkoutUnpaid("s-1");
+
+    expect(result.amount).toBe(3 * rate);
+    expect(mockDebtCreate).toHaveBeenCalledTimes(1);
+    expect(mockDebtCreate.mock.calls[0][0].data.amount).toBe(3 * rate);
+    // hoursPortion = debt - snacks(0) - internet(0) = time-only.
+    expect(mockDebtCreate.mock.calls[0][0].data.sessionAmount).toBe(3 * rate);
+    expect(mockHotspotEndByPhone).toHaveBeenCalledWith(
+      "0599111111",
+      "checkout",
+      expect.objectContaining({ bill: false }),
     );
   });
 });
