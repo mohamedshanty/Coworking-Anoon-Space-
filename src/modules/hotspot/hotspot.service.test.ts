@@ -50,6 +50,9 @@ vi.mock("../../lib/mikrotik", () => ({
     const hex = raw.replace(/[^0-9a-fA-F]/g, "").toUpperCase();
     return hex.match(/.{2}/g)!.join(":");
   },
+  isValidIpv4: (ip: string) =>
+    /^(\d{1,3}\.){3}\d{1,3}$/.test(ip) &&
+    ip.split(".").every((o) => Number(o) >= 0 && Number(o) <= 255),
 }));
 
 const {

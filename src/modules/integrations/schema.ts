@@ -22,6 +22,14 @@ export const anoonCheckInSchema = z
     routerProfile: z.string().optional(),
     source: z.string().optional(),
     clientCheckinId: z.string().optional(),
+    // Optional hotspot device fields, forwarded by the Anoon Kiosk only when
+    // the check-in device was reached via the MikroTik hotspot redirect
+    // (same $(mac)/$(ip) values the noonCowork portal uses).
+    // Deliberately plain strings (no regex): malformed values must NOT fail
+    // validation — the service skips authorization gracefully and the
+    // check-in itself still succeeds (backward compatible).
+    mac: z.string().optional(),
+    ip: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.type === "visitor" && !data.name) {

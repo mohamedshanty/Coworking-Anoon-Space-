@@ -8,12 +8,43 @@ vi.hoisted(() => {
   process.env.HOTSPOT_USER_SECRET = "test-secret-key-for-testing";
 });
 
-const { mockEnsureUser } = vi.hoisted(() => ({
+const {
+  mockEnsureUser,
+  mockFindHost,
+  mockActiveLogin,
+  mockFindIpByMac,
+  mockGetHostname,
+} = vi.hoisted(() => ({
   mockEnsureUser: vi.fn(),
+  mockFindHost: vi.fn(),
+  mockActiveLogin: vi.fn(),
+  mockFindIpByMac: vi.fn(),
+  mockGetHostname: vi.fn(),
 }));
 
+function normalizeMacForTest(raw: string) {
+  const hex = (raw || "").replace(/[^0-9a-fA-F]/g, "").toUpperCase();
+  if (hex.length !== 12) throw new Error(`Invalid MAC: ${raw}`);
+  return hex.match(/.{2}/g)!.join(":");
+}
+
+function isValidIpv4ForTest(ip: string) {
+  return (
+    /^(\d{1,3}\.){3}\d{1,3}$/.test(ip) &&
+    ip.split(".").every((o) => Number(o) >= 0 && Number(o) <= 255)
+  );
+}
+
 vi.mock("../../lib/mikrotik", () => ({
-  getMikrotik: () => ({ ensureUser: mockEnsureUser }),
+  getMikrotik: () => ({
+    ensureUser: mockEnsureUser,
+    findHost: mockFindHost,
+    activeLogin: mockActiveLogin,
+    findIpByMac: mockFindIpByMac,
+    getHostname: mockGetHostname,
+  }),
+  normalizeMac: normalizeMacForTest,
+  isValidIpv4: isValidIpv4ForTest,
 }));
 
 const {
@@ -22,12 +53,28 @@ const {
   mockEmployeeFindUnique,
   mockSessionFindFirst,
   mockSettingsFindFirst,
+  mockKnownDeviceFindUnique,
+  mockKnownDeviceFindMany,
+  mockKnownDeviceFindFirst,
+  mockKnownDeviceCount,
+  mockKnownDeviceUpsert,
+  mockKnownDeviceUpdate,
+  mockKnownDeviceDelete,
+  mockAuditCreate,
 } = vi.hoisted(() => ({
   mockVisitorFindFirst: vi.fn(),
   mockVisitorCreate: vi.fn(),
   mockEmployeeFindUnique: vi.fn(),
   mockSessionFindFirst: vi.fn(),
   mockSettingsFindFirst: vi.fn(),
+  mockKnownDeviceFindUnique: vi.fn(),
+  mockKnownDeviceFindMany: vi.fn(),
+  mockKnownDeviceFindFirst: vi.fn(),
+  mockKnownDeviceCount: vi.fn(),
+  mockKnownDeviceUpsert: vi.fn(),
+  mockKnownDeviceUpdate: vi.fn(),
+  mockKnownDeviceDelete: vi.fn(),
+  mockAuditCreate: vi.fn(),
 }));
 
 vi.mock("../../lib/prisma", () => ({
@@ -36,6 +83,16 @@ vi.mock("../../lib/prisma", () => ({
     employeeRoster: { findUnique: mockEmployeeFindUnique },
     session: { findFirst: mockSessionFindFirst },
     settings: { findFirst: mockSettingsFindFirst },
+    knownDevice: {
+      findUnique: mockKnownDeviceFindUnique,
+      findMany: mockKnownDeviceFindMany,
+      findFirst: mockKnownDeviceFindFirst,
+      count: mockKnownDeviceCount,
+      upsert: mockKnownDeviceUpsert,
+      update: mockKnownDeviceUpdate,
+      delete: mockKnownDeviceDelete,
+    },
+    hotspotAudit: { create: mockAuditCreate },
   },
 }));
 
@@ -87,6 +144,25 @@ beforeEach(() => {
     Promise.resolve({ id: "s-001", visitorId: args.visitorId }),
   );
   mockEnsureUser.mockResolvedValue(undefined);
+  // Router device-auth defaults: on-network host, no known peers.
+  mockFindHost.mockResolvedValue({
+    id: "h1",
+    mac: "AA:BB:CC:DD:EE:FF",
+    address: "10.10.0.50",
+    authorized: false,
+    bypassed: false,
+  });
+  mockActiveLogin.mockResolvedValue(undefined);
+  mockFindIpByMac.mockResolvedValue(null);
+  mockGetHostname.mockResolvedValue(null);
+  mockKnownDeviceFindUnique.mockResolvedValue(null);
+  mockKnownDeviceFindMany.mockResolvedValue([]);
+  mockKnownDeviceFindFirst.mockResolvedValue(null);
+  mockKnownDeviceCount.mockResolvedValue(0);
+  mockKnownDeviceUpsert.mockResolvedValue({});
+  mockKnownDeviceUpdate.mockResolvedValue({});
+  mockKnownDeviceDelete.mockResolvedValue({});
+  mockAuditCreate.mockResolvedValue({});
 });
 
 async function expect404(promise: Promise<any>, message: string) {
@@ -624,5 +700,167 @@ describe("resolveEffectivePlan", () => {
 
   it("defaults a visitor with no speed to visitor-10m", () => {
     expect(resolveEffectivePlan("visitor").routerProfile).toBe("visitor-10m");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Kiosk device authorization (optional mac/ip from the hotspot redirect)
+// ---------------------------------------------------------------------------
+
+describe("kiosk device authorization", () => {
+  const MAC = "AA:BB:CC:DD:EE:FF";
+  const HOST_IP = "10.10.0.50";
+
+  it("schema accepts optional mac/ip (backward compatible when absent)", () => {
+    const without = anoonCheckInSchema.parse({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+    });
+    expect(without.mac).toBeUndefined();
+    expect(without.ip).toBeUndefined();
+
+    const withDevice = anoonCheckInSchema.parse({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      mac: MAC,
+      ip: HOST_IP,
+    });
+    expect(withDevice.mac).toBe(MAC);
+    expect(withDevice.ip).toBe(HOST_IP);
+  });
+
+  it("valid on-network mac → activeLogin + KnownDevice upsert, session still succeeds", async () => {
+    const result = await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+      mac: MAC,
+      ip: "10.10.0.99", // router-observed host address wins over payload ip
+    } as any);
+
+    expect(result.session.id).toBe("s-001");
+    expect(result.alreadyActive).toBe(false);
+    expect(mockEnsureUser).toHaveBeenCalledTimes(1);
+    expect(mockFindHost).toHaveBeenCalledWith(MAC);
+    expect(mockActiveLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ user: "0590000000", ip: HOST_IP, mac: MAC }),
+    );
+    expect(mockKnownDeviceUpsert).toHaveBeenCalled();
+  });
+
+  it("payload ip is used when the host row has no address", async () => {
+    mockFindHost.mockResolvedValue({
+      id: "h1",
+      mac: MAC,
+      address: "",
+      authorized: false,
+      bypassed: false,
+    });
+
+    const result = await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+      mac: MAC,
+      ip: "10.10.0.77",
+    } as any);
+
+    expect(result.session.id).toBe("s-001");
+    expect(mockActiveLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ user: "0590000000", ip: "10.10.0.77", mac: MAC }),
+    );
+  });
+
+  it("no mac → identical to before (ensureUser only, no activeLogin/findHost)", async () => {
+    const result = await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+    } as any);
+
+    expect(result.session.id).toBe("s-001");
+    expect(mockEnsureUser).toHaveBeenCalledTimes(1);
+    expect(mockFindHost).not.toHaveBeenCalled();
+    expect(mockActiveLogin).not.toHaveBeenCalled();
+    expect(mockKnownDeviceUpsert).not.toHaveBeenCalled();
+  });
+
+  it("off-network mac → skipped gracefully, check-in still succeeds", async () => {
+    mockFindHost.mockResolvedValue(null);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const result = await integrationsService.anoonCheckIn({
+        type: "visitor",
+        name: "Test Visitor",
+        phone: "0590000000",
+        internetSpeed: "10M",
+        mac: MAC,
+        ip: HOST_IP,
+      } as any);
+
+      expect(result.session.id).toBe("s-001");
+      expect(result.alreadyActive).toBe(false);
+      expect(mockEnsureUser).toHaveBeenCalledTimes(1);
+      expect(mockActiveLogin).not.toHaveBeenCalled();
+      expect(mockKnownDeviceUpsert).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("malformed mac → skipped gracefully, check-in still succeeds", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      // NOTE: the schema intentionally accepts this (permissive strings) —
+      // validation must never 400 on a bad mac; the service skips instead.
+      const parsed = anoonCheckInSchema.parse({
+        type: "visitor",
+        name: "Test Visitor",
+        phone: "0590000000",
+        mac: "not-a-mac",
+      });
+      const result = await integrationsService.anoonCheckIn(parsed);
+
+      expect(result.session.id).toBe("s-001");
+      expect(mockEnsureUser).toHaveBeenCalledTimes(1);
+      expect(mockActiveLogin).not.toHaveBeenCalled();
+      expect(mockKnownDeviceUpsert).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("known peer on-network → re-authorized via the shared path", async () => {
+    mockKnownDeviceFindMany.mockResolvedValue([
+      { id: "d-laptop", mac: "11:22:33:44:55:66", phone: "0590000000" },
+    ]);
+    mockFindIpByMac.mockResolvedValue("10.10.0.60");
+
+    await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+      mac: MAC,
+      ip: HOST_IP,
+    } as any);
+
+    // Current device + one known peer.
+    expect(mockActiveLogin).toHaveBeenCalledTimes(2);
+    expect(mockActiveLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ mac: "11:22:33:44:55:66", ip: "10.10.0.60" }),
+    );
+    expect(mockKnownDeviceUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: "d-laptop" }) }),
+    );
   });
 });

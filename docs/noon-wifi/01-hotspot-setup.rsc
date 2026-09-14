@@ -4,6 +4,8 @@
 #  استبدل القيم بين <> قبل التنفيذ.
 #
 #  <VPS_IP>        : IP خادم Hostinger
+#  <ANOON_KIOSK_DOMAIN> : نطاق تطبيق Anoon Kiosk (يُملأ لاحقاً — لا تخترع قيمة)
+#  <ANOON_KIOSK_IP>     : IP استضافة Anoon Kiosk (يُملأ لاحقاً؛ قد تكون عدة عناوين)
 #  <TUNNEL_VPS_IP> : 10.20.0.1  (لو استخدمت نفق L2TP — راجع 03-l2tp-client.rsc)
 #  <WIFI_IFACE>    : اسم الجسر/الواجهة اللاسلكية، مثل bridge-wifi
 #  <API_PASSWORD>  : كلمة سر قوية لمستخدم الـ API
@@ -77,9 +79,24 @@ add name=visitor-30m   rate-limit=30M/30M shared-users=4 idle-timeout=60m keepal
 /ip hotspot walled-garden
 add dst-host=nooncowork.191-101-81-99.sslip.io action=allow comment="noonWiFi portal"
 
+/ip hotspot walled-garden
+add dst-host=<ANOON_KIOSK_DOMAIN> action=allow comment="Anoon Kiosk check-in"
+
+# NOTE (replace-vs-keep decision — see 02-login.html):
+# Keeping BOTH entries during migration is safe (walled garden is additive).
+# Remove the noonWiFi portal entry only AFTER the Anoon Kiosk redirect is
+# verified live AND the portal is confirmed unneeded (admin/testing).
+
 /ip hotspot walled-garden ip
 add dst-address=<VPS_IP> protocol=tcp dst-port=443 action=accept comment="portal https"
 add dst-address=<VPS_IP> protocol=tcp dst-port=80  action=accept comment="portal http"
+
+# Anoon Kiosk hosting IP(s) — needed because HTTPS bypasses the hotspot
+# proxy, so dst-host alone is NOT sufficient (same reason as above).
+# Fill in <ANOON_KIOSK_IP> (repeat the pair per IP if the host has several).
+/ip hotspot walled-garden ip
+add dst-address=<ANOON_KIOSK_IP> protocol=tcp dst-port=443 action=accept comment="anoon kiosk https"
+add dst-address=<ANOON_KIOSK_IP> protocol=tcp dst-port=80  action=accept comment="anoon kiosk http"
 
 # لو استخدمت خطوط الويب (Google Fonts) في البوابة أضفها هنا أيضاً،
 # أو الأفضل: استضف الخطوط محلياً على الـ VPS (البوابة الجاهزة لا تستدعي أي مورد خارجي).

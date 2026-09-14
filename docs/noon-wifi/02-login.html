@@ -1,32 +1,40 @@
 <!--
-  noonWiFi — ملف login.html الذي يُرفع إلى الراوتر
-  المكان: Files → مجلد hotspot/ → استبدل login.html الموجود
-  (احتفظ بنسخة من الأصلي: انسخه إلى login-original.html أولاً)
-
-  المتغيرات $(...) يستبدلها الـ hotspot لحظة العرض.
-  لا تضع هنا أي CSS أو صور — الهدف أن ينتقل المتصفح خلال جزء من الثانية.
+  noonWiFi — MikroTik Hotspot Login Redirect
+  Redirects captive portal users to Anoon QR Kiosk.
 -->
 <html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>noon WiFi</title>
-  <meta http-equiv="refresh" content="0; url=https://nooncowork.191-101-81-99.sslip.io/portal?mac=$(mac)&ip=$(ip)&link-orig=$(link-orig-esc)&error=$(error)">
-  <script>
-    // مسار أسرع من meta refresh، ومع ترميز صحيح للمعاملات
-    (function () {
-      var qs = "mac=" + encodeURIComponent("$(mac)")
-             + "&ip=" + encodeURIComponent("$(ip)")
-             + "&link-orig=" + encodeURIComponent("$(link-orig)")
-             + "&error=" + encodeURIComponent("$(error)");
-      location.replace("https://nooncowork.191-101-81-99.sslip.io/portal?" + qs);
-    })();
-  </script>
-</head>
-<body style="font-family:system-ui;text-align:center;padding:3rem">
-  جارٍ فتح صفحة الدخول…
-  <noscript>
-    <a href="https://nooncowork.191-101-81-99.sslip.io/portal?mac=$(mac)&ip=$(ip)">اضغط هنا للمتابعة</a>
-  </noscript>
-</body>
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>noon WiFi</title>
+
+    <meta http-equiv="refresh"
+      content="0; url=https://anoon-qr-system.vercel.app/checkin?mac=$(mac)&ip=$(ip)&link-orig=$(link-orig-esc)&error=$(error)">
+
+    <script>
+      (function () {
+        var qs =
+          "mac=" + encodeURIComponent("$(mac)") +
+          "&ip=" + encodeURIComponent("$(ip)") +
+          "&link-orig=" + encodeURIComponent("$(link-orig)") +
+          "&error=" + encodeURIComponent("$(error)");
+
+        location.replace(
+          "https://anoon-qr-system.vercel.app/checkin?" + qs
+        );
+      })();
+    </script>
+  </head>
+
+  <body style="font-family:system-ui;text-align:center;padding:3rem">
+    جارٍ فتح صفحة الدخول…
+
+    <noscript>
+      <a href="https://anoon-qr-system.vercel.app/checkin?mac=$(mac)&ip=$(ip)">
+        اضغط هنا للمتابعة
+      </a>
+    </noscript>
+  </body>
+
 </html>

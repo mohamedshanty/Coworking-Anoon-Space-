@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { NetTier, NetUserKind } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
@@ -8,6 +7,10 @@ import {
   normalizePhone,
   type PlanDef,
 } from "../hotspot/hotspot.config";
+import {
+  authorizeDeviceAndKnownPeers,
+  routerPasswordFor,
+} from "../hotspot/device-auth";
 import { getMikrotik } from "../../lib/mikrotik";
 import type { AnoonCheckInInput } from "./schema";
 
@@ -298,7 +301,10 @@ export class IntegrationsService {
     }
 
     // Router provisioning is best-effort: it must never fail the local session.
-    await this.ensureRouterUserSafely(phone, visitor.name ?? name, type, plan);
+    await this.ensureRouterUserSafely(phone, visitor.name ?? name, type, plan, {
+      mac: input.mac,
+      ip: input.ip,
+    });
 
     return buildResult(session, false);
   }
@@ -327,12 +333,20 @@ export class IntegrationsService {
    * Provision/update the MikroTik hotspot user for the resolved plan.
    * Failures are logged only — the local session stays successful.
    * Skipped entirely on idempotent replays (alreadyActive).
+   *
+   * When the kiosk forwards the checking-in device's `mac` (hotspot
+   * redirect), additionally authorize that device via the SAME shared
+   * path the portal login uses (activeLogin + KnownDevice upsert +
+   * authorizeKnownDevices for the phone's other devices). Absent `mac`
+   * ⇒ exactly the old behavior (ensureUser only). Off-network or
+   * malformed `mac` ⇒ skipped silently (warn, never throw).
    */
   private async ensureRouterUserSafely(
     phone: string,
     name: string,
     type: AnoonPersonType,
     plan: PlanDef,
+    device?: { mac?: string | null; ip?: string | null },
   ): Promise<void> {
     try {
       const secret = process.env.HOTSPOT_USER_SECRET ?? "";
@@ -342,17 +356,34 @@ export class IntegrationsService {
         );
         return;
       }
-      const password = crypto
-        .createHmac("sha256", secret)
-        .update(phone)
-        .digest("hex")
-        .slice(0, 16);
+      const password = routerPasswordFor(phone);
       await getMikrotik().ensureUser({
         name: phone,
         password,
         profile: plan.routerProfile,
         comment: `anoon-checkin | ${type} | ${name}`,
       });
+
+      // No device context (every pre-change kiosk payload) ⇒ stop here:
+      // behavior is identical to before this change.
+      if (!device?.mac) return;
+
+      try {
+        await authorizeDeviceAndKnownPeers({
+          phone,
+          password,
+          mac: device.mac,
+          ip: device.ip ?? undefined,
+          auditDetail: `anoon-kiosk | ${type} | ${plan.routerProfile}`,
+        });
+      } catch (err) {
+        // Best-effort: off-network / malformed MAC / router hiccup must
+        // never fail the local session.
+        console.warn(
+          "[AnoonCheckIn] device authorization skipped — local session kept:",
+          err instanceof Error ? err.message : err,
+        );
+      }
     } catch (err) {
       console.error(
         "[AnoonCheckIn] ensureUser failed — local session kept:",

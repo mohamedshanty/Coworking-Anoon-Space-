@@ -6,13 +6,16 @@
  * and every session end cuts the internet.
  */
 
-import crypto from "node:crypto";
 import { NetTier, NetUserKind, NetEndReason, Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
-import { HOTSPOT_USER_SECRET } from "../../lib/env";
 import { getMikrotik, normalizeMac } from "../../lib/mikrotik";
 import { sessionsService } from "../sessions/service";
 import { resolveIdentity, ensureVisitor, Identity } from "./identity.service";
+import {
+  authorizeDeviceAndKnownPeers,
+  routerPasswordFor,
+  HotspotHttpError,
+} from "./device-auth";
 import {
   VISITOR_PLANS,
   MEMBER_PLAN,
@@ -49,19 +52,12 @@ const ANCHOR_TOLERANCE_MIN = 30;
  * LIMITS.maxVisitMinutes so tests can override it per-test).
  */
 
-// ---------------------------------------------------------------------------
-// Router password
-// ---------------------------------------------------------------------------
-
-/**
- * Deterministic password derived from phone + server secret.
- * Deterministic => no storage needed, and we can regenerate it to authorize
- * any device later. The secret never leaves the server.
- */
-function routerPasswordFor(phone: string): string {
-  if (!HOTSPOT_USER_SECRET) throw new Error("HOTSPOT_USER_SECRET is not set");
-  return crypto.createHmac("sha256", HOTSPOT_USER_SECRET).update(phone).digest("hex").slice(0, 16);
-}
+// Re-exported for backward compatibility (routes import it from here).
+export { HotspotHttpError } from "./device-auth";
+// Shared device-auth helpers live in ./device-auth (single source of truth).
+// authorizeKnownDevices + routerPasswordFor are re-exported so existing
+// importers/tests keep working.
+export { authorizeKnownDevices, routerPasswordFor } from "./device-auth";
 
 async function audit(
   action: string,
@@ -164,16 +160,6 @@ export async function portalLogin(input: LoginInput): Promise<LoginResult> {
 
   const mt = getMikrotik();
 
-  // -- (a) Verify the device is actually on our network --------------------
-  // Without this, anyone from the internet could call this endpoint and
-  // authorize an arbitrary MAC address.
-  const host = await mt.findHost(mac);
-  if (!host) {
-    await audit("LOGIN", false, { phone, mac, detail: "MAC not in hotspot host" });
-    throw new HotspotHttpError(403, "This device is not connected to the space network");
-  }
-  const ip = host.address && host.address !== "" ? host.address : input.ip;
-
   // -- (b) Who is this? ---------------------------------------------------
   const identity: Identity = await resolveIdentity(phone, input.name);
   const plan = resolvePlan(identity.kind, input.tier);
@@ -211,9 +197,16 @@ export async function portalLogin(input: LoginInput): Promise<LoginResult> {
     comment: `noonWiFi | ${identity.kind} | ${identity.name}`,
   });
 
-  // -- (d) Log in the current device ---------------------------------------
-  await mt.activeLogin({ user: phone, password, ip, mac });
-  await audit("LOGIN", true, { phone, mac, detail: `${identity.kind} ${plan.routerProfile}` });
+  // -- (d) Authorize this device + its known peers (shared path) ---------
+  // Same code path the Anoon kiosk flow uses: on-network verify →
+  // activeLogin → KnownDevice upsert → authorizeKnownDevices.
+  const { ip, extraDevicesAuthorized: extra } = await authorizeDeviceAndKnownPeers({
+    phone,
+    password,
+    mac,
+    ip: input.ip,
+    auditDetail: `${identity.kind} ${plan.routerProfile}`,
+  });
 
   // -- (e) Attendance session in noonCowork --------------------------------
   // Reuse the same service the front desk uses — no duplicate attendance logic.
@@ -249,8 +242,9 @@ export async function portalLogin(input: LoginInput): Promise<LoginResult> {
     }
   }
 
-  // -- (f) Save device and network session ---------------------------------
-  await upsertDevice(mac, phone, await safeHostname(mac));
+  // -- (f) Network session ------------------------------------------------
+  // (KnownDevice upsert + peer re-auth already done inside the shared
+  // authorizeDeviceAndKnownPeers call above.)
 
   // Close any previous open net session for this phone
   await prisma.netSession.updateMany({
@@ -274,9 +268,6 @@ export async function portalLogin(input: LoginInput): Promise<LoginResult> {
     select: { id: true },
   });
 
-  // -- (g) Re-authorize other known devices for this phone -----------------
-  const extra = await authorizeKnownDevices(phone, password, mac);
-
   // -- (h) Notify Anoon QR (fire-and-forget) -------------------------------
   notifyAnoon(phone).catch(() => {});
 
@@ -291,68 +282,6 @@ export async function portalLogin(input: LoginInput): Promise<LoginResult> {
     extraDevicesAuthorized: extra,
     netSessionId: netSession.id,
   };
-}
-
-/**
- * Core requirement: "scan QR from phone authorizes laptop automatically."
- * For every known MAC for the same phone: find its current IP from DHCP/ARP,
- * then log it in. Devices not currently connected are silently skipped.
- */
-async function authorizeKnownDevices(
-  phone: string,
-  password: string,
-  skipMac: string,
-): Promise<number> {
-  const mt = getMikrotik();
-  const devices = await prisma.knownDevice.findMany({
-    where: { phone, isBlocked: false, mac: { not: skipMac } },
-    orderBy: { lastSeenAt: "desc" },
-    take: LIMITS.maxDevicesPerPhone - 1,
-  });
-
-  let count = 0;
-  for (const d of devices) {
-    try {
-      const ip = await mt.findIpByMac(d.mac);
-      if (!ip) continue; // device not connected now
-      await mt.activeLogin({ user: phone, password, ip, mac: d.mac });
-      count++;
-      await prisma.knownDevice.update({ where: { id: d.id }, data: { lastSeenAt: new Date() } });
-      await audit("REAUTH_DEVICE", true, { phone, mac: d.mac });
-    } catch (err) {
-      await audit("REAUTH_DEVICE", false, { phone, mac: d.mac, detail: String(err) });
-    }
-  }
-  return count;
-}
-
-async function upsertDevice(mac: string, phone: string, hostname: string | null) {
-  const count = await prisma.knownDevice.count({ where: { phone } });
-  const existing = await prisma.knownDevice.findUnique({ where: { mac } });
-
-  if (!existing && count >= LIMITS.maxDevicesPerPhone) {
-    // Delete oldest device instead of rejecting the new one — the person
-    // is standing here and needs internet now.
-    const oldest = await prisma.knownDevice.findFirst({
-      where: { phone },
-      orderBy: { lastSeenAt: "asc" },
-    });
-    if (oldest) await prisma.knownDevice.delete({ where: { id: oldest.id } });
-  }
-
-  await prisma.knownDevice.upsert({
-    where: { mac },
-    create: { mac, phone, hostname },
-    update: { phone, hostname: hostname ?? undefined, lastSeenAt: new Date() },
-  });
-}
-
-async function safeHostname(mac: string): Promise<string | null> {
-  try {
-    return await getMikrotik().getHostname(mac);
-  } catch {
-    return null;
-  }
 }
 
 async function notifyAnoon(phone: string): Promise<void> {
@@ -879,13 +808,4 @@ export async function endOfDaySweep(): Promise<{ visitors: number; errors: numbe
 }
 
 // ---------------------------------------------------------------------------
-
-export class HotspotHttpError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "HotspotHttpError";
-  }
-}
+// (HotspotHttpError lives in ./device-auth and is re-exported at the top.)
