@@ -14,6 +14,20 @@ router.get(
   (req, res, next) => traineesController.getTrainees(req, res, next)
 );
 
+// POST validate bulk import (Phase 1: preview, no writes)
+router.post(
+  "/import/validate",
+  authorize("المتدربون", "edit"),
+  (req, res, next) => traineesController.validateImport(req, res, next)
+);
+
+// POST commit bulk import (Phase 2: create/update in one transaction)
+router.post(
+  "/import/commit",
+  authorize("المتدربون", "edit"),
+  (req, res, next) => traineesController.commitImport(req, res, next)
+);
+
 // POST create trainee
 router.post(
   "/",

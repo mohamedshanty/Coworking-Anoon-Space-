@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { traineesService } from "./service";
-import { createTraineeSchema, updateTraineeSchema } from "./schema";
+import { commitTraineeImportSchema, createTraineeSchema, updateTraineeSchema, validateTraineeImportSchema } from "./schema";
 
 export class TraineesController {
   async getTrainees(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -43,6 +43,26 @@ export class TraineesController {
       const id = req.params.id as string;
       await traineesService.deleteTrainee(id);
       res.status(200).json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async validateImport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const input = validateTraineeImportSchema.parse(req.body);
+      const data = await traineesService.validateTraineeImport(input.rows);
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async commitImport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const input = commitTraineeImportSchema.parse(req.body);
+      const data = await traineesService.commitTraineeImport(input.rows);
+      res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
     }
