@@ -62,7 +62,10 @@ export const guestQuickLoginSchema = z.object({
   mac: z
     .string()
     .regex(/^[0-9a-fA-F:.\-]{12,17}$/, "Invalid MAC address"),
-  ip: z.string().regex(/^(\d{1,3}\.){3}\d{1,3}$/, "Invalid IP address"),
+  ip: z
+    .string()
+    .regex(/^(\d{1,3}\.){3}\d{1,3}$/, "Invalid IP address")
+    .optional(),
 });
 
 export type GuestQuickLoginInput = z.infer<typeof guestQuickLoginSchema>;

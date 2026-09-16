@@ -446,11 +446,15 @@ export class IntegrationsService {
 
     // Prefer the router-observed address (authoritative); fall back to the
     // Kiosk-forwarded IP from the hotspot redirect.
-    const ip =
-      host.address && host.address !== "" ? host.address : (input.ip ?? "");
-    if (!isValidIpv4(ip)) {
+    const rawIp =
+      host.address && host.address !== "" ? host.address : input.ip;
+    if (!rawIp) {
+      throw new ApiError(400, "Could not determine device IP");
+    }
+    if (!isValidIpv4(rawIp)) {
       throw new ApiError(400, "Invalid IP address");
     }
+    const ip = rawIp;
 
     // Shared guest account: username == password == code. The account
     // already exists on the router under the guest-shared profile, so no
