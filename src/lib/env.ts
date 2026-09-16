@@ -62,6 +62,17 @@ export const BILLING_INCREMENT_MINUTES = Number(process.env.BILLING_INCREMENT_MI
  */
 export const INTERNET_MAX_VISIT_MINUTES = Number(process.env.INTERNET_MAX_VISIT_MINUTES ?? 4 * 60);
 
+// --- Guest quick-login (fixed shared hotspot accounts, username == password) ---
+/**
+ * Comma-separated whitelist of guest codes. Each code maps 1:1 to a
+ * pre-existing MikroTik hotspot user (same value as username+password).
+ * Add/remove codes here without touching any login logic.
+ */
+export const GUEST_QUICK_LOGIN_CODES = (process.env.GUEST_QUICK_LOGIN_CODES ?? "100,200,300,400,500")
+  .split(",")
+  .map((c) => c.trim())
+  .filter(Boolean);
+
 // --- Startup configuration sanity checks -----------------------------------
 // Warn loudly instead of failing the first portal login with a cryptic 500.
 if (MIKROTIK_HOST && !HOTSPOT_USER_SECRET) {

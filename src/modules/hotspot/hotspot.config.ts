@@ -11,6 +11,7 @@ import {
   BUSINESS_CLOSE_TIME,
   TZ_NAME,
   MAX_DEVICES_PER_PHONE,
+  GUEST_QUICK_LOGIN_CODES,
   INTERNET_BILLING_MODE,
   BILLING_MIN_MINUTES,
   BILLING_INCREMENT_MINUTES,
@@ -65,6 +66,18 @@ export const MEMBER_PLAN: PlanDef = {
 };
 
 export const PAID_KINDS: NetUserKind[] = ["visitor"];
+
+// -- Guest quick-login --------------------------------------------------------
+// Fixed shared hotspot accounts for walk-in guests (username == password).
+// The accounts live on the router under this profile; the backend only
+// holds the whitelist so codes can be added/removed without touching
+// any login logic. Guest logins NEVER create person/tracking rows.
+
+/** Router hotspot profile the shared guest accounts belong to. */
+export const GUEST_SHARED_PROFILE = "guest-shared";
+
+/** Whitelisted guest codes (each doubles as router username+password). */
+export const GUEST_SHARED_CODES: readonly string[] = GUEST_QUICK_LOGIN_CODES;
 
 export function isPaid(kind: NetUserKind): boolean {
   return PAID_KINDS.includes(kind);

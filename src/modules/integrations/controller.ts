@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { integrationsService } from "./service";
-import { anoonCheckInSchema, anoonVisitorCheckInSchema } from "./schema";
+import { anoonCheckInSchema, anoonVisitorCheckInSchema, guestQuickLoginSchema } from "./schema";
 
 export class IntegrationsController {
   async anoonCheckIn(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -50,6 +50,18 @@ export class IntegrationsController {
         success: true,
         data: { sessionId: result.session.id },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async guestQuickLogin(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const input = guestQuickLoginSchema.parse(req.body);
+      const result = await integrationsService.guestQuickLogin(input);
+      // Deliberately NO session/person/plan payload and NO socket.io emit:
+      // guests are invisible to Live, attendance, and reports by design.
+      res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

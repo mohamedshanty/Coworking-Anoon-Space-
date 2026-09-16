@@ -51,3 +51,18 @@ export const anoonVisitorCheckInSchema = z.object({
 export type AnoonVisitorCheckInInput = z.infer<
   typeof anoonVisitorCheckInSchema
 >;
+
+// Guest quick-login (walk-in guests, NOT tracked as persons).
+// The Kiosk forwards mac/ip from the router redirect plus the code
+// the guest typed. The backend maps the code to a fixed shared
+// hotspot account (code == username == password) from its own
+// whitelist — arbitrary credentials from the frontend are never trusted.
+export const guestQuickLoginSchema = z.object({
+  code: z.string().trim().min(1, "Guest code is required").max(16),
+  mac: z
+    .string()
+    .regex(/^[0-9a-fA-F:.\-]{12,17}$/, "Invalid MAC address"),
+  ip: z.string().regex(/^(\d{1,3}\.){3}\d{1,3}$/, "Invalid IP address"),
+});
+
+export type GuestQuickLoginInput = z.infer<typeof guestQuickLoginSchema>;

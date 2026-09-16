@@ -5,14 +5,15 @@ import { sessionsService } from "../sessions/service";
 import {
   resolvePlan,
   normalizePhone,
+  GUEST_SHARED_CODES,
   type PlanDef,
 } from "../hotspot/hotspot.config";
 import {
   authorizeDeviceAndKnownPeers,
   routerPasswordFor,
 } from "../hotspot/device-auth";
-import { getMikrotik } from "../../lib/mikrotik";
-import type { AnoonCheckInInput } from "./schema";
+import { getMikrotik, normalizeMac, isValidIpv4 } from "../../lib/mikrotik";
+import type { AnoonCheckInInput, GuestQuickLoginInput } from "./schema";
 
 export type AnoonPersonType = "visitor" | "subscriber" | "trainee" | "employee";
 
@@ -109,6 +110,13 @@ export type ResolvedMember =
   | { type: "employee"; person: { id: string; name: string; phone: string } }
   | { type: "trainee"; person: any }
   | { type: "subscriber"; person: any };
+
+export type GuestQuickLoginResult = {
+  authorized: boolean;
+  code: string;
+  mac: string;
+  ip: string;
+};
 
 /**
  * Unified member lookup for the Anoon QR "member" tab: given only a phone
@@ -390,6 +398,71 @@ export class IntegrationsService {
         err,
       );
     }
+  }
+
+  /**
+   * Guest quick-login for walk-in guests.
+   *
+   * HARD CONSTRAINT: this must never create or modify any person/tracking
+   * data — no resolveMember(), no Visitor/session/Attendance/KnownDevice
+   * rows, no Anoon QR sync, no socket.io events. The ONLY side effect is
+   * the RouterOS `/ip/hotspot/active/login` call below (the same low-level
+   * mechanism the member/portal flows use via `activeLogin`).
+   *
+   * Unlike the member flow (best-effort router provisioning with a local
+   * session as fallback), router failure here MUST fail the request —
+   * there is no fallback record anywhere to check later.
+   */
+  async guestQuickLogin(input: GuestQuickLoginInput): Promise<GuestQuickLoginResult> {
+    const code = input.code.trim();
+    if (!GUEST_SHARED_CODES.includes(code)) {
+      throw new ApiError(404, "الكود غير صحيح");
+    }
+
+    // normalizeMac throws MikrotikError on malformed input — convert to a
+    // 400 since the global errorHandler would otherwise surface it as 500.
+    let mac: string;
+    try {
+      mac = normalizeMac(input.mac);
+    } catch {
+      throw new ApiError(400, "Invalid MAC address");
+    }
+
+    const mt = getMikrotik();
+
+    // On-network guard (read-only router query, no local writes): without
+    // this, anyone on the internet could authorize an arbitrary MAC.
+    // Mirrors the check inside authorizeDeviceAndKnownPeers, minus every
+    // tracking write that helper performs.
+    let host: any = null;
+    try {
+      host = await mt.findHost(mac);
+    } catch (err) {
+      throw new ApiError(502, "Guest internet authorization failed — please try again");
+    }
+    if (!host) {
+      throw new ApiError(403, "This device is not connected to the space network");
+    }
+
+    // Prefer the router-observed address (authoritative); fall back to the
+    // Kiosk-forwarded IP from the hotspot redirect.
+    const ip =
+      host.address && host.address !== "" ? host.address : (input.ip ?? "");
+    if (!isValidIpv4(ip)) {
+      throw new ApiError(400, "Invalid IP address");
+    }
+
+    // Shared guest account: username == password == code. The account
+    // already exists on the router under the guest-shared profile, so no
+    // ensureUser() provisioning is needed (or wanted).
+    try {
+      await mt.activeLogin({ user: code, password: code, ip, mac });
+    } catch (err) {
+      console.error("[GuestQuickLogin] activeLogin failed:", err);
+      throw new ApiError(502, "Guest internet authorization failed — please try again");
+    }
+
+    return { authorized: true, code, mac, ip };
   }
 
   async anoonVisitorCheckIn(
