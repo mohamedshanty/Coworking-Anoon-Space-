@@ -18,6 +18,7 @@ vi.hoisted(() => {
 const {
   mockFindHost,
   mockEnsureUser,
+  mockEnsureProfileSharedUsers,
   mockActiveLogin,
   mockFindIpByMac,
   mockGetHostname,
@@ -27,6 +28,7 @@ const {
 } = vi.hoisted(() => ({
   mockFindHost: vi.fn(),
   mockEnsureUser: vi.fn(),
+  mockEnsureProfileSharedUsers: vi.fn(),
   mockActiveLogin: vi.fn(),
   mockFindIpByMac: vi.fn(),
   mockGetHostname: vi.fn(),
@@ -39,6 +41,7 @@ vi.mock("../../lib/mikrotik", () => ({
   getMikrotik: () => ({
     findHost: mockFindHost,
     ensureUser: mockEnsureUser,
+    ensureProfileSharedUsers: mockEnsureProfileSharedUsers,
     activeLogin: mockActiveLogin,
     findIpByMac: mockFindIpByMac,
     getHostname: mockGetHostname,
@@ -198,6 +201,7 @@ beforeEach(() => {
   // -- Router (mikrotik) --
   mockFindHost.mockResolvedValue(mockHost());
   mockEnsureUser.mockResolvedValue(undefined);
+  mockEnsureProfileSharedUsers.mockResolvedValue({ changed: false, previous: 4 });
   mockActiveLogin.mockResolvedValue(undefined);
   mockFindIpByMac.mockResolvedValue(null);
   mockGetHostname.mockResolvedValue(null);
@@ -649,6 +653,139 @@ describe("portalLogin", () => {
       });
 
       expect(result.extraDevicesAuthorized).toBe(1);
+    });
+  });
+
+  describe("second device login (same phone, new MAC)", () => {
+    const LAPTOP_MAC = "11:22:33:44:55:66";
+    const LAPTOP_IP = "10.10.0.60";
+
+    function mockLaptopOnNetwork() {
+      mockFindHost.mockResolvedValue({
+        id: "h-laptop",
+        mac: LAPTOP_MAC,
+        address: LAPTOP_IP,
+        authorized: false,
+        bypassed: false,
+      });
+    }
+
+    it("finds (not duplicates) the visitor, authorizes the new MAC, records KnownDevice, reuses the open session", async () => {
+      mockLaptopOnNetwork();
+      // Phone number already exists (created earlier via QR/kiosk) with an
+      // OPEN attendance session — the "same visit" case.
+      mockResolveIdentity.mockResolvedValue(
+        mockIdentity({ visitorId: "v-1", name: "Same Person" }),
+      );
+      mockCheckIn.mockRejectedValue(new Error("Visitor is already checked in"));
+      mockSessionFindFirst.mockResolvedValue({ id: "s-open-001" });
+      // Laptop MAC never seen before.
+      mockKnownDeviceFindUnique.mockResolvedValue(null);
+      mockKnownDeviceCount.mockResolvedValue(1);
+
+      const result = await portalLogin({
+        mac: LAPTOP_MAC,
+        ip: LAPTOP_IP,
+        phone: PHONE,
+        name: "Same Person",
+        tier: "t10",
+      });
+
+      expect(result.ok).toBe(true);
+
+      // (a) find, not duplicate-create
+      expect(mockEnsureVisitor).not.toHaveBeenCalled();
+      expect(mockVisitorCreate).not.toHaveBeenCalled();
+
+      // (b) multi-device precondition enforced on the profile
+      expect(mockEnsureProfileSharedUsers).toHaveBeenCalledWith(
+        "visitor-10m",
+        LIMITS.maxDevicesPerPhone,
+      );
+
+      // (c) actual MikroTik authorization for the NEW mac
+      expect(mockActiveLogin).toHaveBeenCalledWith(
+        expect.objectContaining({ user: PHONE, mac: LAPTOP_MAC, ip: LAPTOP_IP }),
+      );
+
+      // (d) KnownDevice row for the new MAC linked to the same phone
+      expect(mockKnownDeviceUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { mac: LAPTOP_MAC },
+          create: expect.objectContaining({ mac: LAPTOP_MAC, phone: PHONE }),
+        }),
+      );
+
+      // (e) no duplicate attendance session — open one reused
+      const netCreate = mockNetSessionCreate.mock.calls[0][0];
+      expect(netCreate.data.sessionId).toBe("s-open-001");
+      expect(netCreate.data.mac).toBe(LAPTOP_MAC);
+      expect(netCreate.data.visitorId).toBe("v-1");
+    });
+
+    it("login still succeeds when profile enforcement fails (fail-open)", async () => {
+      mockLaptopOnNetwork();
+      mockResolveIdentity.mockResolvedValue(
+        mockIdentity({ visitorId: "v-1", name: "Same Person" }),
+      );
+      mockCheckIn.mockResolvedValue({ id: "s-006", visitorId: "v-1" });
+      mockKnownDeviceFindUnique.mockResolvedValue(null);
+      mockKnownDeviceCount.mockResolvedValue(1);
+      mockEnsureProfileSharedUsers.mockRejectedValue(
+        new Error("not enough permissions"),
+      );
+
+      const result = await portalLogin({
+        mac: LAPTOP_MAC,
+        ip: LAPTOP_IP,
+        phone: PHONE,
+        name: "Same Person",
+        tier: "t10",
+      });
+
+      expect(result.ok).toBe(true);
+      expect(mockActiveLogin).toHaveBeenCalledWith(
+        expect.objectContaining({ mac: LAPTOP_MAC }),
+      );
+      // Failure is audited for ops
+      expect(mockAuditCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ action: "PROFILE_FIX", ok: false }),
+        }),
+      );
+    });
+
+    it("activeLogin failure writes a LOGIN=false audit row with MAC + router error", async () => {
+      mockLaptopOnNetwork();
+      mockResolveIdentity.mockResolvedValue(
+        mockIdentity({ visitorId: "v-1", name: "Same Person" }),
+      );
+      // Router rejects the second simultaneous login for the same user
+      // (e.g. profile shared-users=1 while the phone is still active).
+      mockActiveLogin.mockRejectedValue(
+        new Error("Command failed: /ip/hotspot/active/login"),
+      );
+
+      await expect(
+        portalLogin({
+          mac: LAPTOP_MAC,
+          ip: LAPTOP_IP,
+          phone: PHONE,
+          name: "Same Person",
+          tier: "t10",
+        }),
+      ).rejects.toThrow("Command failed: /ip/hotspot/active/login");
+
+      // Diagnosable from HotspotAudit instead of a bare 500 ...
+      const loginFails = mockAuditCreate.mock.calls
+        .map((c) => c[0]?.data)
+        .filter((d) => d?.action === "LOGIN" && d?.ok === false);
+      expect(loginFails).toHaveLength(1);
+      expect(loginFails[0].mac).toBe(LAPTOP_MAC);
+      expect(loginFails[0].detail).toMatch(/activeLogin failed/);
+
+      // ... and the device is NOT recorded as known (upsert runs on success)
+      expect(mockKnownDeviceUpsert).not.toHaveBeenCalled();
     });
   });
 

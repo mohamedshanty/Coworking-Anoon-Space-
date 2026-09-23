@@ -10,12 +10,14 @@ vi.hoisted(() => {
 
 const {
   mockEnsureUser,
+  mockEnsureProfileSharedUsers,
   mockFindHost,
   mockActiveLogin,
   mockFindIpByMac,
   mockGetHostname,
 } = vi.hoisted(() => ({
   mockEnsureUser: vi.fn(),
+  mockEnsureProfileSharedUsers: vi.fn(),
   mockFindHost: vi.fn(),
   mockActiveLogin: vi.fn(),
   mockFindIpByMac: vi.fn(),
@@ -38,6 +40,7 @@ function isValidIpv4ForTest(ip: string) {
 vi.mock("../../lib/mikrotik", () => ({
   getMikrotik: () => ({
     ensureUser: mockEnsureUser,
+    ensureProfileSharedUsers: mockEnsureProfileSharedUsers,
     findHost: mockFindHost,
     activeLogin: mockActiveLogin,
     findIpByMac: mockFindIpByMac,
@@ -144,6 +147,7 @@ beforeEach(() => {
     Promise.resolve({ id: "s-001", visitorId: args.visitorId }),
   );
   mockEnsureUser.mockResolvedValue(undefined);
+  mockEnsureProfileSharedUsers.mockResolvedValue({ changed: false, previous: 4 });
   // Router device-auth defaults: on-network host, no known peers.
   mockFindHost.mockResolvedValue({
     id: "h1",

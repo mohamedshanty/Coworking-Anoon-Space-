@@ -63,6 +63,40 @@ async function audit(
 // ---------------------------------------------------------------------------
 
 /**
+ * Self-heal the router precondition for multi-device logins: the hotspot
+ * user profile must allow at least LIMITS.maxDevicesPerPhone simultaneous
+ * sessions (same phone user logs in from phone + laptop + ...).
+ *
+ * Fail-open by design: if the router refuses (e.g. API user without write
+ * permission) we audit + warn and continue — a single-device login must
+ * never regress because of this hardening. Never throws.
+ */
+export async function ensureProfileAllowsMultiDevice(profile: string): Promise<void> {
+  try {
+    const res = await getMikrotik().ensureProfileSharedUsers(
+      profile,
+      LIMITS.maxDevicesPerPhone,
+    );
+    if (res.changed) {
+      console.warn(
+        `[hotspot] raised ${profile} shared-users ${res.previous} → ${LIMITS.maxDevicesPerPhone} for multi-device logins`,
+      );
+      await audit("PROFILE_FIX", true, {
+        detail: `${profile} shared-users ${res.previous} → ${LIMITS.maxDevicesPerPhone}`,
+      });
+    }
+  } catch (err) {
+    console.warn(
+      `[hotspot] could not enforce shared-users on profile ${profile} (single-device logins unaffected):`,
+      err instanceof Error ? err.message : err,
+    );
+    await audit("PROFILE_FIX", false, {
+      detail: `${profile}: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+}
+
+/**
  * Core requirement: "scan QR from phone authorizes laptop automatically."
  * For every known MAC for the same phone: find its current IP from DHCP/ARP,
  * then log it in. Devices not currently connected are silently skipped.
@@ -184,7 +218,19 @@ export async function authorizeDeviceAndKnownPeers(
   }
 
   // -- (b) Log in the current device ---------------------------------------
-  await mt.activeLogin({ user: input.phone, password: input.password, ip, mac });
+  // NOTE: a second device for the same phone fails here when the router
+  // profile's shared-users is 1 (RouterOS default) while the first device
+  // is still active. Audit the failure explicitly (MAC + router error) so a
+  // "laptop gets no internet" report is diagnosable from HotspotAudit
+  // instead of a bare 500. The upsert below only runs on success.
+  try {
+    await mt.activeLogin({ user: input.phone, password: input.password, ip, mac });
+  } catch (err) {
+    const detail = `activeLogin failed: ${err instanceof Error ? err.message : String(err)}`;
+    console.error(`[hotspot] ${detail} (phone=${input.phone} mac=${mac} ip=${ip})`);
+    await audit("LOGIN", false, { phone: input.phone, mac, detail });
+    throw err;
+  }
   await audit("LOGIN", true, {
     phone: input.phone,
     mac,

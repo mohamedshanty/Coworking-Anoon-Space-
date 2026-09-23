@@ -13,6 +13,7 @@ import { sessionsService } from "../sessions/service";
 import { resolveIdentity, ensureVisitor, Identity } from "./identity.service";
 import {
   authorizeDeviceAndKnownPeers,
+  ensureProfileAllowsMultiDevice,
   routerPasswordFor,
   HotspotHttpError,
 } from "./device-auth";
@@ -196,6 +197,13 @@ export async function portalLogin(input: LoginInput): Promise<LoginResult> {
     profile: plan.routerProfile,
     comment: `noonWiFi | ${identity.kind} | ${identity.name}`,
   });
+
+  // -- (c2) Multi-device precondition --------------------------------------
+  // Same phone logs in from phone + laptop (+ tablet) as ONE hotspot user.
+  // If the router profile only allows 1 simultaneous session (RouterOS
+  // default), the second device's activeLogin is rejected and it never gets
+  // internet. Self-heal the profile (fail-open: never blocks the login).
+  await ensureProfileAllowsMultiDevice(plan.routerProfile);
 
   // -- (d) Authorize this device + its known peers (shared path) ---------
   // Same code path the Anoon kiosk flow uses: on-network verify →

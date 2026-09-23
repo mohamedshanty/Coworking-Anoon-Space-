@@ -10,6 +10,7 @@ import {
 } from "../hotspot/hotspot.config";
 import {
   authorizeDeviceAndKnownPeers,
+  ensureProfileAllowsMultiDevice,
   routerPasswordFor,
 } from "../hotspot/device-auth";
 import { getMikrotik, normalizeMac, isValidIpv4 } from "../../lib/mikrotik";
@@ -371,6 +372,10 @@ export class IntegrationsService {
         profile: plan.routerProfile,
         comment: `anoon-checkin | ${type} | ${name}`,
       });
+      // Same multi-device precondition as the portal flow: one phone user
+      // across phone + laptop needs shared-users on the profile.
+      // Fail-open (never throws) — see device-auth.ts.
+      await ensureProfileAllowsMultiDevice(plan.routerProfile);
 
       // No device context (every pre-change kiosk payload) ⇒ stop here:
       // behavior is identical to before this change.

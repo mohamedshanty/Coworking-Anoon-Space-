@@ -122,3 +122,20 @@ add dst-address=<ANOON_KIOSK_IP> protocol=tcp dst-port=80  action=accept comment
 #   /ip hotspot active remove [find user=test]
 #   /ip hotspot user remove [find name=test]
 # لو نجح هذا الاختبار يدوياً، فالنظام كله سينجح.
+#
+# --- 8) تحقق multi-device: جوال + لابتوب بنفس الرقم ---------------------------
+# العرض: جهاز ثانٍ بنفس الرقم لا يحصل على إنترنت. السبب المعتاد: الـ profile
+# يسمح بجلسة واحدة فقط (shared-users=1 هو افتراضي RouterOS) فيرفض الراوتر
+# الـ active/login الثاني. الخادم الآن يرفع shared-users تلقائياً عند كل دخول
+# (انظر ensureProfileSharedUsers) — لكن تحقق من الحالة المستقرة هنا:
+#   /ip hotspot user profile print
+#     ← تأكد: shared-users>=4 على noon-10m و visitor-10m/20m/30m
+#   /ip hotspot print
+#     ← راجع: idle-timeout (مهلة الخمول تُسقط الجلسات الخاملة فقط ولا تمنع
+#       دخولاً جديداً — لو كانت 2m فهي عدوانية لكنها ليست سبب فشل الدخول)
+#   بعد تجربة جهازين حقيقيين (جوال ثم لابتوب بنفس الرقم):
+#   /ip hotspot active print
+#     ← يجب أن يظهر الرقم مرتين: مرة لكل mac-address
+#   وفي قاعدة البيانات: صف Visitor واحد لذلك الرقم، وجلسة noonCowork واحدة
+#   مفتوحة، وصف KnownDevice لكل mac. أي فشل دخول تجده مسجلاً في HotspotAudit
+#   (action=LOGIN, ok=false) مع نص خطأ الراوتر.

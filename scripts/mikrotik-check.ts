@@ -7,12 +7,17 @@
  * Checks:
  *   1. Connection + system identity (version, board name)
  *   2. Hotspot user profiles exist (noon-10m, visitor-10m, visitor-20m, visitor-30m)
- *   3. Host count (/ip hotspot host) and active session count (/ip hotspot active)
+ *      AND each allows enough simultaneous sessions (shared-users) for
+ *      multi-device logins (same phone on phone + laptop)
+ *   3. Hotspot server settings (idle-timeout, keepalive-timeout,
+ *      addresses-per-mac) — printed for review
+ *   4. Host count (/ip hotspot host) and active session count (/ip hotspot active)
  *
  * Exits with code 1 on any failure with a specific error message.
  */
 
 import { getMikrotik, MikrotikError } from "../src/lib/mikrotik";
+import { MAX_DEVICES_PER_PHONE } from "../src/lib/env";
 
 const REQUIRED_PROFILES = ["noon-10m", "visitor-10m", "visitor-20m", "visitor-30m"];
 
@@ -69,13 +74,45 @@ async function main() {
   console.log(`\n[mikrotik:check] Hotspot user profiles (${profiles.length} total):`);
   for (const p of profiles) {
     const marker = REQUIRED_PROFILES.includes(p.name) ? " ✓" : "";
-    console.log(`  - ${p.name}${marker}`);
+    console.log(`  - ${p.name} (shared-users=${p?.["shared-users"] ?? "?"})${marker}`);
   }
 
   if (missing.length > 0) {
     fail(`Missing required profiles: ${missing.join(", ")}`);
   }
   console.log("[mikrotik:check] ✓ All 4 required profiles present");
+
+  // ── 2b. shared-users must allow multi-device logins ───────────────────
+  // Same phone logs in from phone + laptop as ONE hotspot user. With
+  // shared-users=1 (RouterOS default) the second device's active/login is
+  // rejected and it never gets internet. The backend self-heals this on
+  // every login, but flag it here so ops can see the steady state.
+  const thin = REQUIRED_PROFILES.map((name) => {
+    const p = profiles.find((x: any) => x?.name === name);
+    const n = Number.parseInt(String(p?.["shared-users"] ?? ""), 10);
+    return { name, shared: Number.isFinite(n) ? n : 0 };
+  }).filter((p) => p.shared < MAX_DEVICES_PER_PHONE);
+  if (thin.length > 0) {
+    fail(
+      `Profiles with shared-users < ${MAX_DEVICES_PER_PHONE} (second device login will be rejected): ` +
+      thin.map((p) => `${p.name}=${p.shared}`).join(", "),
+    );
+  }
+  console.log(`[mikrotik:check] ✓ All required profiles allow ≥${MAX_DEVICES_PER_PHONE} simultaneous sessions`);
+
+  // ── 2c. Hotspot server settings (review only) ──────────────────────────
+  try {
+    const servers = await client.listServers();
+    console.log(`\n[mikrotik:check] Hotspot servers (${servers.length}):`);
+    for (const s of servers) {
+      console.log(
+        `  - ${s?.name ?? "?"}: idle-timeout=${s?.["idle-timeout"] ?? "?"} ` +
+        `keepalive-timeout=${s?.["keepalive-timeout"] ?? "?"} addresses-per-mac=${s?.["addresses-per-mac"] ?? "?"}`,
+      );
+    }
+  } catch (err) {
+    fail(`Failed to list hotspot servers: ${err instanceof Error ? err.message : String(err)}`, err);
+  }
 
   // ── 3. Hosts + active sessions ────────────────────────────────────────
   let hostCount: number;

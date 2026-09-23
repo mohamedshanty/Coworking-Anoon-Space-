@@ -153,6 +153,47 @@ class MikrotikClient {
     return this.write(["/ip/hotspot/user/profile/print"]);
   }
 
+  /**
+   * Multi-device precondition: every device logs in as hotspot user = the
+   * phone number, so the profile's `shared-users` MUST allow at least
+   * `minShared` simultaneous sessions — otherwise the second device's
+   * /ip/hotspot/active/login is rejected ("simultaneous session limit
+   * reached") and the laptop never gets internet, with no KnownDevice row
+   * written (the upsert runs after the login).
+   *
+   * Self-heals a router that was configured without shared-users (RouterOS
+   * default is 1): prints the profile, raises shared-users when below `min`,
+   * and reports whether anything changed. Throws when the profile does not
+   * exist — profiles are required infrastructure (see mikrotik:check).
+   */
+  async ensureProfileSharedUsers(
+    profileName: string,
+    minShared: number,
+  ): Promise<{ changed: boolean; previous: number }> {
+    const res = await this.write([
+      "/ip/hotspot/user/profile/print",
+      `?name=${profileName}`,
+    ]);
+    const profile = res[0];
+    if (!profile) {
+      throw new MikrotikError(`Hotspot user profile not found: ${profileName}`);
+    }
+    const current = Number.parseInt(String(profile["shared-users"] ?? ""), 10);
+    const previous = Number.isFinite(current) ? current : 0;
+    if (previous >= minShared) return { changed: false, previous };
+    await this.write([
+      "/ip/hotspot/user/profile/set",
+      `=.id=${profile[".id"]}`,
+      `=shared-users=${minShared}`,
+    ]);
+    return { changed: true, previous };
+  }
+
+  /** Hotspot servers (idle-timeout, keepalive-timeout, addresses-per-mac...) */
+  async listServers(): Promise<any[]> {
+    return this.write(["/ip/hotspot/print"]);
+  }
+
   /** Count of devices currently in the hotspot host table */
   async countHosts(): Promise<number> {
     const res = await this.write(["/ip/hotspot/host/print"]);
