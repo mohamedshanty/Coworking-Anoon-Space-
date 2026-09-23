@@ -196,6 +196,14 @@ export async function authorizeDeviceAndKnownPeers(
   const mac = normalizeMac(input.mac);
   const mt = getMikrotik();
 
+  // Trace the raw device identity every attempt (both portal and kiosk flows
+  // share this path): when a "second device gets no internet" report comes
+  // in, the PM2 log shows exactly which mac/ip the backend tried to log in
+  // and the HotspotAudit LOGIN row shows the router's verdict.
+  console.log(
+    `[hotspot] authorize attempt phone=${input.phone} mac=${mac} ip=${input.ip ?? "-"}`,
+  );
+
   // -- (a) Verify the device is actually on our network --------------------
   // Without this, anyone from the internet could call the endpoint and
   // authorize an arbitrary MAC address.

@@ -867,4 +867,78 @@ describe("kiosk device authorization", () => {
       expect.objectContaining({ where: expect.objectContaining({ id: "d-laptop" }) }),
     );
   });
+
+  // Regression: phone checks in (new session) → laptop checks in with the
+  // SAME name+phone while the session is still open. Before the fix, the
+  // idempotent early-return skipped router provisioning entirely, so the
+  // laptop got a success-looking alreadyActive:true response yet never
+  // received internet — and no LOGIN audit row was written, which is why
+  // the production HotspotAudit showed zero failed LOGINs for this bug.
+  it("second device while session open → laptop authorized, alreadyActive:true, LOGIN audited", async () => {
+    const LAPTOP_MAC = "11:22:33:44:55:66";
+    mockVisitorFindFirst.mockResolvedValue(mockVisitor());
+    mockSessionFindFirst
+      .mockResolvedValueOnce(null) // phone: no open session → creates one
+      .mockResolvedValue(mockSession()); // laptop: session already open
+    mockFindHost.mockImplementation((mac: string) =>
+      Promise.resolve({
+        id: `h-${mac}`,
+        mac,
+        address: mac === LAPTOP_MAC ? "10.10.0.60" : HOST_IP,
+        authorized: false,
+        bypassed: false,
+      }),
+    );
+
+    const first = await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+      mac: MAC,
+      ip: HOST_IP,
+    } as any);
+    expect(first.alreadyActive).toBe(false);
+
+    const second = await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+      mac: LAPTOP_MAC,
+      ip: "10.10.0.60",
+    } as any);
+
+    expect(second.alreadyActive).toBe(true);
+    expect(second.session.id).toBe("s-001");
+    // No second attendance session…
+    expect(mockCheckIn).toHaveBeenCalledTimes(1);
+    // …but the laptop MAC got its own router login…
+    expect(mockActiveLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ user: "0590000000", ip: "10.10.0.60", mac: LAPTOP_MAC }),
+    );
+    expect(mockKnownDeviceUpsert).toHaveBeenCalled();
+    // …with an audit trail proving the attempt reached the router.
+    expect(mockAuditCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: "LOGIN", ok: true, mac: LAPTOP_MAC }),
+      }),
+    );
+  });
+
+  it("mac-less replay of an open session still skips the router entirely", async () => {
+    mockVisitorFindFirst.mockResolvedValue(mockVisitor());
+    mockSessionFindFirst.mockResolvedValue(mockSession());
+
+    const result = await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+    } as any);
+
+    expect(result.alreadyActive).toBe(true);
+    expect(mockEnsureUser).not.toHaveBeenCalled();
+    expect(mockActiveLogin).not.toHaveBeenCalled();
+  });
 });

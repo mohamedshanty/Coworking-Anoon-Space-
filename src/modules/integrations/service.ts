@@ -265,6 +265,24 @@ export class IntegrationsService {
       include: { visitor: true, snackOrders: true },
     });
     if (openSession) {
+      // Multi-device: this phone is already checked in (e.g. on their phone),
+      // but THIS request can carry a NEW device MAC (e.g. the laptop, which
+      // reached the kiosk via its own hotspot redirect). The router still
+      // needs an /ip/hotspot/active/login for that MAC — without it the
+      // second device receives a success-looking alreadyActive:true response
+      // yet never gets internet, and no LOGIN audit row is ever written
+      // (the previous shared-users fix could not help: the second login was
+      // never attempted). Provision best-effort — never throws, never fails
+      // the local session.
+      if (input.mac) {
+        console.log(
+          `[AnoonCheckIn] alreadyActive phone=${phone} — authorizing additional device mac=${input.mac} ip=${input.ip ?? "-"}`,
+        );
+        await this.ensureRouterUserSafely(phone, visitor.name ?? name, type, plan, {
+          mac: input.mac,
+          ip: input.ip,
+        });
+      }
       return buildResult(openSession, true);
     }
 
