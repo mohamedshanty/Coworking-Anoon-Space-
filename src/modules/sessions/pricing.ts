@@ -12,6 +12,21 @@ export interface InternetCharge {
   replacesSeat?: boolean;
 }
 
+/**
+ * Person types whose seat-time is always free, regardless of subscription
+ * status: trainees, employees, and Tamkeen students ("tamkeen"). Their
+ * package/training already covers space usage — sessions only log the visit
+ * (visitCount++) and any snack/internet extras. Subscribers are NOT covered
+ * here because they need an *active* subscription (checked by the caller).
+ */
+export function isTimeExemptType(visitorType: string | null | undefined): boolean {
+  return (
+    visitorType === "trainee" ||
+    visitorType === "employee" ||
+    visitorType === "tamkeen"
+  );
+}
+
 export function calculateSessionPricing(
   checkIn: Date,
   visitorType: string,
@@ -26,13 +41,13 @@ export function calculateSessionPricing(
   const elapsedMs = Math.max(0, endTime - checkInTime);
   const hours = elapsedMs / (1000 * 60 * 60);
 
-  // Despite the name "isSub", this flag now also covers trainees getting free time.
-  // Trainees are checked in as "trainee" type by staff and don't pay hourly — their
-  // training package/course already covers the space usage.
+  // Despite the name "isSub", this flag now also covers trainees, employees,
+  // and Tamkeen students getting free time. Trainees/Tamkeen students are
+  // checked in as "trainee"/"tamkeen" type by staff and don't pay hourly —
+  // their training package already covers the space usage.
   const isSub =
     (visitorType === "subscriber" && hasActiveSubscription) ||
-    visitorType === "trainee" ||
-    visitorType === "employee";
+    isTimeExemptType(visitorType);
 
   // Time cost calculation
   // In "replaces" mode for non-subscribers: time portion is zeroed —

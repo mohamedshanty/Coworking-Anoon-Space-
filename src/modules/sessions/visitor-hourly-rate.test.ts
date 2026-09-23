@@ -134,7 +134,7 @@ describe.each([
 });
 
 describe("members unaffected (still free / noon-10m)", () => {
-  it.each(["subscriber", "trainee", "employee"] as const)(
+  it.each(["subscriber", "trainee", "employee", "tamkeen"] as const)(
     "%s → noon-10m, rate 0, time zeroed in pricing",
     (kind) => {
       const plan = resolveEffectivePlan(kind as any, "30M", "visitor-30m");
@@ -148,7 +148,8 @@ describe("members unaffected (still free / noon-10m)", () => {
         [],
         { ...SETTINGS, hourlyRate: SETTINGS.hourlyRate },
       );
-      // Trainees/employees are free by type; subscribers with active sub free.
+      // Trainees/employees/Tamkeen students are free by type; subscribers
+      // with active sub free.
       // (subscriber without active sub would pay seat — tested elsewhere.)
       if (kind !== "subscriber") {
         expect(pricing.timeAmount).toBe(0);

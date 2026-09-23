@@ -28,6 +28,7 @@ export async function generateReportBuffer(fromDate: Date, toDate: Date): Promis
     visitor: "زائر",
     subscriber: "مشترك",
     trainee: "متدرب",
+    tamkeen: "تمكين",
   };
   const categoryMap: Record<string, string> = {
     electricity: "كهرباء",
@@ -121,6 +122,7 @@ export async function generateReportBuffer(fromDate: Date, toDate: Date): Promis
   const visitorCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "visitor").length;
   const subscriberCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "subscriber").length;
   const traineeCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "trainee").length;
+  const tamkeenCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "tamkeen").length;
 
   visitsSummarySheet.addRow({ item: "إجمالي الزيارات", value: totalVisits });
   visitsSummarySheet.addRow({ item: "الزيارات المدفوعة", value: paidVisits.length });
@@ -129,6 +131,7 @@ export async function generateReportBuffer(fromDate: Date, toDate: Date): Promis
   visitsSummarySheet.addRow({ item: "الزائرون", value: visitorCount });
   visitsSummarySheet.addRow({ item: "المشتركون", value: subscriberCount });
   visitsSummarySheet.addRow({ item: "المتدربون", value: traineeCount });
+  visitsSummarySheet.addRow({ item: "طلبة تمكين", value: tamkeenCount });
 
   // --- Sheet 2: Subscribers ---
   const subsSheet = workbook.addWorksheet("المشتركون");

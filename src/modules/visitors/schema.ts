@@ -7,7 +7,7 @@ export const addNoteSchema = z.object({
 export const updateVisitorSchema = z.object({
   name: z.string().min(1).optional(),
   phone: z.string().min(1).optional(),
-  type: z.enum(["visitor", "subscriber", "trainee", "employee"]).optional(),
+  type: z.enum(["visitor", "subscriber", "trainee", "employee", "tamkeen"]).optional(),
   source: z.string().optional(),
   followUpStatus: z.enum(["needs", "contacted", "opt_out"]).optional(),
   notes: z.string().optional(),

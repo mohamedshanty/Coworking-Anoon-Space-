@@ -301,6 +301,7 @@ enum PersonType {
   subscriber
   trainee
   employee
+  tamkeen
 }
 
 enum SessionPaymentStatus {

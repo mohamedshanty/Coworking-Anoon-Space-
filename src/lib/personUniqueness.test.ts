@@ -46,10 +46,12 @@ describe("assertPhoneNotTaken", () => {
     });
   });
 
-  it("subscriber exists → full check 409s as subscriber (covers trainee/employee-create paths)", async () => {
+  it("subscriber exists → full check 409s as subscriber (covers trainee/tamkeen/employee-create paths)", async () => {
     // First visitor.findFirst call is the trainee check (no match),
-    // second is the subscriber check (match).
+    // second is the tamkeen check (no match), third is the subscriber
+    // check (match).
     mockVisitorFindFirst
+      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: "v-sub" });
 
@@ -58,7 +60,7 @@ describe("assertPhoneNotTaken", () => {
       "This phone number is already registered as a subscriber",
     );
     expect(mockEmployeeFindUnique).toHaveBeenCalledTimes(1);
-    expect(mockVisitorFindFirst).toHaveBeenCalledTimes(2);
+    expect(mockVisitorFindFirst).toHaveBeenCalledTimes(3);
   });
 
   it("trainee exists → subscriber/employee creates 409", async () => {
@@ -69,8 +71,22 @@ describe("assertPhoneNotTaken", () => {
       "This phone number is already registered as a trainee",
     );
     expect(mockEmployeeFindUnique).toHaveBeenCalled();
-    // Trainee matched first — subscriber check never runs.
+    // Trainee matched first — tamkeen/subscriber checks never run.
     expect(mockVisitorFindFirst).toHaveBeenCalledTimes(1);
+  });
+
+  it("tamkeen student exists → subscriber/trainee/employee creates 409", async () => {
+    // Trainee check misses, tamkeen check hits — subscriber check never runs.
+    mockVisitorFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "v-tamkeen" });
+
+    await expect409(
+      assertPhoneNotTaken(PHONE),
+      "This phone number is already registered as a Tamkeen student",
+    );
+    expect(mockEmployeeFindUnique).toHaveBeenCalled();
+    expect(mockVisitorFindFirst).toHaveBeenCalledTimes(2);
   });
 
   it("employee exists → subscriber/trainee creates 409", async () => {

@@ -6,6 +6,7 @@ import { ApiError } from "../../lib/ApiError";
 import { getEffectiveStatus } from "../../lib/subscription";
 import { palestineStartOfDay, palestineEndOfDay, formatPalestineDateTime, formatPalestineDate } from "../../lib/timezone";
 import { calculateRevenue } from "../../lib/revenue";
+import { isTimeExemptType } from "../sessions/pricing";
 
 const exportQuerySchema = z.object({
   from: z.string().min(1, "'from' is required"),
@@ -104,6 +105,7 @@ export class ReportsController {
         subscriber: "مشترك",
         trainee: "متدرب",
         employee: "موظف",
+        tamkeen: "تمكين",
       };
 
       // Fetch sessions (needed for both types: history shows them, reports needs revenue calc)
@@ -160,7 +162,7 @@ export class ReportsController {
             : null;
 
           const effectiveType = s.sessionType ?? s.visitor.type;
-          const isSub = effectiveType === "subscriber" || effectiveType === "trainee" || effectiveType === "employee";
+          const isSub = effectiveType === "subscriber" || isTimeExemptType(effectiveType);
 
           // Use STORED data (matching the in-app History table exactly):
           // - ordersAmount: sum of SnackOrder totals (stored, not recomputed)
@@ -200,6 +202,7 @@ export class ReportsController {
             subscriber: "FFE6F0FF",
             trainee: "FFFFF3E0",
             employee: "FFE8F5E9",
+            tamkeen: "FFF3E8FF",
             visitor: "FFFFFFFF",
           };
           const rowFill = typeFillColors[effectiveType] ?? "FFFFFFFF";
@@ -233,6 +236,7 @@ export class ReportsController {
         const visitorCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "visitor").length;
         const subscriberCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "subscriber").length;
         const traineeCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "trainee").length;
+        const tamkeenCount = sessions.filter((s) => (s.sessionType ?? s.visitor.type) === "tamkeen").length;
 
         visitsSummarySheet.addRow({ item: "إجمالي الزيارات", value: totalVisits });
         visitsSummarySheet.addRow({ item: "الزيارات المدفوعة", value: paidVisits.length });
@@ -241,6 +245,7 @@ export class ReportsController {
         visitsSummarySheet.addRow({ item: "الزائرون", value: visitorCount });
         visitsSummarySheet.addRow({ item: "المشتركون", value: subscriberCount });
         visitsSummarySheet.addRow({ item: "المتدربون", value: traineeCount });
+        visitsSummarySheet.addRow({ item: "طلبة تمكين", value: tamkeenCount });
       }
 
       // Sheet 2: المشتركون (Subscribers)

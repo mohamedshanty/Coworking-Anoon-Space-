@@ -26,6 +26,7 @@ import contactsRouter from "./modules/contacts/routes";
 import drinksRouter from "./modules/drinks/routes";
 import hotDrinkDefsRouter from "./modules/hot-drink-defs/routes";
 import traineesRouter from "./modules/trainees/routes";
+import tamkeenStudentsRouter from "./modules/tamkeen-students/routes";
 import employeesRouter from "./modules/employees/routes";
 import visitorsRouter from "./modules/visitors/routes";
 import snackWalletRouter from "./modules/snack-wallet/routes";
@@ -112,6 +113,9 @@ router.use("/hot-drink-defs", hotDrinkDefsRouter);
 
 // Register trainees routes
 router.use("/trainees", traineesRouter);
+
+// Register Tamkeen students routes (Visitor rows with type "tamkeen")
+router.use("/tamkeen-students", tamkeenStudentsRouter);
 
 // Register employees roster routes (name + phone, no login)
 router.use("/employees", employeesRouter);

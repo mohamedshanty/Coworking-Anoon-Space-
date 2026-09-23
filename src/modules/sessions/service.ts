@@ -1,7 +1,7 @@
 import { Prisma, NetTier } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
-import { calculateSessionPricing } from "./pricing";
+import { calculateSessionPricing, isTimeExemptType } from "./pricing";
 import { CheckInInput, UpdateSessionInput, AddBatchOrdersInput } from "./schema";
 import { isSamePalestineDay, getPalestineDateParts, palestineStartOfDay, palestineEndOfDay } from "../../lib/timezone";
 import { snackWalletService } from "../snack-wallet/service";
@@ -1654,7 +1654,7 @@ export class SessionsService {
     const sameDaySessionCount = new Map<string, number>();
     for (const s of sessions) {
       const effectiveType = s.sessionType ?? s.visitor.type;
-      if (effectiveType === "subscriber" || effectiveType === "trainee" || effectiveType === "employee") {
+      if (effectiveType === "subscriber" || isTimeExemptType(effectiveType)) {
         const { year, month, day } = getPalestineDateParts(s.checkIn);
         const dayKey = `${s.visitorId}_${year}_${month}_${day}`;
         sameDaySessionCount.set(dayKey, (sameDaySessionCount.get(dayKey) ?? 0) + 1);
@@ -1682,7 +1682,7 @@ export class SessionsService {
       // Determine isSub from the session's own type fields, NOT from live subscription status.
       // This preserves subscriber classification for historical sessions even after the subscription expires.
       const isSub =
-        effectiveType === "subscriber" || effectiveType === "trainee" || effectiveType === "employee";
+        effectiveType === "subscriber" || isTimeExemptType(effectiveType);
 
       // Compute snack totals directly from the session's SnackOrder records (same data the table shows).
       const snacksTotal = s.snackOrders.reduce((sum, o) => sum + Number(o.total), 0);
@@ -1831,7 +1831,7 @@ export class SessionsService {
     const sameDaySessionCount = new Map<string, number>();
     for (const s of sessions) {
       const effectiveType = s.sessionType ?? s.visitor.type;
-      if (effectiveType === "subscriber" || effectiveType === "trainee" || effectiveType === "employee") {
+      if (effectiveType === "subscriber" || isTimeExemptType(effectiveType)) {
         const { year, month, day } = getPalestineDateParts(s.checkIn);
         const dayKey = `${s.visitorId}_${year}_${month}_${day}`;
         sameDaySessionCount.set(dayKey, (sameDaySessionCount.get(dayKey) ?? 0) + 1);
@@ -1852,7 +1852,7 @@ export class SessionsService {
     const subscriberHoursRevenue = r2(
       sessions.reduce((sum, s) => {
         const effectiveType = s.sessionType ?? s.visitor.type;
-        if (effectiveType !== "subscriber" && effectiveType !== "trainee" && effectiveType !== "employee") return sum;
+        if (effectiveType !== "subscriber" && !isTimeExemptType(effectiveType)) return sum;
         const sub = findSubscription(s.visitorId, s.checkIn);
         if (!sub) return sum;
         const daysInSub = Math.max(1, Math.ceil(
@@ -1897,8 +1897,7 @@ export class SessionsService {
       (s) =>
         s.paymentStatus === "paid" &&
         (s.sessionType ?? s.visitor.type) !== "subscriber" &&
-        (s.sessionType ?? s.visitor.type) !== "trainee" &&
-        (s.sessionType ?? s.visitor.type) !== "employee",
+        !isTimeExemptType(s.sessionType ?? s.visitor.type),
     ).length;
     const avgRevenuePerVisit = paidNonSubVisits > 0 ? r2(hoursRevenue / paidNonSubVisits) : 0;
 

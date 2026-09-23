@@ -1,0 +1,6 @@
+# Prisma migration files MUST keep LF line endings on every checkout.
+# The checksum stored in _prisma_migrations is computed over raw file bytes,
+# so a CRLF checkout (Windows, core.autocrlf=true) makes `prisma migrate dev`
+# fail with "migration was modified after it was applied".
+prisma/migrations/**/migration.sql text eol=lf
+*.prisma text eol=lf
