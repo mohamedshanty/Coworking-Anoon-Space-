@@ -114,6 +114,23 @@ vi.mock("../sessions/service", () => ({
 import { integrationsService, resolveEffectivePlan, resolveMember } from "./service";
 import { anoonCheckInSchema } from "./schema";
 import { ApiError } from "../../lib/ApiError";
+import { hostLookupRetryConfig } from "../hotspot/device-auth";
+
+/**
+ * Device authorization now runs fire-and-forget in the background (2-3s retry
+ * budget must not block the session HTTP response). After `await
+ * anoonCheckIn(...)` returns, the router calls may not have completed yet —
+ * flush the background task before asserting on `activeLogin` / upsert /
+ * audit / warn spies.
+ *
+ * Retry delays are shrunk to 5ms in `beforeEach` so retry tests stay fast;
+ * production defaults (4 attempts × 650ms) are restored automatically because
+ * `vi.resetAllMocks` does not touch the mutable config — we reset it
+ * explicitly below.
+ */
+async function flushRouterAuth(ms = 50): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms));
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -135,6 +152,9 @@ function mockSession(overrides: Record<string, any> = {}) {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  // Keep retry-timing tests fast; production default is 650ms.
+  hostLookupRetryConfig.attempts = 4;
+  hostLookupRetryConfig.delayMs = 5;
   mockVisitorFindFirst.mockResolvedValue(null);
   mockVisitorCreate.mockImplementation((args: any) =>
     Promise.resolve({ id: "v-new", ...args.data }),
@@ -753,6 +773,8 @@ describe("kiosk device authorization", () => {
     expect(result.session.id).toBe("s-001");
     expect(result.alreadyActive).toBe(false);
     expect(mockEnsureUser).toHaveBeenCalledTimes(1);
+    // Device auth is fire-and-forget — flush background before asserting.
+    await flushRouterAuth();
     expect(mockFindHost).toHaveBeenCalledWith(MAC);
     expect(mockActiveLogin).toHaveBeenCalledWith(
       expect.objectContaining({ user: "0590000000", ip: HOST_IP, mac: MAC }),
@@ -779,6 +801,7 @@ describe("kiosk device authorization", () => {
     } as any);
 
     expect(result.session.id).toBe("s-001");
+    await flushRouterAuth();
     expect(mockActiveLogin).toHaveBeenCalledWith(
       expect.objectContaining({ user: "0590000000", ip: "10.10.0.77", mac: MAC }),
     );
@@ -816,9 +839,14 @@ describe("kiosk device authorization", () => {
       expect(result.session.id).toBe("s-001");
       expect(result.alreadyActive).toBe(false);
       expect(mockEnsureUser).toHaveBeenCalledTimes(1);
+      // Background retries 4× then skips — flush before asserting.
+      await flushRouterAuth(100);
+      expect(mockFindHost).toHaveBeenCalledTimes(4);
       expect(mockActiveLogin).not.toHaveBeenCalled();
       expect(mockKnownDeviceUpsert).not.toHaveBeenCalled();
-      expect(warnSpy).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[AnoonCheckIn][ROUTER-AUTH]"),
+      );
     } finally {
       warnSpy.mockRestore();
     }
@@ -840,6 +868,7 @@ describe("kiosk device authorization", () => {
 
       expect(result.session.id).toBe("s-001");
       expect(mockEnsureUser).toHaveBeenCalledTimes(1);
+      await flushRouterAuth();
       expect(mockActiveLogin).not.toHaveBeenCalled();
       expect(mockKnownDeviceUpsert).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalled();
@@ -863,6 +892,7 @@ describe("kiosk device authorization", () => {
       ip: HOST_IP,
     } as any);
 
+    await flushRouterAuth();
     // Current device + one known peer.
     expect(mockActiveLogin).toHaveBeenCalledTimes(2);
     expect(mockActiveLogin).toHaveBeenCalledWith(
@@ -918,6 +948,7 @@ describe("kiosk device authorization", () => {
     expect(second.session.id).toBe("s-001");
     // No second attendance session…
     expect(mockCheckIn).toHaveBeenCalledTimes(1);
+    await flushRouterAuth();
     // …but the laptop MAC got its own router login…
     expect(mockActiveLogin).toHaveBeenCalledWith(
       expect.objectContaining({ user: "0590000000", ip: "10.10.0.60", mac: LAPTOP_MAC }),
@@ -1006,6 +1037,7 @@ describe("portal repeat-login decoupling", () => {
     expect(second.alreadyActive).toBe(true);
     expect(mockCheckIn).toHaveBeenCalledTimes(1);
     expect(mockEnsureUser).toHaveBeenCalledTimes(2);
+    await flushRouterAuth();
     expect(mockActiveLogin).toHaveBeenCalledTimes(2);
     expect(mockActiveLogin).toHaveBeenNthCalledWith(
       1,
@@ -1043,6 +1075,7 @@ describe("portal repeat-login decoupling", () => {
     expect(result.alreadyActive).toBe(true);
     expect(result.session.id).toBe("s-001");
     expect(mockEnsureUser).toHaveBeenCalledTimes(1);
+    await flushRouterAuth();
     expect(mockActiveLogin).toHaveBeenCalledWith(
       expect.objectContaining({ user: "0590000000", mac: MAC_A, ip: IP_A }),
     );
@@ -1118,6 +1151,7 @@ describe("portal repeat-login decoupling", () => {
       expect(mockEnsureUser).toHaveBeenCalledWith(
         expect.objectContaining({ profile }),
       );
+      await flushRouterAuth();
       expect(mockActiveLogin).toHaveBeenCalledWith(
         expect.objectContaining({ mac: MAC_B, ip: IP_B }),
       );
@@ -1156,6 +1190,7 @@ describe("portal repeat-login decoupling", () => {
 
     expect(mockCheckIn).not.toHaveBeenCalled();
     expect(mockEnsureUser).toHaveBeenCalledTimes(5);
+    await flushRouterAuth(100);
     expect(mockActiveLogin).toHaveBeenCalledTimes(5);
     expect(mockKnownDeviceUpsert).toHaveBeenCalledTimes(5);
     for (const mac of macs) {
@@ -1191,6 +1226,103 @@ describe("portal repeat-login decoupling", () => {
       expect(consoleSpy).toHaveBeenCalled();
     } finally {
       consoleSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fresh-device timing race: host/ARP entry may not exist at POST time.
+// The host lookup must retry with backoff (not a single immediate check),
+// fire-and-forget so the session response is never blocked.
+// ---------------------------------------------------------------------------
+
+describe("host lookup retry timing", () => {
+  const MAC = "AA:BB:CC:DD:EE:FF";
+  const HOST_IP = "10.10.0.50";
+
+  function hostRow(ip = HOST_IP) {
+    return {
+      id: "h1",
+      mac: MAC,
+      address: ip,
+      authorized: false,
+      bypassed: false,
+    };
+  }
+
+  it("host missing on first 2 polls then appears → still authorized, attempts=3, loud log", async () => {
+    mockFindHost
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(hostRow());
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    try {
+      // Response must NOT wait for retries: it returns success immediately
+      // while the background task is still polling.
+      const result = await integrationsService.anoonCheckIn({
+        type: "visitor",
+        name: "Test Visitor",
+        phone: "0590000000",
+        internetSpeed: "10M",
+        mac: MAC,
+        ip: HOST_IP,
+      } as any);
+
+      expect(result.session.id).toBe("s-001");
+      // Immediately after return, device auth is still in-flight (non-blocking).
+      expect(mockActiveLogin).not.toHaveBeenCalled();
+
+      await flushRouterAuth(150);
+
+      expect(mockFindHost).toHaveBeenCalledTimes(3);
+      expect(mockActiveLogin).toHaveBeenCalledWith(
+        expect.objectContaining({ user: "0590000000", mac: MAC, ip: HOST_IP }),
+      );
+      expect(mockKnownDeviceUpsert).toHaveBeenCalled();
+      // Loud greppable outcome line with retry count.
+      const routerAuthLines = logSpy.mock.calls
+        .map((c) => String(c[0] ?? ""))
+        .filter((s) => s.includes("[AnoonCheckIn][ROUTER-AUTH]"));
+      expect(routerAuthLines).toHaveLength(1);
+      expect(routerAuthLines[0]).toMatch(/result=authorized/);
+      expect(routerAuthLines[0]).toMatch(/attempts=3/);
+      expect(routerAuthLines[0]).toMatch(/phone=0590000000/);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("host never appears → skips gracefully after exhausting retries, no throw", async () => {
+    mockFindHost.mockResolvedValue(null);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const result = await integrationsService.anoonCheckIn({
+        type: "visitor",
+        name: "Test Visitor",
+        phone: "0590000000",
+        internetSpeed: "10M",
+        mac: MAC,
+        ip: HOST_IP,
+      } as any);
+
+      // Session part still succeeds immediately (non-blocking).
+      expect(result.session.id).toBe("s-001");
+
+      await flushRouterAuth(150);
+
+      expect(mockFindHost).toHaveBeenCalledTimes(4);
+      expect(mockActiveLogin).not.toHaveBeenCalled();
+      expect(mockKnownDeviceUpsert).not.toHaveBeenCalled();
+      const skippedLines = warnSpy.mock.calls
+        .map((c) => String(c[0] ?? ""))
+        .filter((s) => s.includes("[AnoonCheckIn][ROUTER-AUTH]"));
+      expect(skippedLines).toHaveLength(1);
+      expect(skippedLines[0]).toMatch(/result=skipped-not-on-network/);
+      expect(skippedLines[0]).toMatch(/attempts=4/);
+    } finally {
+      warnSpy.mockRestore();
     }
   });
 });

@@ -368,11 +368,21 @@ export class IntegrationsService {
    * ALWAYS called (new session and idempotent alreadyActive replays alike).
    *
    * When the kiosk forwards the checking-in device's `mac` (hotspot
-   * redirect), additionally authorize that device via the SAME shared
-   * path the portal login uses (activeLogin + KnownDevice upsert +
-   * authorizeKnownDevices for the phone's other devices). Absent `mac`
-   * ⇒ ensureUser only (router user kept fresh, no device login possible).
-   * Off-network or malformed `mac` ⇒ skipped silently (warn, never throw).
+   * redirect), the device authorization (host lookup with retry +
+   * activeLogin + KnownDevice upsert) runs FIRE-AND-FORGET in the background
+   * so the 2-3s retry budget never blocks the HTTP session response —
+   * same pattern as `notifyAnoon()` / `syncMemberToAnoonQr()` (non-blocking,
+   * logged failures, never throws). Absent `mac` ⇒ ensureUser only
+   * (router user kept fresh, no device login possible).
+   *
+   * Exact skip point (before this fix): `authorizeDeviceAndKnownPeers` did a
+   * SINGLE `mt.findHost(mac)`; when a freshly-connected device had no
+   * host/ARP entry yet, it threw 403 and the catch below did:
+   *   `console.warn("[AnoonCheckIn] device authorization skipped — local session kept:", ...)`
+   * and returned API success with NO `activeLogin` — matching the
+   * "single row in /ip hotspot active print, success response, no internet"
+   * evidence. Now the host lookup retries (see `findHostWithRetry`) and the
+   * final outcome is logged as a greppable `[AnoonCheckIn][ROUTER-AUTH]` line.
    */
   private async ensureRouterUserSafely(
     phone: string,
@@ -401,31 +411,79 @@ export class IntegrationsService {
       // Fail-open (never throws) — see device-auth.ts.
       await ensureProfileAllowsMultiDevice(plan.routerProfile);
 
-      // No device context (every pre-change kiosk payload) ⇒ stop here:
-      // behavior is identical to before this change.
+      // No device context (every pre-change kiosk payload) ⇒ stop here.
       if (!device?.mac) return;
 
-      try {
-        await authorizeDeviceAndKnownPeers({
-          phone,
-          password,
-          mac: device.mac,
-          ip: device.ip ?? undefined,
-          auditDetail: `anoon-kiosk | ${type} | ${plan.routerProfile}`,
-        });
-      } catch (err) {
-        // Best-effort: off-network / malformed MAC / router hiccup must
-        // never fail the local session.
-        console.warn(
-          "[AnoonCheckIn] device authorization skipped — local session kept:",
-          err instanceof Error ? err.message : err,
-        );
-      }
+      // Fire-and-forget: retried host lookup (up to ~2-3s) must NOT block
+      // the session HTTP response. Failures are logged inside the background
+      // task via the [ROUTER-AUTH] line; never throws.
+      void this.authorizeDeviceInBackground(
+        phone,
+        name,
+        type,
+        plan,
+        password,
+        { mac: device.mac, ip: device.ip ?? undefined },
+      ).catch(() => {
+        /* never throws — logged inside */
+      });
     } catch (err) {
       console.error(
         "[AnoonCheckIn] ensureUser failed — local session kept:",
         err,
       );
+    }
+  }
+
+  /**
+   * Background device authorization with retry + loud outcome logging.
+   * Never throws. Exactly one greppable line per login attempt so ops can
+   * diagnose via `pm2 logs nooncowork-backend` without code access:
+   *   [AnoonCheckIn][ROUTER-AUTH] phone=... mac=... result=authorized |
+   *     skipped-not-on-network | error:<msg> attempts=N profile=...
+   */
+  private async authorizeDeviceInBackground(
+    phone: string,
+    name: string,
+    type: AnoonPersonType,
+    plan: PlanDef,
+    password: string,
+    device: { mac: string; ip?: string },
+  ): Promise<void> {
+    const mac = device.mac;
+    try {
+      const result = await authorizeDeviceAndKnownPeers(
+        {
+          phone,
+          password,
+          mac,
+          ip: device.ip,
+          auditDetail: `anoon-kiosk | ${type} | ${plan.routerProfile}`,
+        },
+      );
+      console.log(
+        `[AnoonCheckIn][ROUTER-AUTH] phone=${phone} mac=${mac} result=authorized attempts=${result.attempts} profile=${plan.routerProfile} ip=${result.ip}`,
+      );
+    } catch (err: any) {
+      const attempts =
+        typeof err?.attempts === "number" ? err.attempts : "?";
+      if (
+        err?.name === "HotspotHttpError" &&
+        (err as any)?.status === 403
+      ) {
+        // Genuinely off-network after exhausting retries.
+        console.warn(
+          `[AnoonCheckIn][ROUTER-AUTH] phone=${phone} mac=${mac} result=skipped-not-on-network attempts=${attempts} profile=${plan.routerProfile} — local session kept`,
+        );
+      } else {
+        // Malformed MAC, router hiccup, etc. — best-effort, never fails session.
+        // NOTE: preserves the historic "Off-network or malformed mac ⇒ skipped
+        // silently (warn, never throw)" contract, now with retry count + loud log.
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[AnoonCheckIn][ROUTER-AUTH] phone=${phone} mac=${mac} result=error:${msg} attempts=${attempts} profile=${plan.routerProfile} — local session kept`,
+        );
+      }
     }
   }
 

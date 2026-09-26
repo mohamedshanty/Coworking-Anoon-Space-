@@ -159,6 +159,7 @@ import {
 import { BILLING, LIMITS } from "./hotspot.config";
 import { normalizePhone } from "./hotspot.config";
 import { INTERNET_MAX_VISIT_MINUTES } from "../../lib/env";
+import { hostLookupRetryConfig } from "./device-auth";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -197,6 +198,10 @@ beforeEach(() => {
   // Every mock gets an explicit default below — no test may rely on
   // leftovers from a previous test.
   vi.resetAllMocks();
+  // Host-lookup retries (fresh-device race) use short delays in tests;
+  // production defaults are 4 attempts × 650ms (~2s budget).
+  hostLookupRetryConfig.attempts = 4;
+  hostLookupRetryConfig.delayMs = 5;
 
   // -- Router (mikrotik) --
   mockFindHost.mockResolvedValue(mockHost());

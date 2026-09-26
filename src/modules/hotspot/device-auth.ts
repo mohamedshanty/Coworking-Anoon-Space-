@@ -59,6 +59,58 @@ async function audit(
 }
 
 // ---------------------------------------------------------------------------
+// Host lookup with retry (fresh-device timing race)
+// ---------------------------------------------------------------------------
+
+/**
+ * How many times to poll the router's hotspot host table for a freshly
+ * connected device before concluding it is genuinely off-network.
+ *
+ * A device that JUST connected and got redirected to the portal page may not
+ * have a host/ARP entry yet at the exact moment the login POST is processed.
+ * A single immediate `findHost` therefore returns null for a device that IS
+ * on our network, and the caller silently skips `activeLogin` while still
+ * returning API success (second device gets "success" but no internet).
+ *
+ * Defaults: 4 attempts, 650ms apart → ~2s budget (3 delays + router RTT).
+ * Mutable for tests (`hostLookupRetryConfig.delayMs = 5` keeps retry tests fast).
+ */
+export const hostLookupRetryConfig = {
+  attempts: 4,
+  delayMs: 650,
+};
+
+export type HostLookupRetryOpts = {
+  attempts?: number;
+  delayMs?: number;
+};
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Poll `findHost` until the MAC appears or attempts are exhausted.
+ * Retries ONLY the "not found" (null) case — the fresh-device timing race.
+ * Router errors (throw) fail fast: retrying a down router only adds delay.
+ * Malformed MACs throw from `normalizeMac` before we ever get here.
+ */
+export async function findHostWithRetry(
+  normalizedMac: string,
+  opts?: HostLookupRetryOpts,
+): Promise<{ host: import("../../lib/mikrotik").HotspotHost | null; attempts: number }> {
+  const attempts = opts?.attempts ?? hostLookupRetryConfig.attempts;
+  const delayMs = opts?.delayMs ?? hostLookupRetryConfig.delayMs;
+  const mt = getMikrotik();
+  let attemptsUsed = 0;
+  for (let i = 1; i <= attempts; i++) {
+    attemptsUsed = i;
+    const host = await mt.findHost(normalizedMac); // throws on router error → no retry
+    if (host) return { host, attempts: attemptsUsed };
+    if (i < attempts) await sleep(delayMs);
+  }
+  return { host: null, attempts: attemptsUsed };
+}
+
+// ---------------------------------------------------------------------------
 // Known devices
 // ---------------------------------------------------------------------------
 
@@ -169,19 +221,31 @@ export type AuthorizeDeviceResult = {
   /** Resolved IP the device was authorized with. */
   ip: string;
   extraDevicesAuthorized: number;
+  /** How many host-table polls it took (1 = found immediately). */
+  attempts: number;
+};
+
+export type AuthorizeDeviceOpts = {
+  /** Override retry budget for the host-table poll (tests use short delays). */
+  hostLookupRetries?: number;
+  hostLookupDelayMs?: number;
 };
 
 /**
- * Verify the MAC is on-network, log it in, persist the KnownDevice row,
- * and re-authorize the phone's other known devices.
+ * Verify the MAC is on-network (with retry for fresh-device timing race),
+ * log it in, persist the KnownDevice row, and re-authorize the phone's
+ * other known devices.
  *
- * Throws HotspotHttpError(403) when the MAC is not in the hotspot host
- * table (mirrors portalLogin's on-network check), and throws on malformed
- * MAC / invalid IP via normalizeMac / activeLogin. Callers that must stay
- * best-effort (Anoon kiosk) catch and skip silently.
+ * Throws HotspotHttpError(403) with `attempts` info when the MAC is still
+ * not in the hotspot host table after exhausting retries (genuinely
+ * off-network), and throws on malformed MAC / invalid IP via normalizeMac /
+ * activeLogin. Callers that must stay best-effort (Anoon kiosk) catch and
+ * skip silently — see the "Off-network or malformed mac ⇒ skipped silently
+ * (warn, never throw)" handling in integrations/service.ts.
  */
 export async function authorizeDeviceAndKnownPeers(
   input: AuthorizeDeviceInput,
+  opts?: AuthorizeDeviceOpts,
 ): Promise<AuthorizeDeviceResult> {
   const mac = normalizeMac(input.mac);
   const mt = getMikrotik();
@@ -194,13 +258,24 @@ export async function authorizeDeviceAndKnownPeers(
     `[hotspot] authorize attempt phone=${input.phone} mac=${mac} ip=${input.ip ?? "-"}`,
   );
 
-  // -- (a) Verify the device is actually on our network --------------------
+  // -- (a) Verify the device is actually on our network (with retry) ------
   // Without this, anyone from the internet could call the endpoint and
-  // authorize an arbitrary MAC address.
-  const host = await mt.findHost(mac);
+  // authorize an arbitrary MAC address. Single-check version had a timing
+  // race: a device JUST redirected to the portal may not have a host/ARP
+  // entry yet, so we poll a few times before concluding off-network.
+  const { host, attempts } = await findHostWithRetry(mac, {
+    attempts: opts?.hostLookupRetries,
+    delayMs: opts?.hostLookupDelayMs,
+  });
   if (!host) {
-    await audit("LOGIN", false, { phone: input.phone, mac, detail: "MAC not in hotspot host" });
-    throw new HotspotHttpError(403, "This device is not connected to the space network");
+    await audit("LOGIN", false, {
+      phone: input.phone,
+      mac,
+      detail: `MAC not in hotspot host after ${attempts} attempts`,
+    });
+    const err = new HotspotHttpError(403, "This device is not connected to the space network");
+    (err as any).attempts = attempts;
+    throw err;
   }
 
   // Prefer the router-observed address (authoritative); fall back to the
@@ -241,5 +316,5 @@ export async function authorizeDeviceAndKnownPeers(
   // -- (d) Re-authorize the phone's other known devices ---------------------
   const extra = await authorizeKnownDevices(input.phone, input.password, mac);
 
-  return { ip, extraDevicesAuthorized: extra };
+  return { ip, extraDevicesAuthorized: extra, attempts };
 }
