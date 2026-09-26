@@ -130,19 +130,9 @@ export async function authorizeKnownDevices(
 }
 
 async function upsertDevice(mac: string, phone: string, hostname: string | null) {
-  const count = await prisma.knownDevice.count({ where: { phone } });
-  const existing = await prisma.knownDevice.findUnique({ where: { mac } });
-
-  if (!existing && count >= LIMITS.maxDevicesPerPhone) {
-    // Delete oldest device instead of rejecting the new one — the person
-    // is standing here and needs internet now.
-    const oldest = await prisma.knownDevice.findFirst({
-      where: { phone },
-      orderBy: { lastSeenAt: "asc" },
-    });
-    if (oldest) await prisma.knownDevice.delete({ where: { id: oldest.id } });
-  }
-
+  // No cap on devices per phone: every new device that logs in with a known
+  // phone number gets its own KnownDevice row (one row per phone+mac pair,
+  // growing unbounded). Never delete or overwrite another device's row.
   await prisma.knownDevice.upsert({
     where: { mac },
     create: { mac, phone, hostname },

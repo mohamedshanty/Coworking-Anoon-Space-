@@ -642,7 +642,9 @@ describe("idempotency and router failure", () => {
     expect(second.alreadyActive).toBe(true);
     expect(second.session.id).toBe("s-001");
     expect(mockCheckIn).toHaveBeenCalledTimes(1);
-    expect(mockEnsureUser).toHaveBeenCalledTimes(1);
+    // Decoupled: router user provisioning fires on EVERY login (new or
+    // reused). No duplicate session, but two ensureUser calls.
+    expect(mockEnsureUser).toHaveBeenCalledTimes(2);
   });
 
   it("router failure still returns the successful local session", async () => {
@@ -666,7 +668,7 @@ describe("idempotency and router failure", () => {
     }
   });
 
-  it("reuses an already-open session without check-in or router calls", async () => {
+  it("reuses an already-open session without check-in, but still ensures router user", async () => {
     mockVisitorFindFirst.mockResolvedValue(mockVisitor());
     mockSessionFindFirst.mockResolvedValue(mockSession());
 
@@ -679,7 +681,10 @@ describe("idempotency and router failure", () => {
 
     expect(result.alreadyActive).toBe(true);
     expect(mockCheckIn).not.toHaveBeenCalled();
-    expect(mockEnsureUser).not.toHaveBeenCalled();
+    // Decoupled: session reuse must NOT skip router provisioning.
+    expect(mockEnsureUser).toHaveBeenCalledTimes(1);
+    // No device MAC in this payload, so no device login is possible.
+    expect(mockActiveLogin).not.toHaveBeenCalled();
   });
 });
 
@@ -926,7 +931,7 @@ describe("kiosk device authorization", () => {
     );
   });
 
-  it("mac-less replay of an open session still skips the router entirely", async () => {
+  it("mac-less replay still ensures router user but skips device login", async () => {
     mockVisitorFindFirst.mockResolvedValue(mockVisitor());
     mockSessionFindFirst.mockResolvedValue(mockSession());
 
@@ -938,7 +943,254 @@ describe("kiosk device authorization", () => {
     } as any);
 
     expect(result.alreadyActive).toBe(true);
-    expect(mockEnsureUser).not.toHaveBeenCalled();
+    // ensureUser fires on every login (keeps profile fresh); activeLogin
+    // needs a MAC so it is skipped when none was sent.
+    expect(mockEnsureUser).toHaveBeenCalledTimes(1);
     expect(mockActiveLogin).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Portal repeat-login decoupling: session reuse must never skip router auth.
+// Covers the bug report: same phone Device A then Device B, same device
+// twice, all person types, unbounded KnownDevice, router failure non-blocking.
+// ---------------------------------------------------------------------------
+
+describe("portal repeat-login decoupling", () => {
+  const MAC_A = "AA:BB:CC:DD:EE:01";
+  const MAC_B = "AA:BB:CC:DD:EE:02";
+  const IP_A = "10.10.0.51";
+  const IP_B = "10.10.0.52";
+
+  function onNetworkFor(macsToIps: Record<string, string>) {
+    mockFindHost.mockImplementation((mac: string) =>
+      Promise.resolve(
+        macsToIps[mac]
+          ? {
+              id: `h-${mac}`,
+              mac,
+              address: macsToIps[mac],
+              authorized: false,
+              bypassed: false,
+            }
+          : null,
+      ),
+    );
+  }
+
+  it("same phone, same device twice → (re-)authorized both times, one session", async () => {
+    mockVisitorFindFirst.mockResolvedValue(mockVisitor());
+    mockSessionFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(mockSession());
+    onNetworkFor({ [MAC_A]: IP_A });
+
+    const first = await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+      mac: MAC_A,
+      ip: IP_A,
+    } as any);
+    const second = await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+      mac: MAC_A,
+      ip: IP_A,
+    } as any);
+
+    expect(first.alreadyActive).toBe(false);
+    expect(second.alreadyActive).toBe(true);
+    expect(mockCheckIn).toHaveBeenCalledTimes(1);
+    expect(mockEnsureUser).toHaveBeenCalledTimes(2);
+    expect(mockActiveLogin).toHaveBeenCalledTimes(2);
+    expect(mockActiveLogin).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ user: "0590000000", mac: MAC_A, ip: IP_A }),
+    );
+    expect(mockActiveLogin).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ user: "0590000000", mac: MAC_A, ip: IP_A }),
+    );
+    expect(mockKnownDeviceUpsert).toHaveBeenCalledTimes(2);
+  });
+
+  it("lost race (400 → open session) still authorizes the requesting device", async () => {
+    mockVisitorFindFirst.mockResolvedValue(mockVisitor());
+    // First findFirst (open-session check): none. Second (race recovery): open.
+    mockSessionFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(mockSession());
+    mockCheckIn.mockRejectedValueOnce(
+      Object.assign(new Error("Visitor is already checked in"), {
+        statusCode: 400,
+      }),
+    );
+    onNetworkFor({ [MAC_A]: IP_A });
+
+    const result = await integrationsService.anoonCheckIn({
+      type: "visitor",
+      name: "Test Visitor",
+      phone: "0590000000",
+      internetSpeed: "10M",
+      mac: MAC_A,
+      ip: IP_A,
+    } as any);
+
+    expect(result.alreadyActive).toBe(true);
+    expect(result.session.id).toBe("s-001");
+    expect(mockEnsureUser).toHaveBeenCalledTimes(1);
+    expect(mockActiveLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ user: "0590000000", mac: MAC_A, ip: IP_A }),
+    );
+    expect(mockKnownDeviceUpsert).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["subscriber", "noon-10m"],
+    ["trainee", "noon-10m"],
+    ["employee", "noon-10m"],
+  ] as const)(
+    "repeat login as %s → router auth fires with %s",
+    async (memberType, profile) => {
+      mockSessionFindFirst.mockResolvedValue(mockSession());
+      onNetworkFor({ [MAC_B]: IP_B });
+
+      if (memberType === "employee") {
+        mockEmployeeFindUnique.mockResolvedValue({
+          id: "e-1",
+          name: "Test Employee",
+          phone: "0590000002",
+          active: true,
+        });
+        mockVisitorFindFirst.mockResolvedValue(null);
+        mockVisitorCreate.mockImplementation((args: any) =>
+          Promise.resolve({ id: "v-new", ...args.data }),
+        );
+        // findOrCreateVisitor: no existing anchor → creates one, then
+        // openSession (mocked above) is reused.
+        const result = await integrationsService.anoonCheckIn({
+          type: "member",
+          name: "Test Employee",
+          phone: "0590000002",
+          mac: MAC_B,
+          ip: IP_B,
+        } as any);
+        expect(result.resolvedType).toBe("employee");
+        expect(result.alreadyActive).toBe(true);
+      } else if (memberType === "trainee") {
+        mockVisitorFindFirst.mockResolvedValue(
+          mockVisitor({ id: "v-t", type: "trainee", phone: "0590000001" }),
+        );
+        const result = await integrationsService.anoonCheckIn({
+          type: "member",
+          name: "Member Trainee",
+          phone: "0590000001",
+          mac: MAC_B,
+          ip: IP_B,
+        } as any);
+        expect(result.resolvedType).toBe("trainee");
+        expect(result.alreadyActive).toBe(true);
+      } else {
+        mockVisitorFindFirst
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(
+            mockVisitor({
+              id: "v-sub",
+              type: "subscriber",
+              phone: "0590000003",
+            }),
+          );
+        const result = await integrationsService.anoonCheckIn({
+          type: "member",
+          name: "Member Subscriber",
+          phone: "0590000003",
+          mac: MAC_B,
+          ip: IP_B,
+        } as any);
+        expect(result.resolvedType).toBe("subscriber");
+        expect(result.alreadyActive).toBe(true);
+      }
+
+      expect(mockEnsureUser).toHaveBeenCalledWith(
+        expect.objectContaining({ profile }),
+      );
+      expect(mockActiveLogin).toHaveBeenCalledWith(
+        expect.objectContaining({ mac: MAC_B, ip: IP_B }),
+      );
+      expect(mockKnownDeviceUpsert).toHaveBeenCalled();
+      expect(mockCheckIn).not.toHaveBeenCalled();
+    },
+  );
+
+  it("unbounded KnownDevice: 5 new devices → 5 rows, none deleted or overwritten", async () => {
+    mockVisitorFindFirst.mockResolvedValue(mockVisitor());
+    mockSessionFindFirst.mockResolvedValue(mockSession());
+    const macs = [
+      "AA:BB:CC:DD:EE:11",
+      "AA:BB:CC:DD:EE:12",
+      "AA:BB:CC:DD:EE:13",
+      "AA:BB:CC:DD:EE:14",
+      "AA:BB:CC:DD:EE:15",
+    ];
+    const ips: Record<string, string> = {};
+    macs.forEach((m, i) => {
+      ips[m] = `10.10.0.${60 + i}`;
+    });
+    onNetworkFor(ips);
+
+    for (const mac of macs) {
+      const result = await integrationsService.anoonCheckIn({
+        type: "visitor",
+        name: "Test Visitor",
+        phone: "0590000000",
+        internetSpeed: "10M",
+        mac,
+        ip: ips[mac],
+      } as any);
+      expect(result.alreadyActive).toBe(true);
+    }
+
+    expect(mockCheckIn).not.toHaveBeenCalled();
+    expect(mockEnsureUser).toHaveBeenCalledTimes(5);
+    expect(mockActiveLogin).toHaveBeenCalledTimes(5);
+    expect(mockKnownDeviceUpsert).toHaveBeenCalledTimes(5);
+    for (const mac of macs) {
+      expect(mockKnownDeviceUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { mac },
+          create: expect.objectContaining({ mac, phone: "0590000000" }),
+        }),
+      );
+    }
+    // No cap: never evict the oldest device.
+    expect(mockKnownDeviceDelete).not.toHaveBeenCalled();
+  });
+
+  it("router failure on repeat login is logged but does not break the response", async () => {
+    mockVisitorFindFirst.mockResolvedValue(mockVisitor());
+    mockSessionFindFirst.mockResolvedValue(mockSession());
+    mockEnsureUser.mockRejectedValueOnce(new Error("Router unreachable"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const result = await integrationsService.anoonCheckIn({
+        type: "visitor",
+        name: "Test Visitor",
+        phone: "0590000000",
+        internetSpeed: "10M",
+        mac: MAC_A,
+        ip: IP_A,
+      } as any);
+
+      expect(result.alreadyActive).toBe(true);
+      expect(result.session.id).toBe("s-001");
+      expect(consoleSpy).toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 });

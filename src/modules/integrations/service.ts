@@ -258,82 +258,88 @@ export class IntegrationsService {
       ...(clientCheckinId ? { clientCheckinId } : {}),
     });
 
-    // Idempotency: reuse the person's open session instead of creating another.
-    // (sessionsService.checkIn would throw 400 "already checked in" otherwise.)
+    // Step 1 — Session/attendance (dedup unchanged): reuse the person's open
+    // session instead of creating another (sessionsService.checkIn would
+    // throw 400 "already checked in" otherwise). One open session per
+    // visitor; no duplicate rows. Type-specific rules above are preserved.
+    let session: any;
+    let alreadyActive: boolean;
     const openSession = await prisma.session.findFirst({
       where: { visitorId: visitor.id, checkOut: null },
       include: { visitor: true, snackOrders: true },
     });
     if (openSession) {
-      // Multi-device: this phone is already checked in (e.g. on their phone),
-      // but THIS request can carry a NEW device MAC (e.g. the laptop, which
-      // reached the kiosk via its own hotspot redirect). The router still
-      // needs an /ip/hotspot/active/login for that MAC — without it the
-      // second device receives a success-looking alreadyActive:true response
-      // yet never gets internet, and no LOGIN audit row is ever written
-      // (the previous shared-users fix could not help: the second login was
-      // never attempted). Provision best-effort — never throws, never fails
-      // the local session.
-      if (input.mac) {
-        console.log(
-          `[AnoonCheckIn] alreadyActive phone=${phone} — authorizing additional device mac=${input.mac} ip=${input.ip ?? "-"}`,
-        );
-        await this.ensureRouterUserSafely(phone, visitor.name ?? name, type, plan, {
-          mac: input.mac,
-          ip: input.ip,
-        });
-      }
-      return buildResult(openSession, true);
-    }
-
-    let session: any;
-    try {
-      // Visitor internet-tier rate ALONE represents the visitor's hourly
-      // rate (3/4/5 for 10M/20M/30M). Do NOT add the global seat/base price
-      // (Settings.hourlyRate) on top — that was the +3 ₪ double-count bug:
-      // Session.hourlyRate = base + surcharge showed 6/7/8 on the Live page
-      // and checkout then added the internet visit charge AGAIN on top.
-      // Members (subscriber/trainee/employee) use the free noon-10m profile
-      // and keep the base seat rate (their time is zeroed in pricing anyway).
-      // sessionsService.checkIn already accepts an hourlyRate override.
-      let finalHourlyRate: number;
-      if (type === "visitor") {
-        finalHourlyRate = plan.hourlyRate;
-      } else {
-        const settings = await prisma.settings.findFirst();
-        if (!settings) {
-          throw new ApiError(500, "Settings not initialized in database");
+      session = openSession;
+      alreadyActive = true;
+    } else {
+      try {
+        // Visitor internet-tier rate ALONE represents the visitor's hourly
+        // rate (3/4/5 for 10M/20M/30M). Do NOT add the global seat/base price
+        // (Settings.hourlyRate) on top — that was the +3 ₪ double-count bug:
+        // Session.hourlyRate = base + surcharge showed 6/7/8 on the Live page
+        // and checkout then added the internet visit charge AGAIN on top.
+        // Members (subscriber/trainee/employee) use the free noon-10m profile
+        // and keep the base seat rate (their time is zeroed in pricing anyway).
+        // sessionsService.checkIn already accepts an hourlyRate override.
+        let finalHourlyRate: number;
+        if (type === "visitor") {
+          finalHourlyRate = plan.hourlyRate;
+        } else {
+          const settings = await prisma.settings.findFirst();
+          if (!settings) {
+            throw new ApiError(500, "Settings not initialized in database");
+          }
+          finalHourlyRate = Number(settings.hourlyRate);
         }
-        finalHourlyRate = Number(settings.hourlyRate);
-      }
-      session = await sessionsService.checkIn({
-        visitorId: visitor.id,
-        hourlyRate: finalHourlyRate,
-        // Employees are anchored to a visitor row because sessions do not
-        // support an employee type.
-        type,
-      });
-    } catch (err: any) {
-      // Lost race with a concurrent check-in → return the now-open session.
-      if (err?.statusCode === 400) {
-        const raced = await prisma.session.findFirst({
-          where: { visitorId: visitor.id, checkOut: null },
-          include: { visitor: true, snackOrders: true },
+        session = await sessionsService.checkIn({
+          visitorId: visitor.id,
+          hourlyRate: finalHourlyRate,
+          // Employees are anchored to a visitor row because sessions do not
+          // support an employee type.
+          type,
         });
-        if (raced) {
-          return buildResult(raced, true);
+        alreadyActive = false;
+      } catch (err: any) {
+        // Lost race with a concurrent check-in → reuse the now-open session.
+        if (err?.statusCode === 400) {
+          const raced = await prisma.session.findFirst({
+            where: { visitorId: visitor.id, checkOut: null },
+            include: { visitor: true, snackOrders: true },
+          });
+          if (raced) {
+            session = raced;
+            alreadyActive = true;
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
         }
       }
-      throw err;
     }
 
-    // Router provisioning is best-effort: it must never fail the local session.
+    // Step 2 — Router/network authorization (ALWAYS, independent of Step 1).
+    // Must fire on EVERY successful login request, whether Step 1 created a
+    // new session or reused an existing one, whether the device is already a
+    // known device or brand new, and uniformly for all person types
+    // (visitor/subscriber/trainee/employee). Multi-device: this phone may
+    // already be checked in (e.g. on their phone), but THIS request can carry
+    // a NEW device MAC (e.g. the laptop) which still needs its own
+    // /ip/hotspot/active/login + KnownDevice row — without it the second
+    // device gets a success-looking alreadyActive:true response yet never
+    // gets internet. Provision best-effort — never throws, never fails the
+    // local session; failures are only logged inside ensureRouterUserSafely.
+    if (input.mac) {
+      console.log(
+        `[AnoonCheckIn] ${alreadyActive ? "alreadyActive" : "new session"} phone=${phone} — authorizing device mac=${input.mac} ip=${input.ip ?? "-"}`,
+      );
+    }
     await this.ensureRouterUserSafely(phone, visitor.name ?? name, type, plan, {
       mac: input.mac,
       ip: input.ip,
     });
 
-    return buildResult(session, false);
+    return buildResult(session, alreadyActive);
   }
 
   /**
@@ -359,14 +365,14 @@ export class IntegrationsService {
   /**
    * Provision/update the MikroTik hotspot user for the resolved plan.
    * Failures are logged only — the local session stays successful.
-   * Skipped entirely on idempotent replays (alreadyActive).
+   * ALWAYS called (new session and idempotent alreadyActive replays alike).
    *
    * When the kiosk forwards the checking-in device's `mac` (hotspot
    * redirect), additionally authorize that device via the SAME shared
    * path the portal login uses (activeLogin + KnownDevice upsert +
    * authorizeKnownDevices for the phone's other devices). Absent `mac`
-   * ⇒ exactly the old behavior (ensureUser only). Off-network or
-   * malformed `mac` ⇒ skipped silently (warn, never throw).
+   * ⇒ ensureUser only (router user kept fresh, no device login possible).
+   * Off-network or malformed `mac` ⇒ skipped silently (warn, never throw).
    */
   private async ensureRouterUserSafely(
     phone: string,
