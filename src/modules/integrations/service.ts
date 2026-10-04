@@ -139,7 +139,7 @@ export async function resolveMember(phone: string): Promise<ResolvedMember> {
   }
 
   const trainee = await prisma.visitor.findFirst({
-    where: { phone, type: "trainee" },
+    where: { phone, type: "trainee", deletedAt: null },
     orderBy: { createdAt: "asc" },
   });
   if (trainee) {
@@ -151,6 +151,7 @@ export async function resolveMember(phone: string): Promise<ResolvedMember> {
       phone,
       type: "subscriber",
       subscriptions: { some: {} },
+      deletedAt: null,
     },
     orderBy: { createdAt: "asc" },
   });
@@ -352,11 +353,21 @@ export class IntegrationsService {
     personType: "visitor" | "trainee" | "employee",
     source?: string,
   ): Promise<any> {
-    const existing = await prisma.visitor.findFirst({
-      where: { phone },
+    // Prefer an ACTIVE anchor. An archived phone resolves via restore at
+    // reception — never auto-create a duplicate here.
+    const active = await prisma.visitor.findFirst({
+      where: { phone, deletedAt: null },
       orderBy: { createdAt: "asc" },
     });
-    if (existing) return existing;
+    if (active) return active;
+    const archived = await prisma.visitor.findFirst({
+      where: { phone, deletedAt: { not: null } },
+      orderBy: { createdAt: "asc" },
+    });
+    if (archived) {
+      const { archivedPersonError } = await import("../../lib/person");
+      throw archivedPersonError(archived as any);
+    }
     return prisma.visitor.create({
       data: { name, phone, type: personType, source: source ?? "QR" },
     });
@@ -501,11 +512,8 @@ export class IntegrationsService {
    * there is no fallback record anywhere to check later.
    */
   async guestQuickLogin(input: GuestQuickLoginInput): Promise<GuestQuickLoginResult> {
-    const code = input.code.trim();
-    if (!GUEST_SHARED_CODES.includes(code)) {
-      throw new ApiError(404, "الكود غير صحيح");
-    }
-
+    // Device first, code second: the audit row for a wrong code carries the
+    // normalized MAC, and a malformed MAC is a 400 regardless of the code.
     // normalizeMac throws MikrotikError on malformed input — convert to a
     // 400 since the global errorHandler would otherwise surface it as 500.
     let mac: string;
@@ -513,6 +521,26 @@ export class IntegrationsService {
       mac = normalizeMac(input.mac);
     } catch {
       throw new ApiError(400, "Invalid MAC address");
+    }
+
+    const code = input.code.trim();
+    if (!GUEST_SHARED_CODES.includes(code)) {
+      // Brute-force visibility: guest codes are short numeric strings, so
+      // every wrong guess is audited (best-effort — never fails the
+      // request). The attempted code VALUE is deliberately never logged.
+      try {
+        await prisma.hotspotAudit.create({
+          data: {
+            action: "GUEST_INVALID_CODE",
+            ok: false,
+            mac,
+            detail: "invalid guest code attempt",
+          },
+        });
+      } catch {
+        /* audit must never fail the request */
+      }
+      throw new ApiError(404, "الكود غير صحيح");
     }
 
     const mt = getMikrotik();
@@ -554,36 +582,6 @@ export class IntegrationsService {
     }
 
     return { authorized: true, code, mac, ip };
-  }
-
-  async anoonVisitorCheckIn(
-    phone: string,
-    name: string,
-  ): Promise<{ session: any; alreadyActive: boolean }> {
-    const { palestineStartOfDay } = await import("../../lib/timezone");
-    let visitor = await prisma.visitor.findFirst({ where: { phone } });
-    if (!visitor) {
-      visitor = await prisma.visitor.create({
-        data: { name, phone, type: "visitor" },
-      });
-    }
-
-    const todayStart = palestineStartOfDay(new Date());
-
-    const existingSession = await prisma.session.findFirst({
-      where: {
-        visitorId: visitor.id,
-        checkOut: null,
-        checkIn: { gte: todayStart },
-      },
-      include: { visitor: true, snackOrders: true },
-    });
-    if (existingSession) {
-      return { session: existingSession, alreadyActive: true };
-    }
-
-    const session = await sessionsService.checkIn({ visitorId: visitor.id });
-    return { session, alreadyActive: false };
   }
 }
 

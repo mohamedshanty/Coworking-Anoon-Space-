@@ -24,6 +24,16 @@ export class VisitorsController {
     }
   }
 
+  async restore(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const data = await visitorsService.restore(id);
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async addNote(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const visitorId = req.params.id as string;

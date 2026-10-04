@@ -42,11 +42,18 @@ router.patch(
   (req, res, next) => tamkeenStudentsController.updateTamkeenStudent(req, res, next)
 );
 
-// DELETE Tamkeen student
+// DELETE Tamkeen student (SOFT DELETE: archive only, all records are kept)
 router.delete(
   "/:id",
   authorize("طلبة تمكين", "delete"),
   (req, res, next) => tamkeenStudentsController.deleteTamkeenStudent(req, res, next)
+);
+
+// POST restore an archived Tamkeen student
+router.post(
+  "/:id/restore",
+  authorize("طلبة تمكين", "edit"),
+  (req, res, next) => tamkeenStudentsController.restoreTamkeenStudent(req, res, next)
 );
 
 export default router;

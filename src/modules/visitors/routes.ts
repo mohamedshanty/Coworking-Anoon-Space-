@@ -21,6 +21,13 @@ router.patch(
   (req, res, next) => visitorsController.update(req, res, next)
 );
 
+// POST restore an archived (soft-deleted) visitor
+router.post(
+  "/:id/restore",
+  authorize("داخل المساحة", "edit"),
+  (req, res, next) => visitorsController.restore(req, res, next)
+);
+
 // POST add a timestamped note
 router.post(
   "/:id/notes",

@@ -10,7 +10,8 @@ export class TamkeenStudentsController {
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
       const sortField = req.query.sortField as string | undefined;
       const sortDir = req.query.sortDir === "asc" || req.query.sortDir === "desc" ? req.query.sortDir as "asc" | "desc" : undefined;
-      const data = await tamkeenStudentsService.getTamkeenStudents({ search, page, limit, sortField, sortDir });
+      const includeArchived = req.query.includeArchived === "true";
+      const data = await tamkeenStudentsService.getTamkeenStudents({ search, page, limit, sortField, sortDir, includeArchived });
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
@@ -41,8 +42,18 @@ export class TamkeenStudentsController {
   async deleteTamkeenStudent(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      await tamkeenStudentsService.deleteTamkeenStudent(id);
-      res.status(200).json({ success: true });
+      const data = await tamkeenStudentsService.deleteTamkeenStudent(id);
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async restoreTamkeenStudent(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const data = await tamkeenStudentsService.restoreTamkeenStudent(id);
+      res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
     }

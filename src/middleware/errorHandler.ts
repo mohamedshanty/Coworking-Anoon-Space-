@@ -63,6 +63,9 @@ export const errorHandler: ErrorRequestHandler = (
         walletBalance: rest.walletBalance,
         orderTotal: rest.orderTotal,
       } : {}),
+      // Soft-deleted person: let the client offer restore/link instead of
+      // duplicating the record (see lib/person.ts archivedPersonError).
+      ...(rest.archivedPerson ? { archivedPerson: rest.archivedPerson } : {}),
     });
     return;
   }

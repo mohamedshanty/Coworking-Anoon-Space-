@@ -42,11 +42,18 @@ router.patch(
   (req, res, next) => traineesController.updateTrainee(req, res, next)
 );
 
-// DELETE trainee
+// DELETE trainee (SOFT DELETE: archive only, all records are kept)
 router.delete(
   "/:id",
   authorize("المتدربون", "delete"),
   (req, res, next) => traineesController.deleteTrainee(req, res, next)
+);
+
+// POST restore an archived trainee
+router.post(
+  "/:id/restore",
+  authorize("المتدربون", "edit"),
+  (req, res, next) => traineesController.restoreTrainee(req, res, next)
 );
 
 export default router;

@@ -3,7 +3,9 @@ import { ApiError } from "../../lib/ApiError";
 import { CreateTraineeInput, ImportTraineeRowInput, UpdateTraineeInput } from "./schema";
 import { normalizePhone } from "../hotspot/hotspot.config";
 import { assertPhoneNotTaken } from "../../lib/personUniqueness";
-import { syncMemberToAnoonQr, deactivateMemberOnAnoonQr } from "../../lib/anoon-sync";
+import { syncWalletPhone } from "../../lib/person";
+import { visitorsService } from "../visitors/service";
+import { syncMemberToAnoonQr } from "../../lib/anoon-sync";
 
 export type TraineeImportPreviewRow = {
   rowNumber: number;
@@ -28,12 +30,15 @@ export type TraineeImportPreview = {
 };
 
 export class TraineesService {
-  async getTrainees(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc" }) {
+  async getTrainees(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc"; includeArchived?: boolean }) {
     const page = Math.max(1, params.page ?? 1);
     const limit = Math.min(100, Math.max(1, params.limit ?? 25));
     const skip = (page - 1) * limit;
 
     const where: any = { type: "trainee" };
+    if (!params.includeArchived) {
+      where.deletedAt = null;
+    }
     if (params.search) {
       where.OR = [
         { name: { contains: params.search, mode: "insensitive" } },
@@ -74,7 +79,9 @@ export class TraineesService {
     // Cross-table uniqueness: a phone belongs to exactly one of
     // subscriber / trainee / employee. Plain walk-in visitor rows
     // (auto-created, no subscription) intentionally do NOT conflict.
+    // Archived phones never conflict — they go through restore/link.
     const phone = await assertPhoneNotTaken(data.phone);
+    await visitorsService.assertPhoneNotArchived(phone);
 
     const visitor = await prisma.visitor.create({
       data: {
@@ -106,6 +113,9 @@ export class TraineesService {
     if (visitor.type !== "trainee") {
       throw new ApiError(400, "Visitor is not a trainee");
     }
+    if ((visitor as any).deletedAt) {
+      throw new ApiError(400, "هذا المتدرب مؤرشف — استعده أولاً قبل التعديل");
+    }
 
     // If changing phone, run the cross-table uniqueness guard (covers
     // subscribers, other trainees, and the employee roster).
@@ -120,14 +130,25 @@ export class TraineesService {
       }
     }
 
-    return prisma.visitor.update({
-      where: { id },
-      data: {
-        ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(newPhone !== undefined ? { phone: newPhone } : {}),
-        ...(data.source !== undefined ? { source: data.source } : {}),
-        ...(data.notes !== undefined ? { notes: data.notes } : {}),
-      },
+    return prisma.$transaction(async (tx) => {
+      // Keep the phone-keyed wallet attached when the phone changes.
+      if (newPhone !== undefined || data.name !== undefined) {
+        await syncWalletPhone(tx as any, {
+          oldPhone: visitor.phone,
+          newPhone: newPhone ?? visitor.phone,
+          ...(data.name !== undefined ? { newName: data.name } : {}),
+        });
+      }
+      const updated = await tx.visitor.update({
+        where: { id },
+        data: {
+          ...(data.name !== undefined ? { name: data.name } : {}),
+          ...(newPhone !== undefined ? { phone: newPhone } : {}),
+          ...(data.source !== undefined ? { source: data.source } : {}),
+          ...(data.notes !== undefined ? { notes: data.notes } : {}),
+        },
+      });
+      return updated;
     }).then((updated) => {
       // Fire-and-forget: sync name/phone changes to Anoon QR
       if (data.name || newPhone) {
@@ -152,18 +173,20 @@ export class TraineesService {
       throw new ApiError(400, "Visitor is not a trainee");
     }
 
-    // Check for active sessions
-    const activeSession = await prisma.session.findFirst({
-      where: { visitorId: id, checkOut: null },
-    });
-    if (activeSession) {
-      throw new ApiError(400, "Cannot delete trainee with active session");
+    // SOFT DELETE (archive): sessions, debts, orders, notes stay intact.
+    return visitorsService.archive(id);
+  }
+
+  async restoreTrainee(id: string) {
+    const visitor = await prisma.visitor.findUnique({ where: { id } });
+    if (!visitor) {
+      throw new ApiError(404, "Trainee not found");
+    }
+    if (visitor.type !== "trainee") {
+      throw new ApiError(400, "Visitor is not a trainee");
     }
 
-    await prisma.visitor.delete({ where: { id } });
-
-    // Fire-and-forget: deactivate on Anoon QR
-    void deactivateMemberOnAnoonQr(visitor.phone);
+    return visitorsService.restore(id);
   }
 
   /**

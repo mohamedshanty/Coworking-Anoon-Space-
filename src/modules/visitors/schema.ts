@@ -7,7 +7,8 @@ export const addNoteSchema = z.object({
 export const updateVisitorSchema = z.object({
   name: z.string().min(1).optional(),
   phone: z.string().min(1).optional(),
-  type: z.enum(["visitor", "subscriber", "trainee", "employee", "tamkeen"]).optional(),
+  // `type` is intentionally NOT editable here — type changes go only through
+  // the convert-type operation (with uniqueness checks), never raw PATCH.
   source: z.string().optional(),
   followUpStatus: z.enum(["needs", "contacted", "opt_out"]).optional(),
   notes: z.string().optional(),
