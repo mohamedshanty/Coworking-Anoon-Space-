@@ -41,6 +41,22 @@ model VisitorNote {
   visitor   Visitor  @relation(fields: [visitorId], references: [id], onDelete: Restrict)
 }
 
+// Audit trail for person identity operations (type conversions, merges):
+// who did it, from what to what, and when. Never updated or deleted.
+model PersonAudit {
+  id        String   @id @default(uuid())
+  visitorId String
+  action    String
+  fromType  String?
+  toType    String?
+  actorId   String?
+  actorName String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([visitorId])
+}
+
 model Session {
   id                  String               @id @default(uuid())
   visitorId           String
