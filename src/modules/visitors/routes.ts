@@ -7,6 +7,20 @@ const router = Router();
 
 router.use(authenticate);
 
+// GET active person by phone (MUST be before /:id routes)
+router.get(
+  "/by-phone",
+  authorize("داخل المساحة", "view"),
+  (req, res, next) => visitorsController.getByPhone(req, res, next)
+);
+
+// POST merge two person records (MUST be before /:id routes)
+router.post(
+  "/merge",
+  authorize("داخل المساحة", "edit"),
+  (req, res, next) => visitorsController.mergePersons(req, res, next)
+);
+
 // GET visitor profile by ID
 router.get(
   "/:id",
@@ -26,6 +40,13 @@ router.post(
   "/:id/restore",
   authorize("داخل المساحة", "edit"),
   (req, res, next) => visitorsController.restore(req, res, next)
+);
+
+// POST convert a person's type (ANY → ANY, same id, history preserved)
+router.post(
+  "/:id/convert-type",
+  authorize("داخل المساحة", "edit"),
+  (req, res, next) => visitorsController.convertType(req, res, next)
 );
 
 // POST add a timestamped note

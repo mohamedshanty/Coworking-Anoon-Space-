@@ -47,12 +47,85 @@ export function archivedPersonError(person: {
   );
 }
 
-export async function findArchivedByPhone(phone: string) {
-  return prisma.visitor.findFirst({
-    where: { phone, deletedAt: { not: null } },
+export interface PhoneConflict {
+  id: string | null;
+  name: string;
+  phone: string;
+  type: string;
+  sessionCount: number;
+  /** True when the holder is the (separate) employee roster, which has no Visitor id to merge into. */
+  rosterOnly?: boolean;
+}
+
+/**
+ * App-level uniqueness (no DB constraint): among ACTIVE rows, a phone may
+ * belong to only one person of the managed types
+ * (subscriber / trainee / tamkeen / employee). Plain 'visitor' rows may
+ * share a phone (shared-number case).
+ *
+ * Returns the conflicting ACTIVE holder (excluding `excludeId`), or null.
+ *
+ * Set `includeRoster: false` when the excluded person IS the roster holder
+ * (converting away from type "employee"): the roster row with the same phone
+ * is their own, not another person's.
+ */
+export async function findActivePhoneConflict(
+  phone: string,
+  excludeId?: string,
+  opts?: { includeRoster?: boolean },
+): Promise<PhoneConflict | null> {
+  const notSelf = excludeId ? { id: { not: excludeId } } : {};
+
+  // Employee roster first (separate table, no Visitor id → no merge offer).
+  if (opts?.includeRoster !== false) {
+    const roster = await prisma.employeeRoster.findUnique({
+      where: { phone },
+      select: { id: true, name: true },
+    });
+    if (roster) {
+      return {
+        id: null,
+        name: roster.name,
+        phone,
+        type: "employee",
+        sessionCount: 0,
+        rosterOnly: true,
+      };
+    }
+  }
+
+  const holder = await prisma.visitor.findFirst({
+    where: {
+      phone,
+      deletedAt: null,
+      ...notSelf,
+      OR: [{ type: { in: ["subscriber", "trainee", "tamkeen", "employee"] } }, { subscriptions: { some: {} } }],
+    },
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, phone: true, type: true },
+    select: { id: true, name: true, phone: true, type: true, _count: { select: { sessions: true } } },
   });
+  if (!holder) return null;
+  return {
+    id: holder.id,
+    name: holder.name,
+    phone: holder.phone,
+    type: holder.type,
+    sessionCount: holder._count.sessions,
+  };
+}
+
+/** 409 carrying the conflicting person so the UI can offer a merge. */
+export function phoneConflictError(conflict: PhoneConflict, targetType: string): ApiError {
+  return Object.assign(
+    new ApiError(
+      409,
+      `هذا الرقم مسجل لشخص آخر (${conflict.name}) — يمكنك دمج السجلين بدل التحويل`,
+    ),
+    {
+      conflictingPerson: { ...conflict },
+      targetType,
+    },
+  );
 }
 
 /**

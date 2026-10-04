@@ -66,6 +66,11 @@ export const errorHandler: ErrorRequestHandler = (
       // Soft-deleted person: let the client offer restore/link instead of
       // duplicating the record (see lib/person.ts archivedPersonError).
       ...(rest.archivedPerson ? { archivedPerson: rest.archivedPerson } : {}),
+      // Phone conflict on convert-type: let the client offer a merge
+      // (see lib/person.ts phoneConflictError).
+      ...(rest.conflictingPerson
+        ? { conflictingPerson: rest.conflictingPerson, targetType: rest.targetType ?? null }
+        : {}),
     });
     return;
   }
