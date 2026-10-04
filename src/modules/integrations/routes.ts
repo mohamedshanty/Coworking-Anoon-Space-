@@ -23,12 +23,6 @@ router.post(
   (req, res, next) => integrationsController.anoonCheckIn(req, res, next)
 );
 
-router.post(
-  "/anoon-visitor-checkin",
-  verifyInternalSecret,
-  (req, res, next) => integrationsController.anoonVisitorCheckIn(req, res, next)
-);
-
 // Guest quick-login: fixed shared hotspot code → router-only authorization.
 // No person/tracking writes by design (see service.guestQuickLogin).
 router.post(
