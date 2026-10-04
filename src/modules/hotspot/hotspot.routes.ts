@@ -13,7 +13,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma";
 import {
@@ -43,7 +43,7 @@ const portalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) =>
-    String(req.query.mac ?? req.body?.mac ?? req.ip).toUpperCase(),
+    String(req.query.mac ?? req.body?.mac ?? ipKeyGenerator(req.ip ?? "")).toUpperCase(),
   message: { error: "Too many attempts, wait a minute" },
 });
 

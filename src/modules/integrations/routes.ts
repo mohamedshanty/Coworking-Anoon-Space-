@@ -1,5 +1,5 @@
 import { Router } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { integrationsController } from "./controller";
 import { verifyInternalSecret } from "./secret";
 
@@ -12,7 +12,8 @@ const guestLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => String(req.body?.mac ?? req.ip).toUpperCase(),
+  keyGenerator: (req) =>
+    `${ipKeyGenerator(req.ip ?? "")}:${String(req.body?.mac ?? "").toUpperCase()}`,
   message: { success: false, message: "Too many attempts, wait a minute" },
 });
 
