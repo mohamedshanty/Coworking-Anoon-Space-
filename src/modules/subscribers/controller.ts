@@ -11,7 +11,8 @@ export class SubscribersController {
       const sortField = req.query.sortField as string | undefined;
       const sortDir = req.query.sortDir === "asc" || req.query.sortDir === "desc" ? req.query.sortDir as "asc" | "desc" : undefined;
       const status = req.query.status as string | undefined;
-      const data = await subscribersService.getSubscribers({ search, page, limit, sortField, sortDir, status });
+      const includeArchived = req.query.includeArchived === "true";
+      const data = await subscribersService.getSubscribers({ search, page, limit, sortField, sortDir, status, includeArchived });
       res.status(200).json({
         success: true,
         data,
@@ -79,6 +80,19 @@ export class SubscribersController {
     try {
       const id = req.params.id as string;
       const data = await subscribersService.deleteSubscriber(id);
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async restoreSubscriber(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const data = await subscribersService.restoreSubscriber(id);
       res.status(200).json({
         success: true,
         data,

@@ -43,15 +43,6 @@ export const anoonCheckInSchema = z
 
 export type AnoonCheckInInput = z.infer<typeof anoonCheckInSchema>;
 
-export const anoonVisitorCheckInSchema = z.object({
-  phone: z.string().min(1),
-  name: z.string().min(1),
-});
-
-export type AnoonVisitorCheckInInput = z.infer<
-  typeof anoonVisitorCheckInSchema
->;
-
 // Guest quick-login (walk-in guests, NOT tracked as persons).
 // The Kiosk forwards mac/ip from the router redirect plus the code
 // the guest typed. The backend maps the code to a fixed shared

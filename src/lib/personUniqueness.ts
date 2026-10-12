@@ -7,10 +7,14 @@ export type PersonTable = "visitor" | "trainee" | "tamkeen" | "employee";
 /**
  * Cross-table phone uniqueness.
  *
- * A phone number must belong to exactly one of: subscriber, trainee, Tamkeen
- * student, or the employee roster. Plain walk-in Visitor rows (type "visitor"
- * with no subscription history) are NOT people — they are auto-created
- * attendance anchors and never conflict.
+ * A phone number must belong to exactly one ACTIVE person: subscriber,
+ * trainee, Tamkeen student, or the employee roster. Plain walk-in Visitor
+ * rows (type "visitor" with no subscription history) are NOT people — they
+ * are auto-created attendance anchors and never conflict.
+ *
+ * Soft-deleted (archived) rows never conflict either: reusing an archived
+ * phone goes through the restore/link flow (see lib/person.ts) instead of
+ * a 409, so every check below is scoped to `deletedAt: null`.
  *
  * NOTE on "trainee"/"tamkeen": this means Visitor rows with type "trainee" /
  * "tamkeen" (the trainees / tamkeen-students modules + QR check-in concept),
@@ -42,7 +46,7 @@ export async function assertPhoneNotTaken(
 
   if (excluding?.table !== "trainee") {
     const trainee = await prisma.visitor.findFirst({
-      where: { phone: normalized, type: "trainee" },
+      where: { phone: normalized, type: "trainee", deletedAt: null },
       orderBy: { createdAt: "asc" },
       select: { id: true },
     });
@@ -53,7 +57,7 @@ export async function assertPhoneNotTaken(
 
   if (excluding?.table !== "tamkeen") {
     const tamkeen = await prisma.visitor.findFirst({
-      where: { phone: normalized, type: "tamkeen" },
+      where: { phone: normalized, type: "tamkeen", deletedAt: null },
       orderBy: { createdAt: "asc" },
       select: { id: true },
     });
@@ -69,6 +73,7 @@ export async function assertPhoneNotTaken(
     const subscriber = await prisma.visitor.findFirst({
       where: {
         phone: normalized,
+        deletedAt: null,
         OR: [{ type: "subscriber" }, { subscriptions: { some: {} } }],
       },
       orderBy: { createdAt: "asc" },

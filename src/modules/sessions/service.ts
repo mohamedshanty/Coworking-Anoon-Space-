@@ -1,6 +1,7 @@
 import { Prisma, NetTier } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
+import { archivedPersonError } from "../../lib/person";
 import { calculateSessionPricing, isTimeExemptType } from "./pricing";
 import { CheckInInput, UpdateSessionInput, AddBatchOrdersInput } from "./schema";
 import { isSamePalestineDay, getPalestineDateParts, palestineStartOfDay, palestineEndOfDay } from "../../lib/timezone";
@@ -23,6 +24,9 @@ export class SessionsService {
     const visitors = await prisma.visitor.findMany({
       where: {
         name: { equals: trimmed, mode: "insensitive" },
+        // Archived people are hidden from lookup; re-registration with the
+        // same phone goes through the restore/link flow instead.
+        deletedAt: null,
       },
       include: {
         _count: { select: { sessions: true } },
@@ -104,6 +108,7 @@ export class SessionsService {
     // Find visitors whose total non-dismissed session count is exactly 1 (first-time only)
     // We can't filter by _count in where, so we fetch all visitors with session counts and filter in JS
     const visitorsWithCounts = await prisma.visitor.findMany({
+      where: { deletedAt: null },
       include: {
         sessions: {
           where: { newVisitorDismissed: false },
@@ -208,13 +213,24 @@ export class SessionsService {
       if (!visitor) {
         throw new ApiError(404, "Visitor not found");
       }
+      if ((visitor as any).deletedAt) {
+        throw archivedPersonError(visitor as any);
+      }
       visitorId = visitor.id;
     } else {
-      // Check if visitor with this phone already exists
+      // Check if an ACTIVE visitor with this phone already exists
       let visitor = await prisma.visitor.findFirst({
-        where: { phone: data.phone },
+        where: { phone: data.phone, deletedAt: null },
       });
       if (!visitor) {
+        // Same phone on an archived record → offer restore/link, never a duplicate.
+        const archived = await prisma.visitor.findFirst({
+          where: { phone: data.phone, deletedAt: { not: null } },
+          orderBy: { createdAt: "asc" },
+        });
+        if (archived) {
+          throw archivedPersonError(archived as any);
+        }
         visitor = await prisma.visitor.create({
           data: {
             name: data.name,

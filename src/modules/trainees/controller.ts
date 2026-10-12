@@ -10,7 +10,8 @@ export class TraineesController {
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25));
       const sortField = req.query.sortField as string | undefined;
       const sortDir = req.query.sortDir === "asc" || req.query.sortDir === "desc" ? req.query.sortDir as "asc" | "desc" : undefined;
-      const data = await traineesService.getTrainees({ search, page, limit, sortField, sortDir });
+      const includeArchived = req.query.includeArchived === "true";
+      const data = await traineesService.getTrainees({ search, page, limit, sortField, sortDir, includeArchived });
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
@@ -41,8 +42,18 @@ export class TraineesController {
   async deleteTrainee(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      await traineesService.deleteTrainee(id);
-      res.status(200).json({ success: true });
+      const data = await traineesService.deleteTrainee(id);
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async restoreTrainee(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const data = await traineesService.restoreTrainee(id);
+      res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
     }

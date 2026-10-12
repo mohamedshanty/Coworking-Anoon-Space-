@@ -18,11 +18,19 @@ model Visitor {
   source         String?
   notes          String?
   createdAt      DateTime        @default(now())
+  // Soft delete (archive): hides the person from active lists while
+  // keeping ALL linked records (sessions, debts, orders, subscriptions,
+  // wallet, notes) intact. All person-pointing FKs use Restrict so a
+  // hard delete can never wipe history by accident.
+  deletedAt      DateTime?
   debts          Debt[]
   sessions       Session[]
   subscriptions  Subscription[]
   visitorNotes   VisitorNote[]
   netSessions    NetSession[]
+
+  @@index([deletedAt])
+  @@index([type, deletedAt])
 }
 
 model VisitorNote {
@@ -30,7 +38,23 @@ model VisitorNote {
   visitorId String
   content   String
   createdAt DateTime @default(now())
-  visitor   Visitor  @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  visitor   Visitor  @relation(fields: [visitorId], references: [id], onDelete: Restrict)
+}
+
+// Audit trail for person identity operations (type conversions, merges):
+// who did it, from what to what, and when. Never updated or deleted.
+model PersonAudit {
+  id        String   @id @default(uuid())
+  visitorId String
+  action    String
+  fromType  String?
+  toType    String?
+  actorId   String?
+  actorName String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([visitorId])
 }
 
 model Session {
@@ -53,7 +77,7 @@ model Session {
   newVisitorDismissed Boolean              @default(false)
   hourlyPriceOverride Decimal?             @db.Decimal(10, 2)
   sales               Sale[]
-  visitor             Visitor              @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  visitor             Visitor              @relation(fields: [visitorId], references: [id], onDelete: Restrict)
   snackOrders         SnackOrder[]
   netSessions         NetSession[]
 }
@@ -83,7 +107,7 @@ model Subscription {
   totalFee        Decimal             @db.Decimal(10, 2)
   amountPaid      Decimal             @db.Decimal(10, 2)
   status          SubscriptionStatus
-  visitor         Visitor             @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  visitor         Visitor             @relation(fields: [visitorId], references: [id], onDelete: Restrict)
   debts           Debt[]
 }
 
@@ -182,7 +206,7 @@ model Debt {
   createdAt      DateTime
   collectedAt    DateTime?
   note           String?
-  visitor        Visitor?      @relation(fields: [visitorId], references: [id])
+  visitor        Visitor?      @relation(fields: [visitorId], references: [id], onDelete: Restrict)
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 }
 

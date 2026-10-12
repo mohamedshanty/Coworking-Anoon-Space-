@@ -13,7 +13,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma";
 import {
@@ -26,7 +26,7 @@ import {
   HotspotHttpError,
 } from "./hotspot.service";
 import { VISITOR_PLANS, MEMBER_PLAN, BILLING } from "./hotspot.config";
-import { getMikrotik, normalizeMac } from "../../lib/mikrotik";
+import { getMikrotik, normalizeMac, MikrotikError } from "../../lib/mikrotik";
 import { verifyInternalSecret } from "../integrations/secret";
 import { authenticate } from "../../middleware/authenticate";
 import { authorize } from "../../middleware/authorize";
@@ -43,7 +43,7 @@ const portalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) =>
-    String(req.query.mac ?? req.body?.mac ?? req.ip).toUpperCase(),
+    String(req.query.mac ?? req.body?.mac ?? ipKeyGenerator(req.ip ?? "")).toUpperCase(),
   message: { error: "Too many attempts, wait a minute" },
 });
 
@@ -251,6 +251,17 @@ hotspotRouter.use((err: any, _req: Request, res: Response, next: NextFunction) =
   }
   if (err?.name === "ZodError") {
     return res.status(400).json({ error: "Invalid input" });
+  }
+  // normalizeMac / activeLogin input errors (malformed MAC or IP that passed
+  // the loose zod pre-check) are client errors, not 500s: without this the
+  // portal shows its generic "couldn't connect" message for a typo'd input.
+  // Scoped to the validation messages only — router failures ("Command
+  // failed", "Failed to connect") must still fall through as 5xx.
+  if (
+    err instanceof MikrotikError &&
+    /^(Invalid MAC|Invalid IP)/.test(err.message)
+  ) {
+    return res.status(400).json({ error: err.message });
   }
   next(err);
 });

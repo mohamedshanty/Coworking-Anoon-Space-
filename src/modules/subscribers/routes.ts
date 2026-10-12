@@ -42,11 +42,18 @@ router.patch(
   (req, res, next) => subscribersController.updateSubscriber(req, res, next)
 );
 
-// DELETE subscriber (Visitor + cascade subscriptions/sessions)
+// DELETE subscriber (SOFT DELETE: archive only, all records are kept)
 router.delete(
   "/:id",
   authorize("المشتركون", "delete"),
   (req, res, next) => subscribersController.deleteSubscriber(req, res, next)
+);
+
+// POST restore an archived subscriber
+router.post(
+  "/:id/restore",
+  authorize("المشتركون", "edit"),
+  (req, res, next) => subscribersController.restoreSubscriber(req, res, next)
 );
 
 export default router;

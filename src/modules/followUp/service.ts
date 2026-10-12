@@ -16,6 +16,7 @@ export class FollowUpService {
       return prisma.visitor.findMany({
         where: {
           type: { in: ["visitor", "subscriber"] },
+          deletedAt: null,
           OR: [
             { followUpStatus: null },
             { followUpStatus: { not: "opt_out" } },
@@ -39,6 +40,7 @@ export class FollowUpService {
         LIMIT 1
       ) latest ON true
       WHERE v."type" IN ('visitor', 'subscriber')
+        AND v."deletedAt" IS NULL
         AND (v."followUpStatus" IS NULL OR v."followUpStatus" != 'opt_out')
         AND (v."followUpAt" IS NULL OR v."followUpAt" < ${contactedThreshold})
         AND (

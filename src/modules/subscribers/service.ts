@@ -1,17 +1,24 @@
 import { prisma } from "../../lib/prisma";
 import { ApiError } from "../../lib/ApiError";
 import { CreateSubscriberInput, RenewSubscriptionInput, UpdateSubscriberInput } from "./schema";
-import { syncMemberToAnoonQr, deactivateMemberOnAnoonQr } from "../../lib/anoon-sync";
+import { syncMemberToAnoonQr } from "../../lib/anoon-sync";
 import { normalizePhone } from "../hotspot/hotspot.config";
 import { assertPhoneNotTaken } from "../../lib/personUniqueness";
+import { syncWalletPhone } from "../../lib/person";
+import { visitorsService } from "../visitors/service";
 
 export class SubscribersService {
-  async getSubscribers(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc"; status?: string }) {
+  async getSubscribers(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc"; status?: string; includeArchived?: boolean }) {
     const page = Math.max(1, params.page ?? 1);
     const limit = Math.min(1000, Math.max(1, params.limit ?? 25));
     const skip = (page - 1) * limit;
 
     const where: any = { type: "subscriber" };
+    // Soft-deleted people are hidden from active lists; History/Reports read
+    // via Session include and are unaffected.
+    if (!params.includeArchived) {
+      where.deletedAt = null;
+    }
     if (params.search) {
       where.OR = [
         { name: { contains: params.search, mode: "insensitive" } },
@@ -95,9 +102,15 @@ export class SubscribersService {
     }
 
     // Match legacy rows stored pre-normalization as well as canonical ones.
+    // Only ACTIVE rows are matched — an archived phone goes through the
+    // restore/link flow (409 with archivedPerson), never a silent reuse.
     let visitor = await prisma.visitor.findFirst({
-      where: { phone: { in: [data.phone, normalizedPhone] } },
+      where: { phone: { in: [data.phone, normalizedPhone] }, deletedAt: null },
     });
+
+    if (!visitor) {
+      await visitorsService.assertPhoneNotArchived(normalizedPhone);
+    }
 
     if (visitor) {
       // Check if this visitor already has a live (non-expired) subscription.
@@ -309,8 +322,17 @@ export class SubscribersService {
       }
     }
 
-    // Wrap in transaction so visitor, subscription, and debt name are consistent
+    // Wrap in transaction so visitor, wallet, subscription, and debt name are consistent
     const updated = await prisma.$transaction(async (tx) => {
+      // Keep the phone-keyed wallet attached when the phone changes (same tx).
+      if (newPhone !== undefined || newName !== undefined) {
+        await syncWalletPhone(tx as any, {
+          oldPhone: visitor.phone,
+          newPhone: newPhone ?? visitor.phone,
+          ...(newName ? { newName } : {}),
+        });
+      }
+
       // Update visitor fields
       const vis = await tx.visitor.update({
         where: { id: visitorId },
@@ -383,19 +405,24 @@ export class SubscribersService {
       throw new ApiError(400, "Visitor is not a subscriber");
     }
 
-    // Cascade: Sessions (onDelete: Cascade), Subscriptions (onDelete: Cascade).
-    // Debts: onDelete: SetNull — debts survive with visitorId nulled out.
-    // This is acceptable: debts are financial records that should persist even after subscriber removal.
-    const deleted = await prisma.visitor.delete({
+    // SOFT DELETE (archive): the person is hidden from active lists, but all
+    // sessions, snack orders, debts, wallet transactions, subscriptions and
+    // notes stay intact. FKs are Restrict so history can never be wiped.
+    return visitorsService.archive(visitorId);
+  }
+
+  async restoreSubscriber(visitorId: string) {
+    const visitor = await prisma.visitor.findUnique({
       where: { id: visitorId },
     });
+    if (!visitor) {
+      throw new ApiError(404, "Visitor not found");
+    }
+    if (visitor.type !== "subscriber") {
+      throw new ApiError(400, "Visitor is not a subscriber");
+    }
 
-    // Tell Anoon QR to DEACTIVATE (not delete) its copy, fire-and-forget,
-    // so a later renewal reactivates the same record. Only notified after
-    // the local delete succeeded.
-    void deactivateMemberOnAnoonQr(deleted.phone);
-
-    return deleted;
+    return visitorsService.restore(visitorId);
   }
 }
 

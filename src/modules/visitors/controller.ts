@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { visitorsService } from "./service";
-import { addNoteSchema, updateVisitorSchema } from "./schema";
+import { addNoteSchema, convertTypeSchema, mergePersonsSchema, updateVisitorSchema } from "./schema";
 
 export class VisitorsController {
   async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -18,6 +18,49 @@ export class VisitorsController {
       const id = req.params.id as string;
       const input = updateVisitorSchema.parse(req.body);
       const data = await visitorsService.update(id, input);
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async restore(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const data = await visitorsService.restore(id);
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getByPhone(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const phone = (req.query.phone as string) ?? "";
+      const data = await visitorsService.getByPhone(phone.trim());
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async convertType(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const input = convertTypeSchema.parse(req.body);
+      const actor = req.user ? { id: req.user.id, name: req.user.name } : undefined;
+      const data = await visitorsService.convertType(id, input, actor);
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async mergePersons(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const input = mergePersonsSchema.parse(req.body);
+      const actor = req.user ? { id: req.user.id, name: req.user.name } : undefined;
+      const data = await visitorsService.mergePersons(input, actor);
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);

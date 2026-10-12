@@ -204,7 +204,7 @@ describe("guestQuickLogin", () => {
     expectNoTrackingWrites();
   });
 
-  it("invalid code → 404 'الكود غير صحيح', router untouched", async () => {
+  it("invalid code → 404 'الكود غير صحيح', router untouched, attempt audited", async () => {
     await expectApiError(
       integrationsService.guestQuickLogin({ code: "999", mac: MAC, ip: IP }),
       404,
@@ -212,7 +212,36 @@ describe("guestQuickLogin", () => {
     );
     expect(mockFindHost).not.toHaveBeenCalled();
     expect(mockActiveLogin).not.toHaveBeenCalled();
-    expectNoTrackingWrites();
+    // Brute-force visibility: the wrong guess leaves an audit row (mac only,
+    // never the attempted code value) while no person/tracking table is touched.
+    expect(mockAudit.create).toHaveBeenCalledTimes(1);
+    expect(mockAudit.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "GUEST_INVALID_CODE",
+        ok: false,
+        mac: MAC,
+      }),
+    });
+    for (const m of [
+      mockVisitor.findFirst,
+      mockVisitor.create,
+      mockVisitor.update,
+      mockSession.findFirst,
+      mockSession.create,
+      mockEmployee.findUnique,
+      mockKnownDevice.findMany,
+      mockKnownDevice.findUnique,
+      mockKnownDevice.findFirst,
+      mockKnownDevice.count,
+      mockKnownDevice.upsert,
+      mockKnownDevice.update,
+      mockKnownDevice.delete,
+      mockNetSession.create,
+      mockNetSession.updateMany,
+      mockCheckIn,
+    ]) {
+      expect(m).not.toHaveBeenCalled();
+    }
   });
 
   it("malformed MAC → 400", async () => {

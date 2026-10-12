@@ -3,6 +3,8 @@ import { ApiError } from "../../lib/ApiError";
 import { CreateTamkeenStudentInput, ImportTamkeenStudentRowInput, UpdateTamkeenStudentInput } from "./schema";
 import { normalizePhone } from "../hotspot/hotspot.config";
 import { assertPhoneNotTaken } from "../../lib/personUniqueness";
+import { syncWalletPhone } from "../../lib/person";
+import { visitorsService } from "../visitors/service";
 
 export type TamkeenStudentImportPreviewRow = {
   rowNumber: number;
@@ -27,12 +29,15 @@ export type TamkeenStudentImportPreview = {
 };
 
 export class TamkeenStudentsService {
-  async getTamkeenStudents(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc" }) {
+  async getTamkeenStudents(params: { search?: string; page?: number; limit?: number; sortField?: string; sortDir?: "asc" | "desc"; includeArchived?: boolean }) {
     const page = Math.max(1, params.page ?? 1);
     const limit = Math.min(100, Math.max(1, params.limit ?? 25));
     const skip = (page - 1) * limit;
 
     const where: any = { type: "tamkeen" };
+    if (!params.includeArchived) {
+      where.deletedAt = null;
+    }
     if (params.search) {
       where.OR = [
         { name: { contains: params.search, mode: "insensitive" } },
@@ -73,8 +78,9 @@ export class TamkeenStudentsService {
     // Cross-table uniqueness: a phone belongs to exactly one of
     // subscriber / trainee / Tamkeen student / employee. Plain walk-in
     // visitor rows (auto-created, no subscription) intentionally do NOT
-    // conflict.
+    // conflict. Archived phones never conflict — restore/link instead.
     const phone = await assertPhoneNotTaken(data.phone);
+    await visitorsService.assertPhoneNotArchived(phone);
 
     const visitor = await prisma.visitor.create({
       data: {
@@ -97,6 +103,9 @@ export class TamkeenStudentsService {
     if (visitor.type !== "tamkeen") {
       throw new ApiError(400, "Visitor is not a Tamkeen student");
     }
+    if ((visitor as any).deletedAt) {
+      throw new ApiError(400, "هذا الطالب مؤرشف — استعده أولاً قبل التعديل");
+    }
 
     // If changing phone, run the cross-table uniqueness guard (covers
     // subscribers, trainees, other Tamkeen students, and the employee
@@ -112,14 +121,24 @@ export class TamkeenStudentsService {
       }
     }
 
-    return prisma.visitor.update({
-      where: { id },
-      data: {
-        ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(newPhone !== undefined ? { phone: newPhone } : {}),
-        ...(data.source !== undefined ? { source: data.source } : {}),
-        ...(data.notes !== undefined ? { notes: data.notes } : {}),
-      },
+    return prisma.$transaction(async (tx) => {
+      // Keep the phone-keyed wallet attached when the phone changes.
+      if (newPhone !== undefined || data.name !== undefined) {
+        await syncWalletPhone(tx as any, {
+          oldPhone: visitor.phone,
+          newPhone: newPhone ?? visitor.phone,
+          ...(data.name !== undefined ? { newName: data.name } : {}),
+        });
+      }
+      return tx.visitor.update({
+        where: { id },
+        data: {
+          ...(data.name !== undefined ? { name: data.name } : {}),
+          ...(newPhone !== undefined ? { phone: newPhone } : {}),
+          ...(data.source !== undefined ? { source: data.source } : {}),
+          ...(data.notes !== undefined ? { notes: data.notes } : {}),
+        },
+      });
     });
   }
 
@@ -132,15 +151,20 @@ export class TamkeenStudentsService {
       throw new ApiError(400, "Visitor is not a Tamkeen student");
     }
 
-    // Check for active sessions
-    const activeSession = await prisma.session.findFirst({
-      where: { visitorId: id, checkOut: null },
-    });
-    if (activeSession) {
-      throw new ApiError(400, "Cannot delete Tamkeen student with active session");
+    // SOFT DELETE (archive): sessions, debts, orders, notes stay intact.
+    return visitorsService.archive(id);
+  }
+
+  async restoreTamkeenStudent(id: string) {
+    const visitor = await prisma.visitor.findUnique({ where: { id } });
+    if (!visitor) {
+      throw new ApiError(404, "Tamkeen student not found");
+    }
+    if (visitor.type !== "tamkeen") {
+      throw new ApiError(400, "Visitor is not a Tamkeen student");
     }
 
-    await prisma.visitor.delete({ where: { id } });
+    return visitorsService.restore(id);
   }
 
   /**

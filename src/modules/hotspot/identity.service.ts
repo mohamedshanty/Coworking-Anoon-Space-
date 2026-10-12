@@ -79,7 +79,7 @@ export async function resolveIdentity(
   // unique, and a duplicate plain-visitor row with the same phone must never
   // shadow a subscriber (otherwise they'd be billed as a visitor).
   const subscriberVisitor = await prisma.visitor.findFirst({
-    where: { phone, type: "subscriber", subscriptions: { some: {} } },
+    where: { phone, type: "subscriber", subscriptions: { some: {} }, deletedAt: null },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
@@ -147,7 +147,7 @@ export async function resolveIdentity(
   // unique — pick deterministically (oldest registration) so duplicates at
   // least resolve consistently.
   const visitor = await prisma.visitor.findFirst({
-    where: { phone },
+    where: { phone, deletedAt: null },
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true },
   });
@@ -171,6 +171,15 @@ export async function resolveIdentity(
  */
 export async function ensureVisitor(phone: string, name: string): Promise<string> {
   const normalized = normalizePhone(phone) ?? phone;
+
+  // Prefer an ACTIVE record. If only an archived record exists, return it —
+  // the downstream checkIn(visitorId) raises the restore-offer 409 instead
+  // of silently creating a duplicate.
+  const active = await prisma.visitor.findFirst({
+    where: { phone: normalized, deletedAt: null },
+    select: { id: true },
+  });
+  if (active) return active.id;
 
   const existing = await prisma.visitor.findFirst({
     where: { phone: normalized },
