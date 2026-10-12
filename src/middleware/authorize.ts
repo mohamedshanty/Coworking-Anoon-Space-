@@ -32,13 +32,20 @@ export const authorize = (
         },
       });
 
-      // No permission record = default allow (permissions are opt-out, not opt-in)
+      // Deny by default (permissions are opt-in, not opt-out).
+      // Missing row means no grant: fail closed.
       if (!permission) {
-        return next();
+        throw new ApiError(403, "Access denied. Insufficient permissions.");
       }
 
-      // If canView is true, all actions (edit/delete) are allowed
-      const allowed = permission.canView;
+      // Enforce the exact action: view needs canView, edit needs canEdit,
+      // delete needs canDelete. canView alone never grants edit/delete.
+      const allowed =
+        action === "view"
+          ? permission.canView
+          : action === "edit"
+            ? permission.canEdit
+            : permission.canDelete;
 
       if (!allowed) {
         throw new ApiError(403, "Access denied. Insufficient permissions.");
