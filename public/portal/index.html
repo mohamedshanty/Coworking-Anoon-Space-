@@ -161,9 +161,9 @@
       .then(function (data) { ctx = data; renderForm(); })
       .catch(function () {
         ctx = { known:false, choosable:true, plans:[
-          {tier:"T10",label:"10 ميجا",mbps:10,hourlyRate:3,hint:"تصفّح وبريد"},
-          {tier:"T20",label:"20 ميجا",mbps:20,hourlyRate:4,hint:"اجتماعات فيديو"},
-          {tier:"T30",label:"30 ميجا",mbps:30,hourlyRate:5,hint:"بث وملفات كبيرة"}]};
+          {tier:"t10",label:"10 ميجا",mbps:10,hourlyRate:3,hint:"تصفّح وبريد"},
+          {tier:"t20",label:"20 ميجا",mbps:20,hourlyRate:4,hint:"اجتماعات فيديو"},
+          {tier:"t30",label:"30 ميجا",mbps:30,hourlyRate:5,hint:"بث وملفات كبيرة"}]};
         renderForm();
       });
   }
