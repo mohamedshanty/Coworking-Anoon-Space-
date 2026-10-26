@@ -4,7 +4,31 @@ import { getEffectiveStatus } from "../../lib/subscription";
 import { archivedPersonError, findActivePhoneConflict, phoneConflictError, syncWalletPhone } from "../../lib/person";
 import { mergePerson } from "../../lib/mergePerson";
 import { deactivateMemberOnAnoonQr, syncMemberToAnoonQr } from "../../lib/anoon-sync";
-import { AddNoteInput, ConvertTypeInput, MergePersonsInput, UpdateVisitorInput } from "./schema";
+import { AddNoteInput, ConvertTypeInput, MergePersonsInput, UpdateVisitorInput, WhatsAppReplyInput } from "./schema";
+
+/** Strip spaces, dashes, plus signs, and leading zeros for consistent phone matching. */
+function normalizePhone(phone: string): string {
+  return phone.replace(/[\s\-+]/g, "").replace(/^0+/, "");
+}
+
+/** Convert a phone number to international format (970XXXXXXXXX) for output display. */
+function toInternationalFormat(phone: string): string {
+  let cleaned = phone.replace(/[\s\-()]/g, "");
+
+  if (cleaned.startsWith("+")) {
+    cleaned = cleaned.substring(1);
+  }
+
+  if (cleaned.startsWith("972") || cleaned.startsWith("970")) {
+    return cleaned;
+  }
+
+  if (cleaned.startsWith("0")) {
+    return "970" + cleaned.substring(1);
+  }
+
+  return cleaned;
+}
 
 export class VisitorsService {
   async getById(id: string) {
@@ -299,6 +323,96 @@ export class VisitorsService {
       throw new ApiError(404, "لا يوجد شخص نشط بهذا الرقم");
     }
     return visitor;
+  }
+
+  /**
+   * Churned visitors (n8n WhatsApp outreach): anyone with at least one
+   * session whose most recent visit is older than `days`. Soft-deleted
+   * (archived) people are excluded, mirroring the rest of the module.
+   */
+  async getChurned(days: number = 14) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+
+    const churned = await prisma.$queryRaw<
+      { id: string; name: string; phone: string; lastVisitDate: Date; totalVisits: bigint }[]
+    >`
+      SELECT
+        v."id",
+        v."name",
+        v."phone",
+        MAX(COALESCE(s."checkOut", s."checkIn")) AS "lastVisitDate",
+        COUNT(s."id") AS "totalVisits"
+      FROM "Visitor" v
+      INNER JOIN "Session" s ON s."visitorId" = v."id"
+      WHERE v."phone" IS NOT NULL AND v."phone" != ''
+        AND v."deletedAt" IS NULL
+      GROUP BY v."id", v."name", v."phone"
+      HAVING MAX(COALESCE(s."checkOut", s."checkIn")) < ${cutoff}
+      ORDER BY "lastVisitDate" ASC
+    `;
+
+    return churned.map((row) => ({
+      id: row.id,
+      name: row.name,
+      phone: toInternationalFormat(row.phone),
+      lastVisitDate: row.lastVisitDate.toISOString(),
+      totalVisits: Number(row.totalVisits),
+    }));
+  }
+
+  /** Log an inbound WhatsApp reply (and optional AI reply) as a timestamped note. */
+  async addWhatsAppReply(visitorId: string, data: WhatsAppReplyInput) {
+    const visitor = await prisma.visitor.findUnique({ where: { id: visitorId } });
+    if (!visitor) {
+      throw new ApiError(404, "Visitor not found");
+    }
+
+    const timestamp = new Date(data.timestamp);
+    const content = [
+      `[WhatsApp Reply — ${timestamp.toISOString()}]`,
+      `Message: ${data.message}`,
+      ...(data.aiReply ? [`AI Reply: ${data.aiReply}`] : []),
+    ].join("\n");
+
+    const note = await prisma.visitorNote.create({
+      data: {
+        visitorId,
+        content,
+      },
+    });
+
+    return {
+      id: note.id,
+      content: note.content,
+      createdAt: note.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * n8n phone lookup: fuzzy-matches on a normalized phone (ignores spaces,
+   * dashes, plus signs, leading zeros). Excludes archived people.
+   */
+  async getByPhoneN8n(phone: string) {
+    const normalized = normalizePhone(phone);
+
+    const visitors = await prisma.visitor.findMany({
+      where: { deletedAt: null },
+      select: { id: true, name: true, phone: true, type: true, createdAt: true },
+    });
+
+    const match = visitors.find((v) => v.phone && normalizePhone(v.phone) === normalized);
+    if (!match) {
+      throw new ApiError(404, "Visitor not found for this phone number");
+    }
+
+    return {
+      id: match.id,
+      name: match.name,
+      phone: match.phone,
+      type: match.type,
+      createdAt: match.createdAt.toISOString(),
+    };
   }
 
   /**

@@ -20,6 +20,9 @@ function requireEnv(name: string): string {
 export const JWT_ACCESS_SECRET = requireEnv("JWT_ACCESS_SECRET");
 export const JWT_REFRESH_SECRET = requireEnv("JWT_REFRESH_SECRET");
 
+// --- n8n integration (optional): API key guarding the churn-outreach endpoints ---
+export const N8N_API_KEY = process.env.N8N_API_KEY || "";
+
 export const ALLOWED_ORIGINS = (
   process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:8080"
 )

@@ -2,9 +2,17 @@ import { Router } from "express";
 import { visitorsController } from "./controller";
 import { authenticate } from "../../middleware/authenticate";
 import { authorize } from "../../middleware/authorize";
+import { n8nAuth } from "../../middleware/n8nAuth";
 
 const router = Router();
 
+// ─── n8n-protected routes (shared API key, no JWT) ────────────────────────────
+// WhatsApp churn outreach: list churned visitors, log a reply, look up by phone.
+router.get("/churned", n8nAuth, (req, res, next) => visitorsController.getChurned(req, res, next));
+router.post("/:id/whatsapp-reply", n8nAuth, (req, res, next) => visitorsController.addWhatsAppReply(req, res, next));
+router.get("/by-phone/:phone", n8nAuth, (req, res, next) => visitorsController.getByPhoneN8n(req, res, next));
+
+// ─── Admin dashboard routes (JWT + permission auth) ───────────────────────────
 router.use(authenticate);
 
 // GET active person by phone (MUST be before /:id routes)
