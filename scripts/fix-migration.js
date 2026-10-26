@@ -1,3 +1,4 @@
+const { log } = require('console');
 const { Pool } = require('pg');
 const pool = new Pool({
   connectionString: 'postgresql://neondb_owner:npg_NePRtc7ikfM0@ep-raspy-moon-aix4blmi-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require',
@@ -12,6 +13,7 @@ async function run() {
     WHERE migration_name = '20260819000000_add_session_to_debt'
   `);
   console.log('✓ Fixed applied_steps_count');
+  console.log("This Is Test Message")
 
   // Show all migrations status
   const res = await pool.query('SELECT migration_name, finished_at IS NOT NULL as applied FROM "_prisma_migrations" ORDER BY started_at');
